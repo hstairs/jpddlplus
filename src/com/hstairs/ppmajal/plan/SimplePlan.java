@@ -1679,7 +1679,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         }
     }
 
-    public Float build_pddl_plus_plan (LinkedList<GroundAction> raw_plan, float delta, Float epsilon) {
+    public Float build_pddl_plus_plan (LinkedList<GroundAction> raw_plan, Float epsilon) {
 
         System.out.println("Epsilon set to be:" + epsilon);
         Float time = 0f;
