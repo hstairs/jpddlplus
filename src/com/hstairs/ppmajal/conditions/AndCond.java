@@ -764,14 +764,16 @@ public class AndCond extends ComplexCondition implements PostCondition {
         for (final Object cond : (Collection<Object>)sons ){
             if (cond instanceof Condition){
                 Condition condInternal = ((Condition)cond).normalize();
-                if (condInternal.isUnsatisfiable()){
-                    this.setUnsatisfiable(true);
-                    sons1.add(condInternal);
-                }else if (!condInternal.isValid()){
-                    if (condInternal instanceof AndCond){
-                        sons1.addAll(((AndCond) condInternal).sons);
-                    }else{
+                if (condInternal != null){
+                    if (condInternal.isUnsatisfiable()){
+                        this.setUnsatisfiable(true);
                         sons1.add(condInternal);
+                    }else if (!condInternal.isValid()){
+                        if (condInternal instanceof AndCond){
+                            sons1.addAll(((AndCond) condInternal).sons);
+                        }else{
+                            sons1.add(condInternal);
+                        }
                     }
                 }
             }else if (cond instanceof NumEffect){

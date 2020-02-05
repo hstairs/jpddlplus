@@ -828,6 +828,22 @@ public class EPddlProblem extends PddlProblem {
 
         for (ActionSchema a : this.linkedDomain.getActionsSchema()) {
             involved_fluents.addAll(a.getPreconditions().getInvolvedFluents());
+            if (a.forall != null){
+                for (ForAll forall : (Collection<ForAll>)a.forall.sons){
+                    for (Condition cond : (Collection<Condition>)forall.sons){
+                        if (cond instanceof ConditionalEffect){
+                            final ConditionalEffect condEff = (ConditionalEffect) cond;
+                            involved_fluents.addAll(condEff.activation_condition.getInvolvedFluents());
+                        }
+                    }    
+                }
+            }
+            for (Condition cond : (Collection<Condition>)a.cond_effects.sons){
+                if (cond instanceof ConditionalEffect){
+                    final ConditionalEffect condEff = (ConditionalEffect) cond;
+                    involved_fluents.addAll(condEff.activation_condition.getInvolvedFluents());
+                }
+            }
             involved_fluents.addAll(a.getNumFluentsNecessaryForExecution());
         }
         for (ProcessSchema a : this.linkedDomain.getProcessesSchema()) {

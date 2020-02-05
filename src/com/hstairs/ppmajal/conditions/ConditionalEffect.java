@@ -67,6 +67,8 @@ public class ConditionalEffect extends Condition implements PostCondition {
         this.activation_condition = this.activation_condition.weakEval(s, invF);
         if (this.activation_condition.isValid()){
             this.activation_condition = Predicate.createPredicate(Predicate.trueFalse.TRUE);
+        }else if (this.activation_condition.isUnsatisfiable()){
+            this.activation_condition = Predicate.createPredicate(Predicate.trueFalse.FALSE);
         }
         if (this.effect instanceof Condition) {
             Condition con = (Condition) this.effect;
@@ -138,7 +140,7 @@ public class ConditionalEffect extends Condition implements PostCondition {
 
     @Override
     public Condition normalize ( ) {
-        this.activation_condition.normalize();
+        this.activation_condition = this.activation_condition.normalize();
         if (this.effect instanceof Condition) {
             Condition con = (Condition) this.effect;
             this.effect = (PostCondition) con.normalize();
