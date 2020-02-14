@@ -1538,10 +1538,8 @@ public class SimplePlan extends ArrayList<GroundAction> {
                 }
                 nf_trace.put(nf, nf_traj);
             }
-            System.out.println(current);
         }
         for (GroundAction gr : this) {
-            System.out.println(gr);
             this.setCost(this.getCost() + gr.getActionCost(temp, pp.getMetric()));
             if (!temp.satisfy(globalConstraints) && (debug > 0)) {
                 System.out.println("Global Constraint is not satisfied:" + globalConstraints);
@@ -1578,7 +1576,6 @@ public class SimplePlan extends ArrayList<GroundAction> {
             }
             //System.out.println(constr.condition.pddlPrint(false));
             if (print_trace) {
-                System.out.println(temp);
                 add_state_to_json(nf_trace, (PDDLState) temp);
             }
 
