@@ -162,7 +162,6 @@ public class PDDLState extends State {
             return Double.NaN;
         }
         return this.numFluents.get(fromProblemNFId2StateNFId[f.getId()]);
-
     }
 
 
@@ -198,7 +197,6 @@ public class PDDLState extends State {
             if (o instanceof Comparison) {
                 Comparison c = (Comparison) o;
                 if (!c.isSatisfied(this)) {
-                    //System.out.println(c + "is not satisfied in " +this);
                     return false;
                 }
 
@@ -231,6 +229,7 @@ public class PDDLState extends State {
 
     @Override
     public boolean satisfy (Condition input) {
+        
         return input.isSatisfied(this);
 
     }
