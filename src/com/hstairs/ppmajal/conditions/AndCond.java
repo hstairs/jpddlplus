@@ -51,7 +51,9 @@ public class AndCond extends ComplexCondition implements PostCondition {
     public String toString ( ) {
         String ret_val = "(AND ";
         for (Object o : sons) {
-            ret_val = ret_val.concat(o.toString());
+            if (o != null){
+                ret_val = ret_val.concat(o.toString());
+            }
         }
         ret_val = ret_val.concat(")");
         return ret_val;

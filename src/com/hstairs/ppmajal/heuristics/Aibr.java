@@ -362,7 +362,7 @@ public class Aibr extends Heuristic {
         for (Object o : cond_effects.sons) {
             if (o instanceof ConditionalEffect) {
                 ConditionalEffect cond = (ConditionalEffect) o;
-                GroundAction a = new GroundAction(name + counter,subProblem.getFreshActionId());
+                GroundAction a = new GroundAction(name + counter+p,subProblem.getFreshActionId());
                 a.setParameters(p);
                 a.setPreconditions(a.getPreconditions().and(cond.activation_condition));
                 a.create_effects_by_cases(cond.effect);
