@@ -19,7 +19,7 @@
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * and open the template in233 the editor.
  */
 package com.hstairs.ppmajal.heuristics.advanced;
 
@@ -93,6 +93,7 @@ public class h1 extends Heuristic {
     private Set<GroundAction> masterProblemReachableTransitions;
     private HashMap<Pair<Integer, Integer>, Comparison> directAssignmentConditionHandle;
     public boolean aggressiveRelaxedPlan;
+    private final int totActions;
 
     public h1(EPddlProblem problem) {
         this(problem, false);
@@ -102,6 +103,7 @@ public class h1 extends Heuristic {
         super(problem.getGoals(), problem.actions, problem.getProcessesSet(), problem.getEventsSet(), null, problem);
         this.problem = problem;
         this.ignoreCostInHeuristic = ignoreCostHeuristic;
+        this.totActions = problem.getTotActions();
     }
 
     protected void dataStructureConstruction(){
@@ -140,8 +142,8 @@ public class h1 extends Heuristic {
     @Override
     public void forceUniquenessInConditionsAndInternalActions ( ) {
         ArrayList<GroundAction> internalActions = new ArrayList();
-        heuristicActionsToProblemActions = new GroundAction[A.size()+1];
-        fromIdToAction = new GroundAction[A.size()+1];
+        heuristicActionsToProblemActions = new GroundAction[totActions+1];
+        fromIdToAction = new GroundAction[totActions+1];
         pseudoGoal = new GroundAction("goal",internalActions.size());
         pseudoGoal.setPreconditions(G);
         internalActions.add(pseudoGoal);
@@ -204,12 +206,12 @@ public class h1 extends Heuristic {
             establishedAchiever = new GroundAction[conditionUniverse.size() + 1];
             establishedLocalCost = new float[conditionUniverse.size() + 1];
             Arrays.fill(establishedLocalCost, Float.MAX_VALUE);
-            achieversSet = new AchieverSet[this.A.size()];
+            achieversSet = new AchieverSet[this.totActions];
         }
         allAchievers = new ReferenceLinkedOpenHashSet[conditionUniverse.size() + 1];
         float estimate = Float.MAX_VALUE;
         FibonacciHeap<GroundAction> a_plus = new FibonacciHeap();
-        FibonacciHeapNode[] actionToFibNode = new FibonacciHeapNode[this.A.size()];
+        FibonacciHeapNode[] actionToFibNode = new FibonacciHeapNode[this.totActions];
 //        IntPriorityQueue a_plus = new it.unimi.dsi.fastutil.ints.IntHeapPriorityQueue(new GroundActionComparator());
         cost = new float[conditionUniverse.size() + 1];
         Arrays.fill(cost, Float.MAX_VALUE);
@@ -220,9 +222,9 @@ public class h1 extends Heuristic {
                 cost[c.getHeuristicId()] = 0f;
             } 
         }
-        actionHCost = new float[A.size()];
+        actionHCost = new float[totActions];
         Arrays.fill(actionHCost, Float.MAX_VALUE);
-        closed = new boolean[A.size()];
+        closed = new boolean[totActions];
         Arrays.fill(closed, false);
         for (int i = 0 ; i < this.A.size(); i++){
             GroundAction gr = ((ArrayList<GroundAction>)this.A).get(i);
@@ -896,14 +898,14 @@ public class h1 extends Heuristic {
 
 
     protected void generateAchieversDataStructures ( ) {
-        achieve = new Collection[this.A.size()];
+        achieve = new Collection[this.totActions];
         
         invertedAchievers = new Collection[this.conditionUniverse.size() + 1];
-        possibleAchievers = new Collection[this.A.size()];
+        possibleAchievers = new Collection[this.totActions];
         this.invertedPossibleAchievers = new Collection[this.conditionUniverse.size() + 1];
         precondition_mapping = new Collection[this.conditionUniverse.size() + 1];
         //this should also include the indirect dependencies, otherwise does not work!!
-        extraActionPrecondition = new AndCond[this.A.size()];
+        extraActionPrecondition = new AndCond[this.totActions];
 
 
     }

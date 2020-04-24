@@ -83,6 +83,11 @@ public class PddlProblem {
         actions = new LinkedHashSet();
         
     }
+
+    public int getTotActions() {
+        return totActions;
+    }
+    
     
     public PddlProblem (String problemFile, PDDLObjects po, Set<Type> types, PddlDomain linked) {
         this(linked);
