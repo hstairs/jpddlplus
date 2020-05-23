@@ -100,7 +100,7 @@ public class hlm extends h1 {
         }
         Stack<GroundAction> a_plus = new Stack();//actions executable. Progressively updated
         ArrayList<Set<Condition>> lm = new ArrayList<>(nCopies(conditionUniverse.size() + 1, null));//mapping between condition and landmarks
-        ArrayList<Boolean> never_active = new ArrayList<>(nCopies(A.size() + 1, true));//mapping between action and boolean. True if action has not been activated yet
+        ArrayList<Boolean> never_active = new ArrayList<>(nCopies(problem.getTotActions() + 1, true));//mapping between action and boolean. True if action has not been activated yet
         // HashMap<GroundAction, IloNumVar> action_to_variable = new HashMap();//mapping between action representation and integer variable in cplex
         reach_achievers = new ArrayList<>(nCopies(conditionUniverse.size() + 1, null));
 
@@ -476,7 +476,7 @@ public class hlm extends h1 {
             lp_global = new IloCplex();
             lp_global.setOut(null);
             objective_function = lp_global.linearNumExpr();
-            action_to_variable = new ArrayList<>(nCopies(A.size() + 1, null));
+            action_to_variable = new ArrayList<>(nCopies(problem.getTotActions()+ 1, null));
             condition_to_cplex_constraint = new ArrayList<>(nCopies(conditionUniverse.size() + 1, null));
             has_state_dependent_achievers = new HashMap();
             for (Condition c : conditionUniverse) {

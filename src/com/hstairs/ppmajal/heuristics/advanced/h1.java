@@ -103,7 +103,7 @@ public class h1 extends Heuristic {
         super(problem.getGoals(), problem.actions, problem.getProcessesSet(), problem.getEventsSet(), null, problem);
         this.problem = problem;
         this.ignoreCostInHeuristic = ignoreCostHeuristic;
-        this.totActions = problem.getTotActions();
+        this.totActions = problem.getTotActions()+1;
     }
 
     protected void dataStructureConstruction(){
