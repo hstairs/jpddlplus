@@ -383,9 +383,11 @@ public class ExtendedNormExpression extends Expression {
                 newA.f = a.f.ground(substitution, po);
             }
             newA.n = a.n;
-            if (a.bin != null){
+            if (a.bin != null) {
                 newA.bin = (BinaryOp) a.bin.ground(substitution, po);
             }
+            newA.linear = a.linear;
+
             ret.summations.add(newA);
         }
         return ret;
