@@ -44,6 +44,7 @@ tokens {
 	FORALL_GD;
 	COMPARISON_GD;
 	AND_EFFECT;
+	ONEOF_EFFECT;
 	FORALL_EFFECT;
 	WHEN_EFFECT;
 	ASSIGN_EFFECT;
@@ -70,10 +71,8 @@ tokens {
 }
 
 
-@header {
-package parser;
-}
-@lexer::header { package parser; }
+@header { package com.hstairs.ppmajal.parser; }
+@lexer::header { package com.hstairs.ppmajal.parser; }
 
 
 @parser::members {
@@ -387,6 +386,7 @@ cEffect
 	| '(' 'when' goalDesc condEffect ')'
 	  -> ^(WHEN_EFFECT goalDesc condEffect)
 	| pEffect
+	| '(' 'oneof' condEffect* ')' -> ^(ONEOF_EFFECT condEffect*)
 	;
 
 pEffect
@@ -401,6 +401,7 @@ pEffect
 // TODO: why is this different from the "and cEffect" above? Does it matter?
 condEffect
 	: '(' 'and' pEffect* ')' -> ^(AND_EFFECT pEffect*)
+	| '(' 'oneof' condEffect* ')' -> ^(ONEOF_EFFECT condEffect*)
 	| pEffect
 	;
 

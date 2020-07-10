@@ -29,7 +29,7 @@ import java.util.*;
 /**
  * @author enrico
  */
-public class OneOf extends ComplexCondition {
+public class OneOf extends ComplexCondition implements PostCondition{
 
     private String smt_representation;
 
@@ -225,6 +225,26 @@ public class OneOf extends ComplexCondition {
 
     @Override
     public void extendTerms (Variable v) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void apply(State s, Map modifications) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void apply(RelState s, Map modifications) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public HashMap<Object, Object> apply(PDDLState s) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public HashMap<Object, Object> apply(RelState s) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }

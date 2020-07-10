@@ -23,7 +23,6 @@ import com.hstairs.ppmajal.expressions.ExtendedNormExpression;
 import com.hstairs.ppmajal.expressions.NumEffect;
 import com.hstairs.ppmajal.expressions.NumFluent;
 import com.hstairs.ppmajal.problem.PDDLState;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 
 import java.util.*;
 
@@ -76,6 +75,7 @@ public abstract class Transition {
     final protected String name;
     final protected ConditionalEffects conditionalPropositionalEffects;
     final protected ConditionalEffects<NumEffect> conditionalNumericEffects;
+//    final protected ConditionalEffects<Predicate> ndConditionalEffects;
     final protected Condition preconditions;
     final protected Semantics semantics;
     protected Transition(String name, ConditionalEffects conditionalPropositionalEffects, ConditionalEffects conditionalNumericEffects, Condition preconditions, Semantics semantcis) {
