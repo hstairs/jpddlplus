@@ -81,7 +81,7 @@ public class SearchNode extends SimpleSearchNode {
             if (father == null) {
                 json_rep.put("ancestor", "init_state");
             } else {
-                json_rep.put("ancestor", father.json_rep.get("visited_step"));
+                json_rep.put("ancestor", father.json_rep.get("visit_step"));
             }
             json_rep.put("visited", false);
             json_rep.put("visit_step", -1);
@@ -122,7 +122,7 @@ public class SearchNode extends SimpleSearchNode {
             if (father == null) {
                 json_rep.put("ancestor", "init_state");
             } else {
-                json_rep.put("ancestor", ((SearchNode) father).json_rep.get("visited_step"));
+                json_rep.put("ancestor", ((SearchNode) father).json_rep.get("visit_step"));
             }
             json_rep.put("visited", false);
             json_rep.put("visit_step", -1);
@@ -167,7 +167,7 @@ public class SearchNode extends SimpleSearchNode {
             if (father == null) {
                 json_rep.put("ancestor", "init_state");
             } else {
-                json_rep.put("ancestor", father.json_rep.get("visited_step"));
+                json_rep.put("ancestor", father.json_rep.get("visit_step"));
             }
             json_rep.put("visited", false);
             json_rep.put("visit_step", -1);
@@ -204,7 +204,7 @@ public class SearchNode extends SimpleSearchNode {
             if (father == null) {
                 json_rep.put("ancestor", "init_state");
             } else {
-                json_rep.put("ancestor", father.json_rep.get("visited_step"));
+                json_rep.put("ancestor", father.json_rep.get("visit_step"));
             }
             json_rep.put("visited", false);
             json_rep.put("visit_step", -1);
