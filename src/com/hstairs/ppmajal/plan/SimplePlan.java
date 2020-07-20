@@ -1525,19 +1525,9 @@ public class SimplePlan extends ArrayList<GroundAction> {
         this.setCost(0f);
 
         HashMap<NumFluent, DoubleArrayList> nf_trace = new HashMap();
-        numeric_plan_trace = null;
         if (print_trace) {
             numeric_plan_trace = new JSONObject();
-            Iterator<NumFluent> it = this.pp.getNumFluentsInvolvedInInit().iterator();
-            while (it.hasNext()) {
-                NumFluent nf = it.next();
-                DoubleArrayList nf_traj = new DoubleArrayList();
-                Boolean get = (Boolean) this.pp.getActualFluents().get(nf);
-                if (get != null && get == true && nf.has_to_be_tracked()) {
-                    nf_traj.add(current.fluentValue(nf));
-                }
-                nf_trace.put(nf, nf_traj);
-            }
+            add_state_to_json(nf_trace, (PDDLState) temp);
         }
         for (GroundAction gr : this) {
             this.setCost(this.getCost() + gr.getActionCost(temp, pp.getMetric()));
@@ -1727,20 +1717,8 @@ public class SimplePlan extends ArrayList<GroundAction> {
         this.setCost(0f);
         //current.addNumericFluent(new NumFluentValue("#t", resolution));
         nf_trace = new HashMap();
-        numeric_plan_trace = null;
         if (print_trace) {
             numeric_plan_trace = new JSONObject();
-            for (NumFluent nf : pp.getNumFluentsInvolvedInInit()) {
-                try {
-                    if (pp.getActualFluents().get(nf) != null && nf.has_to_be_tracked()) {
-                        DoubleArrayList nf_traj = new DoubleArrayList();
-                        nf_traj.add(current.fluentValue(nf));
-                        nf_trace.put(nf, nf_traj);
-                    }
-                } catch (Exception ex) {
-                    Logger.getLogger(SimplePlan.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
         }
 
         //current.addTimeFluent();
@@ -1836,12 +1814,24 @@ public class SimplePlan extends ArrayList<GroundAction> {
     }
 
     private void add_state_to_json(HashMap<NumFluent, DoubleArrayList> nf_trace, PDDLState current) throws Exception {
-        for (NumFluent nf : nf_trace.keySet()) {
+        for (NumFluent nf : this.pp.getNumFluentsInvolvedInInit()) {
             Boolean get = (Boolean) this.pp.getActualFluents().get(nf);
-            if (get != null && get == true && nf.has_to_be_tracked()) {
+            if (get != null && get == false && nf.has_to_be_tracked()) {
+                if (nf_trace.get(nf) == null){
+                    nf_trace.put(nf, new DoubleArrayList());
+                }
                 nf_trace.get(nf).add(current.fluentValue(nf));
                 numeric_plan_trace.put(nf.toString(), nf_trace.get(nf));
             }
+        }
+        if (!Double.isNaN(current.time) && pddlPlus){
+            Object o = numeric_plan_trace.get("__TIME__");
+            if (o == null) {
+                o = new DoubleArrayList();
+                numeric_plan_trace.put("__TIME__", o);
+            }
+            ((DoubleArrayList) o).add(current.time);
+
         }
     }
 
