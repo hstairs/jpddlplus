@@ -543,17 +543,19 @@ public class Predicate extends Terminal implements PostCondition {
     public void pddlPrint (boolean typeInformation, StringBuilder bui) {
         bui.append(" (");
         bui.append(getPredicateName());
-        for (Object o1 : this.getTerms()) {
-            if (o1 instanceof PDDLObject) {
-                PDDLObject obj = (PDDLObject) o1;
-                bui.append(" ");
-                bui.append(obj.getName()); // TODO: Why not obj.pddlPrint(typeInformation,bui) ?
-            } else {
-                Variable obj = (Variable) o1;
-                bui.append(" ");
-                bui.append(obj.getName());
-                if (typeInformation) {
-                    bui.append(obj.getType()); // No space?
+        if (this.getTerms() != null) {
+            for (Object o1 : this.getTerms()) {
+                if (o1 instanceof PDDLObject) {
+                    PDDLObject obj = (PDDLObject) o1;
+                    bui.append(" ");
+                    bui.append(obj.getName()); // TODO: Why not obj.pddlPrint(typeInformation,bui) ?
+                } else {
+                    Variable obj = (Variable) o1;
+                    bui.append(" ");
+                    bui.append(obj.getName());
+                    if (typeInformation) {
+                        bui.append(obj.getType()); // No space?
+                    }
                 }
             }
         }

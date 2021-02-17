@@ -308,7 +308,7 @@ public class Grounder {
                 for (Object o : and.sons) {
                     if (o instanceof Predicate) {
                         Predicate predicateAction = (Predicate) o;
-                        if (dynamicPredicateMap.get(predicateAction.getPredicateName()) == null) {
+                        if (dynamicPredicateMap.get(predicateAction.getPredicateName()) == null && predicateAction.getTerms().size()>0) {
                             Collection<HashMap<Variable, Set<PDDLObject>>> S1 = new HashSet();
                             for (Map.Entry<Predicate, Boolean> ele : initBooleanState.entrySet()) {
                                 HashMap<Variable, Set<PDDLObject>> t1 = new HashMap();

@@ -72,7 +72,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
     private double duration;
     final private boolean pddlPlus;
 
-    public SimplePlan (PddlDomain dom) {
+    public SimplePlan(PddlDomain dom) {
         super();
         pd = dom;
 
@@ -81,22 +81,21 @@ public class SimplePlan extends ArrayList<GroundAction> {
         pddlPlus = true;
     }
 
-    public SimplePlan (PddlDomain dom, PddlProblem prob) {
+    public SimplePlan(PddlDomain dom, PddlProblem prob) {
         super();
         pd = dom;
         pp = prob;
         invariantAnalysis = false;
         employedMacro = 0;
-                pddlPlus = true;
+        pddlPlus = true;
 
     }
 
-        public SimplePlan (PddlDomain a, PddlProblem p, boolean performInvariantAnalysis) {
-            this(a,p,performInvariantAnalysis,false);
-        }
+    public SimplePlan(PddlDomain a, PddlProblem p, boolean performInvariantAnalysis) {
+        this(a, p, performInvariantAnalysis, false);
+    }
 
-    
-    public SimplePlan (PddlDomain a, PddlProblem p, boolean performInvariantAnalysis, boolean pddlPlusPlan) {
+    public SimplePlan(PddlDomain a, PddlProblem p, boolean performInvariantAnalysis, boolean pddlPlusPlan) {
         super();
         pd = a;
         pp = p;
@@ -113,7 +112,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 //
 //
 //    }
-    public int distance (SimplePlan a) {
+    public int distance(SimplePlan a) {
         int d = 0;
 
         //System.out.println("computing distance");
@@ -134,7 +133,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
     }
 
     @Override
-    public Object clone ( ) {
+    public Object clone() {
         SimplePlan sp = new SimplePlan(pd, pp);
         if (this.invariantFluents != null) {
             sp.invariantFluents = (HashMap) this.invariantFluents.clone();
@@ -154,7 +153,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
     }
 
     //it will be handled as a mmaction
-    public void putAction (String actionName, ParametersAsTerms par) {
+    public void putAction(String actionName, ParametersAsTerms par) {
 
         ActionSchema action = pd.getActionByName(actionName);
         if (action == null) {
@@ -172,7 +171,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
     }
 
     //to be done....
-    public void parseSolutionWithoutProblem (String solution_file) throws Exception {
+    public void parseSolutionWithoutProblem(String solution_file) throws Exception {
         Scanner sc = new Scanner((new File(solution_file)));
         String nameOperator;
 
@@ -220,7 +219,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
                             //System.out.println(obj);
                             ActionSchema a = this.pd.getActionByName(nameOperator);
                             Variable v = (Variable) a.getPar().get(objectCounter);
-                            PDDLObject obj = PDDLObject.createObject(par,v.getType());
+                            PDDLObject obj = PDDLObject.createObject(par, v.getType());
 //                            obj.setType(v.getType());
 
                             pars.add(obj);
@@ -235,7 +234,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         }
     }
 
-    public void addActionsFromString (String s1) {
+    public void addActionsFromString(String s1) {
         String nameOperator, s2;
         ParametersAsTerms pars = new ParametersAsTerms();
         s2 = s1.substring(s1.indexOf(":") + 1, s1.length());
@@ -269,7 +268,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 //               System.out.println(a.getParameters().size());
 //                System.out.println(objectCounter);
                 Variable v = (Variable) a.getPar().get(objectCounter);
-                PDDLObject obj = PDDLObject.createObject(par,v.getType());
+                PDDLObject obj = PDDLObject.createObject(par, v.getType());
 
                 pars.add(obj);
                 objectCounter++;
@@ -280,7 +279,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
     }
 
     //to be done....
-    public void parseSolution (String solution_file) throws Exception {
+    public void parseSolution(String solution_file) throws Exception {
         Scanner sc = new Scanner((new File(solution_file)));
         String nameOperator;
 
@@ -324,8 +323,8 @@ public class SimplePlan extends ArrayList<GroundAction> {
                                 s1 = s1.substring(parEndIndex + 1);
                             }
                             PDDLObject objectByName = pp.getObjectByName(par);
-                            if (objectByName == null && pd.constants != null && !pd.constants.isEmpty()){
-                                objectByName = Utils.getObjectByName(pd.constants,par);
+                            if (objectByName == null && pd.constants != null && !pd.constants.isEmpty()) {
+                                objectByName = Utils.getObjectByName(pd.constants, par);
                             }
                             pars.add(objectByName);
                         } while (!finish);
@@ -359,7 +358,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return ret_val;
     }
 
-    public String printAction (int index) {
+    public String printAction(int index) {
 
         GroundAction a = this.get(index);
 
@@ -367,7 +366,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public String toDetailedString ( ) {
+    public String toDetailedString() {
         String ret_val = "";
 
         for (Object o : this) {
@@ -380,12 +379,11 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return ret_val;
     }
 
-    public boolean propConsistent ( ) {
+    public boolean propConsistent() {
         return true;
     }
 
-
-    public void simplifyActions ( ) throws Exception {
+    public void simplifyActions() throws Exception {
 
         //scopro quali sono i fluenti che devo eliminare perche' ci sono scritti
         //i valori nello stato iniziale
@@ -400,7 +398,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public boolean savePlan (String nFile) {
+    public boolean savePlan(String nFile) {
         Writer output = null;
         try {
             output = new BufferedWriter(new FileWriter(nFile));
@@ -424,7 +422,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public boolean saveConformantIPCPlan (String nFile) {
+    public boolean saveConformantIPCPlan(String nFile) {
         Writer output = null;
 
         try {
@@ -455,7 +453,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public boolean savePlan (String nFile, boolean processes) {
+    public boolean savePlan(String nFile, boolean processes) {
         Writer output = null;
         try {
             output = new BufferedWriter(new FileWriter(nFile));
@@ -486,18 +484,18 @@ public class SimplePlan extends ArrayList<GroundAction> {
     /**
      * @return the invariantFluents
      */
-    public HashMap getInvariantFluents ( ) {
+    public HashMap getInvariantFluents() {
         return invariantFluents;
     }
 
     /**
      * @param invariantFluents the invariantFluents to set
      */
-    public void setInvariantFluents (HashMap invariantFluents) {
+    public void setInvariantFluents(HashMap invariantFluents) {
         this.invariantFluents = invariantFluents;
     }
 
-    public boolean savePlan (String tempPlan, int i) {
+    public boolean savePlan(String tempPlan, int i) {
         Writer output = null;
         try {
             output = new BufferedWriter(new FileWriter(tempPlan));
@@ -521,13 +519,13 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public String last_relevant_fluents_last_state (int i, PDDLState s, PddlProblem p) {
+    public String last_relevant_fluents_last_state(int i, PDDLState s, PddlProblem p) {
         String ret = "";
         PDDLState temp = s.clone();
         for (int j = i; j < this.size(); j++) {
             GroundAction action = this.get(j);
 
-            temp.apply(action,temp.clone());
+            temp.apply(action, temp.clone());
         }
         ret += "S[plan(" + i + ")] \n";
         //System.out.println(this.getInvariantFluents());
@@ -548,14 +546,13 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return ret;
     }
 
-
-    public PDDLState execute (PDDLState init) {
+    public PDDLState execute(PDDLState init) {
         PDDLState temp = init.clone();
         int i = 0;
         for (GroundAction gr : this) {
             if (gr.isApplicable(temp)) {
                 i++;
-                temp.apply(gr,temp.clone());
+                temp.apply(gr, temp.clone());
                 if (debug > 1) {
                     System.out.println(gr.getName() + " action has been applied");
                     //System.out.println(temp.pddlPrint());
@@ -577,7 +574,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return temp;
     }
 
-    public Pair<ArrayList<String>, HashSet<String>> regress_polynomial (Condition cond, HashMap<String, Predicate> str_to_pred) {
+    public Pair<ArrayList<String>, HashSet<String>> regress_polynomial(Condition cond, HashMap<String, Predicate> str_to_pred) {
         ArrayList<String> simulation = new ArrayList();
         ArrayList<String> preference = new ArrayList();
 
@@ -644,10 +641,10 @@ public class SimplePlan extends ArrayList<GroundAction> {
         all_preferences += "))";
         simulation.add(all_preferences);
 
-        return new Pair(simulation,variables);
+        return new Pair(simulation, variables);
     }
 
-    public Condition regress (Condition cond) {
+    public Condition regress(Condition cond) {
 
         for (int i = (this.size() - 1); i >= 0; i--) {
 //            System.out.println("DEBUG: before regressing: "+cond);
@@ -659,8 +656,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return cond;
     }
 
-
-    public void parseSolutionWithMacro (String solutionString, Map macroToPrimitives) throws FileNotFoundException {
+    public void parseSolutionWithMacro(String solutionString, Map macroToPrimitives) throws FileNotFoundException {
         Scanner sc = new Scanner((new File(solutionString)));
         String nameOperator;
         boolean prima = false;
@@ -722,22 +718,21 @@ public class SimplePlan extends ArrayList<GroundAction> {
         }
     }
 
-
     /**
      * @return the macroEmployed
      */
-    public int getEmployedMacro ( ) {
+    public int getEmployedMacro() {
         return employedMacro;
     }
 
     /**
      * @param macroEmployed the macroEmployed to set
      */
-    public void setEmployedMacro (int macroEmployed) {
+    public void setEmployedMacro(int macroEmployed) {
         this.employedMacro = macroEmployed;
     }
 
-    public Float getValueObjectiveFunction (PddlProblem problem) throws CloneNotSupportedException {
+    public Float getValueObjectiveFunction(PddlProblem problem) throws CloneNotSupportedException {
 
         if (problem.getMetric() != null) {
             if (problem.getMetric().getMetExpr() != null) {
@@ -745,7 +740,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
                 if (problem.getMetric().getMetExpr().eval(this.execute((PDDLState) problem.getInit())) == Double.NaN) {
                     return new Float(this.size());
                 }
-                return (float)problem.getMetric().getMetExpr().eval(this.execute((PDDLState) problem.getInit()));
+                return (float) problem.getMetric().getMetExpr().eval(this.execute((PDDLState) problem.getInit()));
             } else {
                 return new Float(this.size());
             }
@@ -754,7 +749,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         }
     }
 
-    public DirectedAcyclicGraph buildValidationStructures (PDDLState init, ComplexCondition g) throws Exception {
+    public DirectedAcyclicGraph buildValidationStructures(PDDLState init, ComplexCondition g) throws Exception {
         DirectedAcyclicGraph po = new DirectedAcyclicGraph(DefaultEdge.class);
         po.addVertex(-1);
         //DirectedAcyclicGraph po = new DirectedAcyclicGraph();
@@ -902,7 +897,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return po;
     }
 
-    public DirectedAcyclicGraph deorder (PDDLState init, ComplexCondition g, boolean computeGoalAchievers) throws Exception {
+    public DirectedAcyclicGraph deorder(PDDLState init, ComplexCondition g, boolean computeGoalAchievers) throws Exception {
 
         DirectedAcyclicGraph po = this.buildValidationStructures(init, g);
         if (debug > 0) {
@@ -1065,8 +1060,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return po;
     }
 
-
-    private HashMap<NumFluent, HashSet<NumFluent>> computeFluentDependencePlanDependant (HashSet<NumFluent> nfSet) {
+    private HashMap<NumFluent, HashSet<NumFluent>> computeFluentDependencePlanDependant(HashSet<NumFluent> nfSet) {
 
 //         if (fluentDependencyChain==null)
 //            fluentDependencyChain = new HashMap();
@@ -1091,7 +1085,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public String toStringWithIndex ( ) {
+    public String toStringWithIndex() {
         String ret_val = "";
 
         for (int i = 0; i < this.size(); i++) {
@@ -1102,7 +1096,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public List generateMacrosFromPop (DirectedAcyclicGraph po, HashMap achieveGoal, boolean missingServicesCut, boolean biconnectivity, boolean goalthreatCut) throws Exception {
+    public List generateMacrosFromPop(DirectedAcyclicGraph po, HashMap achieveGoal, boolean missingServicesCut, boolean biconnectivity, boolean goalthreatCut) throws Exception {
 
         List result = new ArrayList();
 
@@ -1191,7 +1185,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return result;
     }
 
-    private void removeLargerProducer (DirectedAcyclicGraph po) {
+    private void removeLargerProducer(DirectedAcyclicGraph po) {
 
         Object producer = null;
 
@@ -1218,7 +1212,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    private void removeLargerAbsorberLargerProducer (DirectedAcyclicGraph po) {
+    private void removeLargerAbsorberLargerProducer(DirectedAcyclicGraph po) {
         Object absorber = null;
         Object producer = null;
         int maxAbsorber = 0;
@@ -1252,7 +1246,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    private Set<Integer> takeSplittingPointFromMissingServices (DirectedAcyclicGraph po) {
+    private Set<Integer> takeSplittingPointFromMissingServices(DirectedAcyclicGraph po) {
 
         Set<Integer> ret = new HashSet();
 
@@ -1267,7 +1261,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public DirectedAcyclicGraph removeInitGoal (DirectedAcyclicGraph po) {
+    public DirectedAcyclicGraph removeInitGoal(DirectedAcyclicGraph po) {
         po.removeEdge(po.edgesOf(0));
         //po.removeEdge(po.edgesOf(po.vertexSet().size() -1));
         po.removeEdge(po.edgesOf(this.size() - 1));
@@ -1280,8 +1274,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-
-    private void performBesttCut (DirectedAcyclicGraph po) {
+    private void performBesttCut(DirectedAcyclicGraph po) {
 
         int best = 0;
         Object bestID = null;
@@ -1324,7 +1317,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    private void performBesttCut2 (DirectedAcyclicGraph po) {
+    private void performBesttCut2(DirectedAcyclicGraph po) {
 
         int best = 0;
         Object bestID = null;
@@ -1363,7 +1356,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    private HashMap goalAchievers (IdentityHashMap vs) {
+    private HashMap goalAchievers(IdentityHashMap vs) {
 
         HashMap ret = new HashMap();
         int goalIndex = this.size() - 1;
@@ -1390,35 +1383,34 @@ public class SimplePlan extends ArrayList<GroundAction> {
     /**
      * @return the validationStructures
      */
-    public IdentityHashMap getValidationStructures ( ) {
+    public IdentityHashMap getValidationStructures() {
         return validationStructures;
     }
-
 
     /**
      * @return the connectedSetBuilder
      */
-    public ConnectivityInspector<Object, Object> getConnectedSetBuilder ( ) {
+    public ConnectivityInspector<Object, Object> getConnectedSetBuilder() {
         return connectedSetBuilder;
     }
 
     /**
      * @param connectedSetBuilder the connectedSetBuilder to set
      */
-    public void setConnectedSetBuilder (ConnectivityInspector<Object, Object> connectedSetBuilder) {
+    public void setConnectedSetBuilder(ConnectivityInspector<Object, Object> connectedSetBuilder) {
         this.connectedSetBuilder = connectedSetBuilder;
     }
 
-    public HashMap getGoalAchiever ( ) {
+    public HashMap getGoalAchiever() {
         return this.goalAchiever;
     }
 
-    private void setGoalAchiever (HashMap goalAchievers) {
+    private void setGoalAchiever(HashMap goalAchievers) {
         this.goalAchiever = goalAchievers;
 
     }
 
-    private Collection<? extends Integer> takeSplittingPointFromActionsGoalThreat ( ) throws CloneNotSupportedException {
+    private Collection<? extends Integer> takeSplittingPointFromActionsGoalThreat() throws CloneNotSupportedException {
         Set ret = new HashSet();
         for (int i = 1; i < this.size() - 1; i++) {
             GroundAction gr = this.get(i);
@@ -1430,7 +1422,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public boolean entangledByInit (String name, PDDLState init, Condition con) {
+    public boolean entangledByInit(String name, PDDLState init, Condition con) {
         for (GroundAction gr : this) {
             if (gr.getName().equals(name)) {
                 AndCond ac = (AndCond) gr.getPreconditions();
@@ -1451,7 +1443,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return true;
     }
 
-    public int entangledByInitCounter (String name, PDDLState init, Condition con) {
+    public int entangledByInitCounter(String name, PDDLState init, Condition con) {
 
         int numberOfHoldings = 0;
 
@@ -1474,7 +1466,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return numberOfHoldings;
     }
 
-    public boolean entangledByGoal (String name, ComplexCondition goal, Condition con) {
+    public boolean entangledByGoal(String name, ComplexCondition goal, Condition con) {
 
         for (GroundAction gr : this) {
             if (gr.getName().equals(name)) {
@@ -1492,7 +1484,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return true;
     }
 
-    public int countOccurenceOf (String name) {
+    public int countOccurenceOf(String name) {
         int counter = 0;
         for (GroundAction gr : this) {
             if (gr.getName().equals(name)) {
@@ -1502,7 +1494,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return counter;
     }
 
-    public int entangledByGoalCounter (String name, ComplexCondition goal, Condition con) {
+    public int entangledByGoalCounter(String name, ComplexCondition goal, Condition con) {
         int counter = 0;
 
         for (GroundAction gr : this) {
@@ -1524,29 +1516,21 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return counter;
     }
 
-    public void addActionsFromPartialOrder (Set actionsOfThePlan) {
+    public void addActionsFromPartialOrder(Set actionsOfThePlan) {
 
     }
 
-    public PDDLState execute (PDDLState current, Condition globalConstraints) {
+    public PDDLState execute(PDDLState current, Condition globalConstraints) throws Exception {
         State temp = current.clone();
         int i = 0;
         this.setCost(0f);
 
         HashMap<NumFluent, DoubleArrayList> nf_trace = new HashMap();
-        numeric_plan_trace = null;
         if (print_trace) {
             numeric_plan_trace = new JSONObject();
-            Iterator<NumFluent> it = this.pp.getNumFluentsInvolvedInInit().iterator();
-            while (it.hasNext()) {
-                NumFluent nf = it.next();
-                DoubleArrayList nf_traj = new DoubleArrayList();
-                nf_traj.add(current.fluentValue(nf));
-                nf_trace.put(nf, nf_traj);
-            }
+            add_state_to_json(nf_trace, (PDDLState) temp);
         }
         for (GroundAction gr : this) {
-
             this.setCost(this.getCost() + gr.getActionCost(temp, pp.getMetric()));
             if (!temp.satisfy(globalConstraints) && (debug > 0)) {
                 System.out.println("Global Constraint is not satisfied:" + globalConstraints);
@@ -1562,7 +1546,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
                     System.out.println(Printer.pddlPrint(pp, (PDDLState) temp));
                 }
 //                temp = gr.apply(temp);
-                temp.apply(gr,temp.clone());
+                temp.apply(gr, temp.clone());
 
                 if (debug > 1) {
                     System.out.println(gr.getName() + " action has been applied");
@@ -1595,7 +1579,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return (PDDLState) temp;
     }
 
-    public List generateMacrosFromBlocks (List blocks) throws Exception {
+    public List generateMacrosFromBlocks(List blocks) throws Exception {
         List result = new ArrayList();
 
         for (List s : (List<List>) blocks) {
@@ -1626,7 +1610,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return result;
     }
 
-    private double take_max (TreeSet<Integer> chain, int i, Comparison c) {
+    private double take_max(TreeSet<Integer> chain, int i, Comparison c) {
 
         Float best = Float.NEGATIVE_INFINITY;
         Integer bestIndex = -1;
@@ -1643,7 +1627,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 //                    System.out.println("DEBUG:on the state:"+tempInit);
                     if (this.get(index).hasApplicableEffects(tempInit)) {
 //                        tempInit = (PDDLState) this.get(index).apply(tempInit);
-                        tempInit.apply(this.get(index),tempInit.clone());
+                        tempInit.apply(this.get(index), tempInit.clone());
 //                        System.out.println("DEBUG: After Modification"+tempInit);
                     }
                 }
@@ -1665,7 +1649,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return best;
     }
 
-    private void add_ordering_because_of_within_chain (DirectedAcyclicGraph po) {
+    private void add_ordering_because_of_within_chain(DirectedAcyclicGraph po) {
         for (IdentityHashMap ihm : (Collection<IdentityHashMap>) this.getValidationStructures().values()) {
             for (TreeSet<Integer> chain : (Collection<TreeSet<Integer>>) ihm.values()) {
                 for (Integer l1 : chain) {
@@ -1680,7 +1664,8 @@ public class SimplePlan extends ArrayList<GroundAction> {
         }
     }
 
-    public Float build_pddl_plus_plan (LinkedList<GroundAction> raw_plan, Float epsilon) {
+    public Float build_pddl_plus_plan(LinkedList<GroundAction> raw_plan, Float epsilon) {
+
 
         System.out.println("Epsilon set to be:" + epsilon);
         Float time = 0f;
@@ -1714,7 +1699,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    public PDDLState execute (PDDLState init, Condition GC, Set<GroundProcess> processesSet, Set<GroundEvent> reachable_events, float delta, float resolution, Float time) throws CloneNotSupportedException {
+    public PDDLState execute(PDDLState init, Condition GC, Set<GroundProcess> processesSet, Set<GroundEvent> reachable_events, float delta, float resolution, Float time) throws CloneNotSupportedException, Exception {
 
         if (resolution > delta) {
             resolution = delta;
@@ -1734,20 +1719,8 @@ public class SimplePlan extends ArrayList<GroundAction> {
         this.setCost(0f);
         //current.addNumericFluent(new NumFluentValue("#t", resolution));
         nf_trace = new HashMap();
-        numeric_plan_trace = null;
         if (print_trace) {
             numeric_plan_trace = new JSONObject();
-            for (NumFluent nf : pp.getNumFluentsInvolvedInInit()) {
-                try {
-                    if (pp.getActualFluents().get(nf) != null && nf.has_to_be_tracked()) {
-                        DoubleArrayList nf_traj = new DoubleArrayList();
-                        nf_traj.add(current.fluentValue(nf));
-                        nf_trace.put(nf, nf_traj);
-                    }
-                } catch (Exception ex) {
-                    Logger.getLogger(SimplePlan.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
         }
 
         //current.addTimeFluent();
@@ -1770,7 +1743,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
             } else if (gr.isApplicable(current)) {
 //                current = (PDDLState) gr.apply(current);
-                current.apply(gr,current.clone());
+                current.apply(gr, current.clone());
 
                 //current_time = gr.time;
             } else {
@@ -1789,13 +1762,13 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    private Set<GroundEvent> apply_events (PDDLState s, Set<GroundEvent> reachable_events) throws CloneNotSupportedException {
+    private Set<GroundEvent> apply_events(PDDLState s, Set<GroundEvent> reachable_events) throws CloneNotSupportedException {
         Set<GroundEvent> ret = new LinkedHashSet();
         for (GroundEvent ev : reachable_events) {
 
             if (ev.isApplicable(s)) {
 //                s = (PDDLState) ev.apply(s);
-                s.apply(ev,s.clone());
+                s.apply(ev, s.clone());
                 GroundEvent ev1 = (GroundEvent) ev.clone();
                 ret.add(ev1);
 //                System.out.println("Applying event"+ev1);
@@ -1805,7 +1778,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
 
     }
 
-    private PDDLState advance_time (PDDLState current, Set<GroundProcess> processesSet, Set<GroundEvent> reachable_events, float delta, Float time) throws CloneNotSupportedException {
+    private PDDLState advance_time(PDDLState current, Set<GroundProcess> processesSet, Set<GroundEvent> reachable_events, float delta, Float time) throws CloneNotSupportedException, Exception {
 
         //System.out.println("Advance time!");
 //        System.out.println("StartTime:");
@@ -1816,7 +1789,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
             }
             this.apply_events(current, reachable_events);
 //            System.out.println("StartTime:"+start_time);
-            GroundProcess waiting = new GroundProcess("waiting",-1);
+            GroundProcess waiting = new GroundProcess("waiting", -1);
             waiting.setNumericEffects(new AndCond());
             waiting.addDelta(delta);
 //            System.out.println("Clock:"+current.functionValue(new NumFluent("time_elapsed")).getNumber());
@@ -1842,14 +1815,29 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return current;
     }
 
-    private void add_state_to_json (HashMap<NumFluent, DoubleArrayList> nf_trace, PDDLState current) {
-        for (NumFluent nf : nf_trace.keySet()) {
-            nf_trace.get(nf).add(current.fluentValue(nf));
-            numeric_plan_trace.put(nf.toString(), nf_trace.get(nf));
+    private void add_state_to_json(HashMap<NumFluent, DoubleArrayList> nf_trace, PDDLState current) throws Exception {
+        for (NumFluent nf : this.pp.getNumFluentsInvolvedInInit()) {
+            Boolean get = (Boolean) this.pp.getActualFluents().get(nf);
+            if (get != null && get == false && nf.has_to_be_tracked()) {
+                if (nf_trace.get(nf) == null){
+                    nf_trace.put(nf, new DoubleArrayList());
+                }
+                nf_trace.get(nf).add(current.fluentValue(nf));
+                numeric_plan_trace.put(nf.toString(), nf_trace.get(nf));
+            }
+        }
+        if (!Double.isNaN(current.time) && pddlPlus){
+            Object o = numeric_plan_trace.get("__TIME__");
+            if (o == null) {
+                o = new DoubleArrayList();
+                numeric_plan_trace.put("__TIME__", o);
+            }
+            ((DoubleArrayList) o).add(current.time);
+
         }
     }
 
-    public String printPDDLPlusPlan ( ) {
+    public String printPDDLPlusPlan() {
         float start = 0f;
         String ret = "";
         for (int i = 0; i < this.inst_actions.size(); i++) {
@@ -1867,7 +1855,7 @@ public class SimplePlan extends ArrayList<GroundAction> {
         return ret;
     }
 
-    public void parseSolutionFromOtherPlan (SimplePlan newPlan) {
+    public void parseSolutionFromOtherPlan(SimplePlan newPlan) {
 
         if (this.size() > 0) {
             throw new RuntimeException("The plan needs to be empty at this stage");
@@ -1899,5 +1887,5 @@ public class SimplePlan extends ArrayList<GroundAction> {
     public double getDuration() {
         return duration;
     }
-    
+
 }

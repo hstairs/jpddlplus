@@ -168,7 +168,7 @@ public class quasi_hm extends Heuristic {
 
         numberOfReachableConditions = 0;
 
-        ArrayList<Boolean> active_actions = new ArrayList<>(nCopies(A.size() + 1, false));
+        ArrayList<Boolean> active_actions = new ArrayList<>(nCopies(problem.getTotActions() + 1, false));
 //        for (GroundAction gr: temp_a){
 //            if (gr.isApplicable(s))
 //                //active_actions.add(gr);

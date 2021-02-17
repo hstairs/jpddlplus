@@ -25,7 +25,9 @@ package com.hstairs.ppmajal.heuristics;
 
 import com.hstairs.ppmajal.heuristics.advanced.h1;
 import com.hstairs.ppmajal.problem.EPddlProblem;
+import com.hstairs.ppmajal.problem.GroundAction;
 import com.hstairs.ppmajal.problem.State;
+import java.util.Collection;
 
 import java.util.LinkedHashSet;
 
@@ -34,10 +36,20 @@ import java.util.LinkedHashSet;
  */
 public class blindHeuristic extends Aibr {
 
+    Collection<GroundAction> reachable;
+    
     public blindHeuristic (EPddlProblem problem){
         super(problem);
     }
 
+    @Override
+    public Float setup(State s_0){
+        reachable = new LinkedHashSet();
+        reachable.addAll(problem.actions);
+        reachable.addAll(problem.getProcessesSet());
+        reachable.addAll(problem.getEventsSet());
+        return computeEstimate(s_0);
+    }
     @Override
     public Float computeEstimate (State s_0) {
         if (reachability){
@@ -49,5 +61,13 @@ public class blindHeuristic extends Aibr {
             return 1f;
         }
     }
+
+    @Override
+    public Collection<GroundAction> getReachableTransitions() {
+        return reachable; //To change body of generated methods, choose Tools | Templates.
+    }
+    
+    
+    
 
 }

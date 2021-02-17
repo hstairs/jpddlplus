@@ -365,7 +365,7 @@ public class NumFluent extends Expression {
 
     public boolean has_to_be_tracked ( ) {
         if (has_to_be_tracked == null) {
-            if (this.getName().equals("total-cost")) {
+            if (this.getName().equals("total_cost")) {
                 needsTrackingInState(Boolean.FALSE);
             } else {
                 needsTrackingInState(Boolean.TRUE);

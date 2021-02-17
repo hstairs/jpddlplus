@@ -55,15 +55,20 @@ public class OrCond extends ComplexCondition {
         ReferenceLinkedOpenHashSet sons1 = new ReferenceLinkedOpenHashSet();
         for (final Condition cond : (Collection<Condition>)sons ){
             Condition condInternal = cond.normalize();
-            if (condInternal.isValid()){
+            if (condInternal != null){
+                if (condInternal.isValid()){
+                    this.setUnsatisfiable(true);
+                    return Predicate.createPredicate(Predicate.trueFalse.FALSE);
+                }else if (!condInternal.isUnsatisfiable()){
+                    if (condInternal instanceof OrCond){
+                        sons1.addAll(((AndCond) condInternal).sons);
+                    }else{
+                        sons1.add(condInternal);
+                    }
+                }
+            } else {
                 this.setUnsatisfiable(true);
                 return Predicate.createPredicate(Predicate.trueFalse.FALSE);
-            }else if (!condInternal.isUnsatisfiable()){
-                if (condInternal instanceof OrCond){
-                    sons1.addAll(((AndCond) condInternal).sons);
-                }else{
-                    sons1.add(condInternal);
-                }
             }
         }
         sons = sons1;

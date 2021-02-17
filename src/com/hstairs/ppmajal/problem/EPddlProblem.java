@@ -642,7 +642,7 @@ public class EPddlProblem extends PddlProblem {
         //At this point there should be even less relevant facts that needs to be stored
     }
 
-        public void simplifyAndSetupInit (boolean simplify, boolean aibrPreprocessing) throws Exception {
+    public void simplifyAndSetupInit (boolean simplify, boolean aibrPreprocessing) throws Exception {
        
         long start = System.currentTimeMillis();
         if (simplify) {
@@ -651,8 +651,8 @@ public class EPddlProblem extends PddlProblem {
         }
         // normalize global constraints, once and forall
         globalConstraints = (AndCond) globalConstraints.normalize();
-        makeInit();
-        }
+        makeInit(simplify);
+    }
 
     public void simplifyAndSetupInit (boolean simplify) throws Exception {
         this.simplifyAndSetupInit(simplify, true);
@@ -828,6 +828,22 @@ public class EPddlProblem extends PddlProblem {
 
         for (ActionSchema a : this.linkedDomain.getActionsSchema()) {
             involved_fluents.addAll(a.getPreconditions().getInvolvedFluents());
+            if (a.forall != null){
+                for (ForAll forall : (Collection<ForAll>)a.forall.sons){
+                    for (Condition cond : (Collection<Condition>)forall.sons){
+                        if (cond instanceof ConditionalEffect){
+                            final ConditionalEffect condEff = (ConditionalEffect) cond;
+                            involved_fluents.addAll(condEff.activation_condition.getInvolvedFluents());
+                        }
+                    }    
+                }
+            }
+            for (Condition cond : (Collection<Condition>)a.cond_effects.sons){
+                if (cond instanceof ConditionalEffect){
+                    final ConditionalEffect condEff = (ConditionalEffect) cond;
+                    involved_fluents.addAll(condEff.activation_condition.getInvolvedFluents());
+                }
+            }
             involved_fluents.addAll(a.getNumFluentsNecessaryForExecution());
         }
         for (ProcessSchema a : this.linkedDomain.getProcessesSchema()) {
@@ -869,16 +885,25 @@ public class EPddlProblem extends PddlProblem {
 
     }
 
-    private PDDLState makePddlState ( ) {
+    private PDDLState makePddlState() {
+        return this.makePddlState(true);
+    }
+
+    private PDDLState makePddlState(boolean searchRepresentation) {
         //ensure compactness
-        removeStaticPart();
-        removeUnnecessaryFluents();
+        if (searchRepresentation) {
+            removeStaticPart();
+            removeUnnecessaryFluents();
+        }
         HashMap<Integer,Double> numFluents = new HashMap();
         numberOfNumericVariables = 0;
         if (NumFluent.numFluentsBank != null){
 //        System.out.println(NumFluent.numFluentsBank);
             for (NumFluent nf : NumFluent.numFluentsBank.values()) {
-                if (this.getActualFluents().get(nf) != null && nf.has_to_be_tracked()) {
+                if ((this.getActualFluents().get(nf) != null && nf.has_to_be_tracked())|| !searchRepresentation) {
+                    if (!searchRepresentation){
+                        nf.needsTrackingInState(true);
+                    }
                     PDDLNumber number = this.initNumFluentsValues.get(nf);
                     if (number == null) {
                         numFluents.put(nf.getId(), Double.NaN);
@@ -895,7 +920,7 @@ public class EPddlProblem extends PddlProblem {
         numberOfBooleanVariables = 0;
         if (Predicate.idToPredicate != null) {
             for (Predicate p : Predicate.idToPredicate.values()) {
-                if (this.getActualFluents().get(p) != null) {
+                if (this.getActualFluents().get(p) != null || !searchRepresentation) {
                     Boolean r = this.initBoolFluentsValues.get(p);
                     if (r == null || !r) {
                         //boolFluents.set(p.getId(), false);
@@ -924,8 +949,13 @@ public class EPddlProblem extends PddlProblem {
         
     }
 
-    protected void makeInit ( ) {
-        this.init = makePddlState();
+    protected void makeInit(){
+        this.init = makePddlState(true);
+        addTimeFluentToInit();
+    }
+    
+    protected void makeInit ( boolean simplify) {
+        this.init = makePddlState(simplify);
         addTimeFluentToInit();
     }
 

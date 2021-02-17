@@ -121,7 +121,8 @@ public class GroundAction extends PDDLGenericAction {
         for (Object o : getParameters()) {
             parameters = parameters.concat(o.toString()).concat(" ");
         }
-        return "\n\nAction Name:" + this.name + " Parameters: " + parameters + "\nPre: " + this.preconditions + "\nEffetti positivi: " + this.getAddList() + "\nEffetti negativi: " + this.getDelList() + "\nNumeric Effects:  " + this.getNumericEffects();
+        return "\n\nAction Name:" + this.name + " Parameters: " + parameters + "\nPre: " + this.preconditions + "\nEffetti positivi: " 
+                + this.getAddList() + "\nEffetti negativi: " + this.getDelList() + "\nNumeric Effects:  " + this.getNumericEffects()+ "\n Conditional Effects:"+this.cond_effects;
 
     }
 
@@ -275,7 +276,7 @@ public class GroundAction extends PDDLGenericAction {
                 }
             }
         }
-        this.cond_effects.normalize();
+        this.cond_effects = (AndCond) this.cond_effects.normalize();
         this.normalized = true;
     }
 

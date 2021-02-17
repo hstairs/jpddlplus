@@ -268,4 +268,18 @@ public class RelState extends Object {
 
     }
 
+    @Override
+    public String toString() {
+        StringBuilder str = new StringBuilder("");
+        for (int i=0; i < this.possNumValues.size(); i++){
+            int idNFProblem = PDDLState.fromStateNFId2ProblemNFId[i];
+            NumFluent fluent = NumFluent.fromIdToNumFluents.get(idNFProblem);
+            str.append(fluent).append("=").append(functionValues(fluent)).append(" ");
+        }
+        str.append("\n");
+
+        return str.toString();    }
+
+    
+    
 }
