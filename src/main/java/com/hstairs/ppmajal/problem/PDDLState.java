@@ -23,6 +23,7 @@ import com.carrotsearch.hppc.DoubleArrayList;
 import com.hstairs.ppmajal.conditions.*;
 import com.hstairs.ppmajal.expressions.NumEffect;
 import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.expressions.SimulatedEffects;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import java.math.BigDecimal;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.tuple.Pair;
+import se_util.ReadSimulatedEffects;
 
 /**
  * @author enrico
@@ -244,6 +246,30 @@ protected DoubleArrayList numFluents;
                 }
 
             }
+            
+            if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
+                String name = ReadSimulatedEffects.readEffectName(gr.getName());
+                int[] pars = ReadSimulatedEffects.getVariables(gr.getName());
+                int[] out = ReadSimulatedEffects.getToUpdate(gr.getName());
+                String[] varNames = ReadSimulatedEffects.getVariableNames(gr.getName());
+                String[] outNames = ReadSimulatedEffects.getToUpdateNames(gr.getName());
+                //questa parte è da riscrivere con i metodi corretti per ottenere numfluent e boolpredicate
+                List<Object> vars = new ArrayList<Object>();
+                List<Object> outs = new ArrayList<Object>();
+                PDDLObject actual;
+                for(int i = 0; i <pars.length;i++){
+                    actual = gr.getParameters().get(i);
+                    vars.add(ReadSimulatedEffects.getFluentFromPddlObject(varNames[i], actual));
+                }
+                for(int i = 0; i < out.length;i++){
+                    actual = gr.getParameters().get(i);
+                    outs.add(ReadSimulatedEffects.getFluentFromPddlObject(outNames[i], actual));
+                }
+                
+                 SimulatedEffects sim = new SimulatedEffects(name,vars,outs);
+                 this.apply(sim,prev);
+               
+            }
         }else{
             final Set<ConditionalEffects> effs = Set.of(gr.getConditionalPropositionalEffects(), gr.getConditionalNumericEffects());
             for (final ConditionalEffects<PostCondition> eff: effs) {
@@ -257,6 +283,30 @@ protected DoubleArrayList numFluents;
                 for (final PostCondition n : eff.getUnconditionalEffect()) {
                     this.apply(n, prev);
                 }
+            }
+            
+            if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
+                String name = ReadSimulatedEffects.readEffectName(gr.getName());
+                int[] pars = ReadSimulatedEffects.getVariables(gr.getName());
+                int[] out = ReadSimulatedEffects.getToUpdate(gr.getName());
+                String[] varNames = ReadSimulatedEffects.getVariableNames(gr.getName());
+                String[] outNames = ReadSimulatedEffects.getToUpdateNames(gr.getName());
+                //questa parte è da riscrivere con i metodi corretti per ottenere numfluent e boolpredicate
+                List<Object> vars = new ArrayList<Object>();
+                List<Object> outs = new ArrayList<Object>();
+                PDDLObject actual;
+                for(int i = 0; i <pars.length;i++){
+                    actual = gr.getParameters().get(i);
+                    vars.add(ReadSimulatedEffects.getFluentFromPddlObject(varNames[i], actual));
+                }
+                for(int i = 0; i < out.length;i++){
+                    actual = gr.getParameters().get(i);
+                    outs.add(ReadSimulatedEffects.getFluentFromPddlObject(outNames[i], actual));
+                }
+                
+                 SimulatedEffects sim = new SimulatedEffects(name,vars,outs);
+                 this.apply(sim,prev);
+               
             }
         }
     }
@@ -355,6 +405,44 @@ protected DoubleArrayList numFluents;
             if (this.satisfy(cond.activation_condition)) {
                 this.apply(cond.effect,prev);
             }
+        
+          }else if (effect instanceof SimulatedEffects) {
+        	SimulatedEffects sim = (SimulatedEffects) effect;
+        	Object[] values = new Object[sim.getVariablesSize()];
+        	Object tmp;
+        	for(int i = 0; i < values.length;i++) {
+        		tmp = sim.getVariable(i);
+        		if (tmp instanceof BoolPredicate) {
+        			values[i] = this.holds((BoolPredicate) tmp);
+        			
+        		}else if(tmp instanceof NumFluent) {
+        			values[i] = this.fluentValue((NumFluent) tmp);
+        		}
+        	}
+        	
+        	Object newVal = sim.applyEffect(values);
+                
+        	Object[] toUpdate = sim.getToUpdate().toArray();
+        	if(newVal instanceof Double) {
+        		for(int i = 0; i< toUpdate.length;i++) {
+        			this.setNumFluent((NumFluent)toUpdate[i], (double)newVal);
+        		}
+        	}else if(newVal instanceof Boolean) {
+        		for(int i = 0; i< toUpdate.length;i++) {
+        			this.setPropFluent((BoolPredicate)toUpdate[i], (boolean)newVal);
+        		}
+        	}
+        	
+        	/*Object[] variables  = new Object[(int) ((SimulatedEffects) effect).sons.length];
+        	int i = 0;
+        	for (PostCondition c: (PostCondition[])((SimulatedEffects) effect).sons){
+        		   if ((PostCondition)c instanceof NumEffect) {
+        			   variables[i] = FluentValue((NumFluent)
+        		   }else if ((PostCondition)c instanceof BoolPredicate) {
+        			   
+        		   }
+        		   
+        	 }*/
         }
     }
 

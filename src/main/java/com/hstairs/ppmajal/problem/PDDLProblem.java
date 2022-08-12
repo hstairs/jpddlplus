@@ -53,6 +53,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jgrapht.alg.util.Pair;
+import se_util.ReadSimulatedEffects;
 
 /**
  * @author enrico
@@ -191,6 +192,7 @@ public class PDDLProblem implements SearchProblem {
             Logger.getLogger(PDDLProblem.class.getName()).log(Level.SEVERE, null, ex);
         }
         indexObject = 0;
+        ReadSimulatedEffects.setNumFluents(new ArrayList(initNumFluentsValues.keySet()));
     }
 
     /**
