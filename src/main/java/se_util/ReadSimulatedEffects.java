@@ -7,7 +7,7 @@ package se_util;
 import com.hstairs.ppmajal.conditions.PDDLObject;
 import com.hstairs.ppmajal.expressions.NumFluent;
 import java.util.List;
-import java.util.Set;
+
 
 /**
  *
@@ -17,7 +17,6 @@ public class ReadSimulatedEffects {
     
     static private String domain;
     static private List<NumFluent> numFluents;
- 
     
     public static String readEffectName(String name){
         String tmp = domain.split(name)[1];

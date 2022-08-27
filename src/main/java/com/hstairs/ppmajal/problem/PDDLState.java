@@ -32,6 +32,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.tuple.Pair;
 import se_util.ReadSimulatedEffects;
+import se_util.SimulatedEffectValues;
 
 /**
  * @author enrico
@@ -44,6 +45,7 @@ protected DoubleArrayList numFluents;
     private static int[] fromStateNFId2ProblemNFId;
     protected BitSet boolFluents;
     public BigDecimal time;
+    private Map<String,SimulatedEffectValues> sim = new HashMap();
     
     private PDDLState(DoubleArrayList numFluents, BitSet boolFluents) {
         this.numFluents = numFluents.clone();
@@ -249,10 +251,18 @@ protected DoubleArrayList numFluents;
             
             if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
                 String name = ReadSimulatedEffects.readEffectName(gr.getName());
-                int[] pars = ReadSimulatedEffects.getVariables(gr.getName());
-                int[] out = ReadSimulatedEffects.getToUpdate(gr.getName());
-                String[] varNames = ReadSimulatedEffects.getVariableNames(gr.getName());
-                String[] outNames = ReadSimulatedEffects.getToUpdateNames(gr.getName());
+                
+                if(!sim.containsKey(name)){
+                    
+                    sim.put(name, new SimulatedEffectValues(ReadSimulatedEffects.getVariables(gr.getName()),ReadSimulatedEffects.getToUpdate(gr.getName())
+                    ,ReadSimulatedEffects.getVariableNames(gr.getName()),ReadSimulatedEffects.getToUpdateNames(gr.getName()))); 
+                }
+                
+                SimulatedEffectValues temporal = sim.get(name);
+                int[] pars = temporal.getVariables();
+                int[] out = temporal.getToUpdate();
+                String[] varNames = temporal.getVariableNames();
+                String[] outNames = temporal.getToUpdateNames();
                 //questa parte è da riscrivere con i metodi corretti per ottenere numfluent e boolpredicate
                 List<Object> vars = new ArrayList<Object>();
                 List<Object> outs = new ArrayList<Object>();
@@ -287,10 +297,17 @@ protected DoubleArrayList numFluents;
             
             if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
                 String name = ReadSimulatedEffects.readEffectName(gr.getName());
-                int[] pars = ReadSimulatedEffects.getVariables(gr.getName());
-                int[] out = ReadSimulatedEffects.getToUpdate(gr.getName());
-                String[] varNames = ReadSimulatedEffects.getVariableNames(gr.getName());
-                String[] outNames = ReadSimulatedEffects.getToUpdateNames(gr.getName());
+                if(!sim.containsKey(name)){
+                    
+                    sim.put(name, new SimulatedEffectValues(ReadSimulatedEffects.getVariables(gr.getName()),ReadSimulatedEffects.getToUpdate(gr.getName())
+                    ,ReadSimulatedEffects.getVariableNames(gr.getName()),ReadSimulatedEffects.getToUpdateNames(gr.getName()))); 
+                }
+                
+                SimulatedEffectValues temporal = sim.get(name);
+                int[] pars = temporal.getVariables();
+                int[] out = temporal.getToUpdate();
+                String[] varNames = temporal.getVariableNames();
+                String[] outNames = temporal.getToUpdateNames();
                 //questa parte è da riscrivere con i metodi corretti per ottenere numfluent e boolpredicate
                 List<Object> vars = new ArrayList<Object>();
                 List<Object> outs = new ArrayList<Object>();
