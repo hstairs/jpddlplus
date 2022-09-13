@@ -6,7 +6,9 @@ package se_util;
 
 import com.hstairs.ppmajal.conditions.PDDLObject;
 import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -108,5 +110,25 @@ public class ReadSimulatedEffects {
     }
     public static void setNumFluents(List<NumFluent> numFluents){
         ReadSimulatedEffects.numFluents = numFluents;
+    }
+    
+    public static void addSimulatedFluents(TransitionGround gr,Set ActualFluents ){
+        if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
+                String name = ReadSimulatedEffects.readEffectName(gr.getName());
+                
+                int[] pars = ReadSimulatedEffects.getVariables(gr.getName());
+                int[] out = ReadSimulatedEffects.getToUpdate(gr.getName());
+                String[] varNames = ReadSimulatedEffects.getVariableNames(gr.getName());
+                String[] outNames = ReadSimulatedEffects.getToUpdateNames(gr.getName());
+                PDDLObject actual;
+                for(int i = 0; i <pars.length;i++){
+                    actual = gr.getParameters().get(i);
+                    ActualFluents.add(ReadSimulatedEffects.getFluentFromPddlObject(varNames[i], actual));
+                }
+                for(int i = 0; i < out.length;i++){
+                    actual = gr.getParameters().get(i);
+                    ActualFluents.add(ReadSimulatedEffects.getFluentFromPddlObject(outNames[i], actual));
+                }
+        }
     }
 }

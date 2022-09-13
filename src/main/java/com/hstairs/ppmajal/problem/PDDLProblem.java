@@ -340,6 +340,7 @@ public class PDDLProblem implements SearchProblem {
 
             for (TransitionGround gr : transitions) {
                 gr.updateInvariantFluents(actualFluents);
+                ReadSimulatedEffects.addSimulatedFluents(gr,actualFluents);
 
             }
         }
