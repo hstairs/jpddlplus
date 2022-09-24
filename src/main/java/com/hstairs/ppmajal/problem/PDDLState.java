@@ -45,7 +45,7 @@ protected DoubleArrayList numFluents;
     private static int[] fromStateNFId2ProblemNFId;
     protected BitSet boolFluents;
     public BigDecimal time;
-    private Map<String,SimulatedEffectValues> sim = new HashMap();
+    private final Map<String,SimulatedEffectValues> sim = ReadSimulatedEffects.getMap();
     
     private PDDLState(DoubleArrayList numFluents, BitSet boolFluents) {
         this.numFluents = numFluents.clone();
@@ -251,13 +251,7 @@ protected DoubleArrayList numFluents;
             
             if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
                 String name = ReadSimulatedEffects.readEffectName(gr.getName());
-                
-                if(!sim.containsKey(name)){
-                    
-                    sim.put(name, new SimulatedEffectValues(ReadSimulatedEffects.getVariables(gr.getName()),ReadSimulatedEffects.getToUpdate(gr.getName())
-                    ,ReadSimulatedEffects.getVariableNames(gr.getName()),ReadSimulatedEffects.getToUpdateNames(gr.getName()))); 
-                }
-                
+                     
                 SimulatedEffectValues temporal = sim.get(name);
                 int[] pars = temporal.getVariables();
                 int[] out = temporal.getToUpdate();
@@ -297,12 +291,7 @@ protected DoubleArrayList numFluents;
             
             if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
                 String name = ReadSimulatedEffects.readEffectName(gr.getName());
-                if(!sim.containsKey(name)){
-                    
-                    sim.put(name, new SimulatedEffectValues(ReadSimulatedEffects.getVariables(gr.getName()),ReadSimulatedEffects.getToUpdate(gr.getName())
-                    ,ReadSimulatedEffects.getVariableNames(gr.getName()),ReadSimulatedEffects.getToUpdateNames(gr.getName()))); 
-                }
-                
+              
                 SimulatedEffectValues temporal = sim.get(name);
                 int[] pars = temporal.getVariables();
                 int[] out = temporal.getToUpdate();

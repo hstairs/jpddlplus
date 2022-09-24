@@ -26,11 +26,25 @@ public class SimulatedEffects  implements PostCondition{
 
 	public Object applyEffect(Object[] values) {
 		Object out = null;
-		if(function.equals("f1")) {
-			out = applyNum(values);
-		}else if(function.equals("increment_se")){
+            switch (function) {
+                case "f1":
+                    out = applyNum(values);
+                    break;
+                case "increment_se":
                     out = increase_se(values);
-                }
+                    break;
+                case "decrement_se":
+                    out = decrease_se(values);
+                    break;
+                case "increment_decrement_se":
+                    out = increment_decrement_se(values);
+                    break;
+                case "max":
+                    out = max(values);
+                    break;
+                default:
+                    break;
+            }
 		return out;
 	}
 	
@@ -46,6 +60,30 @@ public class SimulatedEffects  implements PostCondition{
 		result += 1.0;
                 return result;
 	}
+        public Double decrease_se(Object[] values) {
+		Double result = (Double)values[0];
+		result -= 1.0;
+                return result;
+	}
+         public Double[] increment_decrement_se(Object[] values) {
+             Double[] result = new Double[2];
+		result[0] = (Double)values[0];
+		result[0] += 1.0;
+                result[1] = (Double)values[1];
+		result[1] -= 1.0;
+                return result;
+	}
+         
+         public Double max(Object[] values){
+             Double result;
+             if((Double)values[0] >= (Double)values[1]){
+                 result = (Double)values[0];
+             }else{
+                 result = (Double)values[1];
+             }
+             return result;
+         }
+       
 	
 	public int getVariablesSize() {
 		return variables.size();

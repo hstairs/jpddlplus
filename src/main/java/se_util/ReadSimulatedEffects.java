@@ -7,7 +7,9 @@ package se_util;
 import com.hstairs.ppmajal.conditions.PDDLObject;
 import com.hstairs.ppmajal.expressions.NumFluent;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -19,6 +21,7 @@ public class ReadSimulatedEffects {
     
     static private String domain;
     static private List<NumFluent> numFluents;
+    static private Map<String,SimulatedEffectValues> sim = new HashMap();
     
     public static String readEffectName(String name){
         String tmp = domain.split(name)[1];
@@ -111,15 +114,24 @@ public class ReadSimulatedEffects {
     public static void setNumFluents(List<NumFluent> numFluents){
         ReadSimulatedEffects.numFluents = numFluents;
     }
+    public static Map<String,SimulatedEffectValues> getMap(){
+        return sim;
+    }
     
     public static void addSimulatedFluents(TransitionGround gr,Set ActualFluents ){
         if(ReadSimulatedEffects.hasSimulatedEffects(gr.getName())){
                 String name = ReadSimulatedEffects.readEffectName(gr.getName());
                 
-                int[] pars = ReadSimulatedEffects.getVariables(gr.getName());
-                int[] out = ReadSimulatedEffects.getToUpdate(gr.getName());
-                String[] varNames = ReadSimulatedEffects.getVariableNames(gr.getName());
-                String[] outNames = ReadSimulatedEffects.getToUpdateNames(gr.getName());
+                if(!sim.containsKey(name)){
+                    sim.put(name, new SimulatedEffectValues(ReadSimulatedEffects.getVariables(gr.getName()),ReadSimulatedEffects.getToUpdate(gr.getName())
+                    ,ReadSimulatedEffects.getVariableNames(gr.getName()),ReadSimulatedEffects.getToUpdateNames(gr.getName()))); 
+                }
+                
+                SimulatedEffectValues temporal = sim.get(name);
+                int[] pars = temporal.getVariables();
+                int[] out = temporal.getToUpdate();
+                String[] varNames = temporal.getVariableNames();
+                String[] outNames = temporal.getToUpdateNames();
                 PDDLObject actual;
                 for(int i = 0; i <pars.length;i++){
                     actual = gr.getParameters().get(i);
