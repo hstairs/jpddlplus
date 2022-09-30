@@ -24,23 +24,26 @@ public class SimulatedEffects  implements PostCondition{
 		this.toUpdate=toUpdate;
 	}
 
-	public Object applyEffect(Object[] values) {
-		Object out = null;
+	public Object[] applyEffect(Object[] values) {
+		Object[] out = new Object[toUpdate.size()];
             switch (function) {
                 case "f1":
-                    out = applyNum(values);
+                    out[0] = applyNum(values);
                     break;
                 case "increment_se":
-                    out = increase_se(values);
+                    out[0] = increase_se(values);
                     break;
                 case "decrement_se":
-                    out = decrease_se(values);
+                    out[0] = decrease_se(values);
                     break;
                 case "increment_decrement_se":
-                    out = increment_decrement_se(values);
+                    out[0] = increment_decrement_se(values);
                     break;
                 case "max":
-                    out = max(values);
+                    out[0] = max(values);
+                    break;
+                case "max2":
+                    out = max2(values);
                     break;
                 default:
                     break;
@@ -90,6 +93,17 @@ public class SimulatedEffects  implements PostCondition{
                  if (result < (Double)values[i]){
                      result = (Double)values[i];
                  }
+             }
+             return result;
+         }
+         
+          public Double[] max2(Object[] values){
+             Double[] result = {(Double)values[0],(Double)values[2]};
+             if((Double)values[0] < (Double)values[1]){
+                 result[0] = (Double)values[1];
+             }
+              if((Double)values[2] < (Double)values[3]){
+                 result[1] = (Double)values[3];
              }
              return result;
          }

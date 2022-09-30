@@ -426,16 +426,24 @@ protected DoubleArrayList numFluents;
         		}
         	}
         	
-        	Object newVal = sim.applyEffect(values);
+        	Object[] newVal = sim.applyEffect(values);
                 
         	Object[] toUpdate = sim.getToUpdate().toArray();
-        	if(newVal instanceof Double) {
+        	if(newVal[0] instanceof Double) {
         		for(int i = 0; i< toUpdate.length;i++) {
-        			this.setNumFluent((NumFluent)toUpdate[i], (double)newVal);
+                            if(newVal.length == 1){
+        			this.setNumFluent((NumFluent)toUpdate[i], (double)newVal[0]);
+                            }else{
+                                this.setNumFluent((NumFluent)toUpdate[i], (double)newVal[i]);
+                            }
         		}
-        	}else if(newVal instanceof Boolean) {
+        	}else if(newVal[0] instanceof Boolean) {
         		for(int i = 0; i< toUpdate.length;i++) {
-        			this.setPropFluent((BoolPredicate)toUpdate[i], (boolean)newVal);
+                            if(newVal.length == 1){
+        			this.setPropFluent((BoolPredicate)toUpdate[i], (boolean)newVal[0]);
+                            }else{
+                               this.setPropFluent((BoolPredicate)toUpdate[i], (boolean)newVal[i]); 
+                            }
         		}
         	}
         	
