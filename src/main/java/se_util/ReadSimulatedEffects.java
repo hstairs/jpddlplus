@@ -134,11 +134,11 @@ public class ReadSimulatedEffects {
                 String[] outNames = temporal.getToUpdateNames();
                 PDDLObject actual;
                 for(int i = 0; i <pars.length;i++){
-                    actual = gr.getParameters().get(i);
+                    actual = gr.getParameters().get(pars[i]);
                     ActualFluents.add(ReadSimulatedEffects.getFluentFromPddlObject(varNames[i], actual));
                 }
                 for(int i = 0; i < out.length;i++){
-                    actual = gr.getParameters().get(i);
+                    actual = gr.getParameters().get(out[i]);
                     ActualFluents.add(ReadSimulatedEffects.getFluentFromPddlObject(outNames[i], actual));
                 }
         }

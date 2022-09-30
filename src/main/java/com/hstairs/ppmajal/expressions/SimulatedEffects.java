@@ -74,12 +74,22 @@ public class SimulatedEffects  implements PostCondition{
                 return result;
 	}
          
-         public Double max(Object[] values){
+         public Double max_old(Object[] values){
              Double result;
              if((Double)values[0] >= (Double)values[1]){
                  result = (Double)values[0];
              }else{
                  result = (Double)values[1];
+             }
+             return result;
+         }
+         
+         public Double max(Object[] values){
+             Double result = (Double)values[0];
+             for(int i = 1; i < values.length; i++ ){
+                 if (result < (Double)values[i]){
+                     result = (Double)values[i];
+                 }
              }
              return result;
          }

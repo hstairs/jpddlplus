@@ -262,11 +262,11 @@ protected DoubleArrayList numFluents;
                 List<Object> outs = new ArrayList<Object>();
                 PDDLObject actual;
                 for(int i = 0; i <pars.length;i++){
-                    actual = gr.getParameters().get(i);
+                    actual = gr.getParameters().get(pars[i]);
                     vars.add(ReadSimulatedEffects.getFluentFromPddlObject(varNames[i], actual));
                 }
                 for(int i = 0; i < out.length;i++){
-                    actual = gr.getParameters().get(i);
+                    actual = gr.getParameters().get(out[i]);
                     outs.add(ReadSimulatedEffects.getFluentFromPddlObject(outNames[i], actual));
                 }
                 
@@ -302,11 +302,11 @@ protected DoubleArrayList numFluents;
                 List<Object> outs = new ArrayList<Object>();
                 PDDLObject actual;
                 for(int i = 0; i <pars.length;i++){
-                    actual = gr.getParameters().get(i);
+                    actual = gr.getParameters().get(pars[i]);
                     vars.add(ReadSimulatedEffects.getFluentFromPddlObject(varNames[i], actual));
                 }
                 for(int i = 0; i < out.length;i++){
-                    actual = gr.getParameters().get(i);
+                    actual = gr.getParameters().get(out[i]);
                     outs.add(ReadSimulatedEffects.getFluentFromPddlObject(outNames[i], actual));
                 }
                 
