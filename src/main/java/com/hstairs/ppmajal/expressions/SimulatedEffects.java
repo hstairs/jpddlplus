@@ -45,6 +45,15 @@ public class SimulatedEffects  implements PostCondition{
                 case "max2":
                     out = max2(values);
                     break;
+                case "max3":
+                    out = max3(values);
+                    break; 
+                case "max4":
+                    out = max4(values);
+                    break;
+                case "max5":
+                    out = max5(values);
+                    break;
                 default:
                     break;
             }
@@ -104,6 +113,57 @@ public class SimulatedEffects  implements PostCondition{
              }
               if((Double)values[2] < (Double)values[3]){
                  result[1] = (Double)values[3];
+             }
+             return result;
+         }
+          
+         public Double[] max3(Object[] values){
+             Double[] result = {(Double)values[0],(Double)values[2],(Double)values[4]};
+             if((Double)values[0] < (Double)values[1]){
+                 result[0] = (Double)values[1];
+             }
+              if((Double)values[2] < (Double)values[3]){
+                 result[1] = (Double)values[3];
+             }
+              if((Double)values[4] < (Double)values[5]){
+                 result[2] = (Double)values[5];
+             }
+             return result;
+         }
+         
+         public Double[] max4(Object[] values){
+             Double[] result = {(Double)values[0],(Double)values[2],(Double)values[4],(Double)values[6]};
+             if((Double)values[0] < (Double)values[1]){
+                 result[0] = (Double)values[1];
+             }
+              if((Double)values[2] < (Double)values[3]){
+                 result[1] = (Double)values[3];
+             }
+              if((Double)values[4] < (Double)values[5]){
+                 result[2] = (Double)values[5];
+             }
+              if((Double)values[6] < (Double)values[7]){
+                 result[3] = (Double)values[7];
+             }
+             return result;
+         }
+         
+         public Double[] max5(Object[] values){
+             Double[] result = {(Double)values[0],(Double)values[2],(Double)values[4],(Double)values[6],(Double)values[8]};
+             if((Double)values[0] < (Double)values[1]){
+                 result[0] = (Double)values[1];
+             }
+              if((Double)values[2] < (Double)values[3]){
+                 result[1] = (Double)values[3];
+             }
+              if((Double)values[4] < (Double)values[5]){
+                 result[2] = (Double)values[5];
+             }
+              if((Double)values[6] < (Double)values[7]){
+                 result[3] = (Double)values[7];
+             }
+              if((Double)values[8] < (Double)values[9]){
+                 result[4] = (Double)values[9];
              }
              return result;
          }
