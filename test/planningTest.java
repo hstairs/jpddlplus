@@ -37,7 +37,7 @@ public class planningTest extends TestCase {
 
     public void testPDDLPlanning() {
         //car
-        String enhspPath = "/home/enrico/Dropbox/plan_exec_2_0/jpddlplus/";
+        String enhspPath = "/Users/enrico/Dropbox/plan_exec_2_0/jpddlplus/";
         String input = "-o " + enhspPath + "examples/pddl+/car_non_linear/domain.pddl -f "
                 + "" + enhspPath + "examples/pddl+/car_non_linear/instances/instance_1_30.0_0.1_10.0.pddl "
                 + "-planner sat-aibr";
@@ -64,7 +64,6 @@ public class planningTest extends TestCase {
         args = input.split(" ");
         run(args,6);
         
-        
         //counter
         input = "-o " + enhspPath + "examples/pddl2_1/counters/domain.pddl -f "
                 +enhspPath+ "examples/pddl2_1/counters/instance_4.pddl -planner sat-hadd";
@@ -88,11 +87,6 @@ public class planningTest extends TestCase {
                 + "-h aibr";
         args = input.split(" ");
         run(args,2);
-        input = "-o " + enhspPath + "/home/enrico/Dropbox/plan_exec_2_0/jpddlplus/unit_test_instances/validation_task_translation/compiled_domain.pddl -f "
-                + "" + enhspPath + "/home/enrico/Dropbox/plan_exec_2_0/jpddlplus/unit_test_instances/validation_task_translation/compiled_instance_2_30.0_0.1_10.0.pddl "
-                + "-h aibr";
-        args = input.split(" ");
-        run(args,0);
         
 //        input = "-o " + enhspPath + "/home/enrico/Dropbox/plan_exec_2_0/jpddlplus/unit_test_instances/ground_instance/d.pddl -f "
 //                + "" + enhspPath + "/home/enrico/Dropbox/plan_exec_2_0/jpddlplus/unit_test_instances/ground_instance/p.pddl "

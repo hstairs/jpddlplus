@@ -1,0 +1,157 @@
+COMANDO: python2.7 fast-downward.py --build release64 icaps21_lm_cut_ex2/d1.pddl icaps21_lm_cut_ex2/p.pddl --search "astar(lmcutnumeric(redundant_constraints=true))" > ex2_d1_p.txt
+
+INFO     Running translator.
+INFO     translator input: ['icaps21_lm_cut_ex2/d1.pddl', 'icaps21_lm_cut_ex2/p.pddl']
+INFO     translator arguments: []
+INFO     translator time limit: None
+INFO     translator memory limit: None
+INFO     callstring: /usr/bin/python2.7 /home/luigi/Desktop/numeric-fast-downward/builds/release64/bin/translate/translate.py icaps21_lm_cut_ex2/d1.pddl icaps21_lm_cut_ex2/p.pddl
+Parsing...
+Parsing: [0.000s CPU, 0.002s wall-clock]
+Handling Global Constraints... [0.000s CPU, 0.000s wall-clock]
+Normalizing task... [0.010s CPU, 0.001s wall-clock]
+Instantiating...
+Generating Datalog program... [0.000s CPU, 0.000s wall-clock]
+Normalizing Datalog program...
+Trivial rules: Converted to facts.
+Normalizing Datalog program: [0.000s CPU, 0.001s wall-clock]
+Preparing model... [0.000s CPU, 0.000s wall-clock]
+Generated 25 rules.
+Computing model... [0.000s CPU, 0.000s wall-clock]
+24 relevant atoms
+0 auxiliary atoms
+24 final queue length
+30 total queue pushes
+Completing instantiation... [0.000s CPU, 0.000s wall-clock]
+Instantiating: [0.000s CPU, 0.003s wall-clock]
+Task converted to SAS.
+Relaxed_reachable: True
+List of 5 Atoms:
+List of 4 numeric Fluents:
+List of 3 Actions:
+List of 1 propositional Axioms:
+List of 5 numeric Axioms:
+List of 0 constant predicates from initial state
+List of 0 constant numeric predicates from initial state
+List of 3 reachable Action Parameters:
+Computing fact groups...
+Finding invariants...
+2 initial candidates
+Finding invariants: [0.000s CPU, 0.000s wall-clock]
+Checking invariant weight... [0.000s CPU, 0.000s wall-clock]
+Instantiating groups... [0.000s CPU, 0.000s wall-clock]
+Collecting mutex groups... [0.000s CPU, 0.000s wall-clock]
+Choosing groups...
+5 uncovered facts
+Choosing groups: [0.000s CPU, 0.000s wall-clock]
+Building translation key... [0.000s CPU, 0.000s wall-clock]
+Computing fact groups: [0.000s CPU, 0.000s wall-clock]
+Handling numeric axioms... [0.000s CPU, 0.000s wall-clock]
+Building STRIPS to SAS dictionary... [0.000s CPU, 0.000s wall-clock]
+Building dictionary for full mutex groups... [0.000s CPU, 0.000s wall-clock]
+Building mutex information...
+Building mutex information: [0.000s CPU, 0.000s wall-clock]
+Translating task...
+Processing axioms...
+Simplifying axioms... [0.000s CPU, 0.000s wall-clock]
+Processing axioms: [0.000s CPU, 0.000s wall-clock]
+Translating task: [0.000s CPU, 0.000s wall-clock]
+0 effect conditions simplified
+0 implied preconditions added
+Detecting unreachable propositions...
+Simplifyed global constraint to new variable ordering [(1, 0)]
+0 operators removed
+0 axioms removed
+4 propositions removed
+Detecting unreachable propositions: [0.000s CPU, 0.000s wall-clock]
+Translator variables: 5
+Translator derived variables: 3
+Translator facts: 12
+Translator goal facts: 1
+Translator mutex groups: 0
+Translator total mutex groups size: 0
+Translator operators: 3
+Translator axioms: 1
+Translator task size: 39
+Translator peak memory: 18828 KB
+Writing output... [0.000s CPU, 0.001s wall-clock]
+Done! [0.010s CPU, 0.008s wall-clock]
+INFO     Running preprocessor (release64).
+INFO     preprocessor input: output.sas
+INFO     preprocessor arguments: []
+INFO     preprocessor time limit: None
+INFO     preprocessor memory limit: None
+INFO     callstring: /home/luigi/Desktop/numeric-fast-downward/builds/release64/bin/preprocess < output.sas
+read global constraint at var 1 value 0
+var1 [range 2; derived; layer: 3] {Atom new-axiom@0(), NegatedAtom new-axiom@0(), }
+Building causal graph...
+The causal graph is acyclic.
+5 variables of 5 necessary
+7 numeric variables of 7 necessary
+0 of 0 mutex groups necessary.
+3 of 3 operators necessary.
+1 of 1 axiom rules necessary.
+2 of 2 axiom_functional comparison rules necessary.
+2 of 2 axiom_functional assignment rules necessary.
+Building domain transition graphs...
+solveable in poly time 0
+Building successor generator...
+Preprocessor facts: 12
+Preprocessor derived variables: 3
+Preprocessor task size: 35
+Writing output...
+done
+INFO     Running search (release64).
+INFO     search input: output
+INFO     search arguments: ['--search', 'astar(lmcutnumeric(redundant_constraints=true))']
+INFO     search time limit: None
+INFO     search memory limit: None
+INFO     search executable: /home/luigi/Desktop/numeric-fast-downward/builds/release64/bin/downward
+INFO     callstring: /home/luigi/Desktop/numeric-fast-downward/builds/release64/bin/downward --search 'astar(lmcutnumeric(redundant_constraints=true))' --internal-plan-file sas_plan < output
+reading input... [t=6.5714e-05s]
+done reading input! [t=0.000297518s]
+packing state variables...done! [t=0.00030928s]
+Variables: 5
+Facts: 12
+Bytes per state: 32
+Building successor generator...done! [t=0.000346079s]
+done initalizing global data [t=0.000350167s]
+pruning method: none
+The current working directory is /home/luigi/Desktop/numeric-fast-downwardConducting best first search with reopening closed nodes, (real) bound = 2147483647
+Initializing landmark cut heuristic...
+ops 3, prop: 16, numeric conditions 2
+New best heuristic value for lmcutnumeric(redundant_constraints = true): 4
+[g=0, 1 evaluated, 0 expanded, t=0.00061323s, 9864 KB]
+f = 4 [1 evaluated, 0 expanded, t=0.000686387s, 9864 KB]
+Initial heuristic value for lmcutnumeric(redundant_constraints = true): 4
+New best heuristic value for lmcutnumeric(redundant_constraints = true): 3
+[g=1, 2 evaluated, 1 expanded, t=0.000737764s, 9864 KB]
+New best heuristic value for lmcutnumeric(redundant_constraints = true): 2
+[g=2, 3 evaluated, 2 expanded, t=0.000778721s, 9864 KB]
+New best heuristic value for lmcutnumeric(redundant_constraints = true): 1
+[g=3, 6 evaluated, 3 expanded, t=0.00086371s, 9864 KB]
+New best heuristic value for lmcutnumeric(redundant_constraints = true): 0
+[g=4, 8 evaluated, 4 expanded, t=0.000911309s, 9864 KB]
+Solution found!
+Actual search time: 0.000222517s [t=0.000941616s]
+a1  (1)
+a1  (1)
+a2  (1)
+a3  (1)
+Plan length: 4 step(s).
+Plan cost: 4
+Expanded 5 state(s).
+Reopened 0 state(s).
+Evaluated 8 state(s).
+Evaluations: 8
+Generated 8 state(s).
+Dead ends: 0 state(s).
+Expanded until last jump: 0 state(s).
+Reopened until last jump: 0 state(s).
+Evaluated until last jump: 1 state(s).
+Generated until last jump: 0 state(s).
+Number of registered states: 8
+Search time: 0.000401103s
+Total time: 0.000945483s
+Solution found.
+Peak memory: 9864 KB

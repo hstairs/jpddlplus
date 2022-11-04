@@ -1,4 +1,4 @@
-(define (problem problem_name) (:domain domain_name)
+(define (problem problem_name) (:domain domainname)
 (:init
     (a)
     (= (x) 0)

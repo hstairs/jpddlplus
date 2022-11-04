@@ -53,6 +53,4 @@ public class ComparisonTest extends TestCase {
         
         assertEquals(true, eq.isSatisfied(68.0,68.00000101327896));
     }
-    // TODO add test methods here. The name must begin with 'test'. For example:
-    // public void testHello() {}
 }
