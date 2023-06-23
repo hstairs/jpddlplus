@@ -50,6 +50,7 @@ import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.tree.Tree;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.jgrapht.alg.util.Pair;
+import se_util.ReadSimulatedEffects;
 
 /**
  * @author enrico
@@ -188,6 +189,7 @@ public class PDDLProblem implements SearchProblem {
             Logger.getLogger(PDDLProblem.class.getName()).log(Level.SEVERE, null, ex);
         }
         indexObject = 0;
+        ReadSimulatedEffects.setNumFluents(new ArrayList(initNumFluentsValues.keySet()));
     }
 
     /**
@@ -335,6 +337,7 @@ public class PDDLProblem implements SearchProblem {
 
             for (TransitionGround gr : transitions) {
                 gr.updateInvariantFluents(actualFluents);
+                ReadSimulatedEffects.addSimulatedFluents(gr,actualFluents);
 
             }
         }
