@@ -31,21 +31,10 @@ The library depends on a number of libs, some for the PDDL parsing, other for so
 
 ## Compilation
 
-You can use the library *off-the-shelf* but you can also decide to compile that. I am going to add a building file that should do the job for you. For the moment you should do the compilation manually (shouldn't be much of a problem though)
+In order to compile, just execute the command "compile" from shell. This will produce a jar file, jpddlplus.jar which can be both used as a library or as a standlone program (see below).
+The other way is to use an IDE such as intelliJIdea.
+
 
 ## Already in the box: a clone of the ENHSP planner
 
-Besides many other things, the API has some self-contained planners such as the ENHSP planner (which stands for Expressive Numeric Heuristic Search Planner). I heavily suggest you to install the planner starting from [here](https://bitbucket.org/enricode/enhsp.-numeric-heuristic-search-pddl-planner) if you want to use the planner.
-
-By the way you can use a version of that planner also from here. It can be invoked with:
-
-java -jar dist/PPMaJal2.jar -o <domain_file> -f <problem_file> -h <configuration> -s <search-strategy> -gw <weight for the g-values> -hw <weight for the h-values> -break_ties <larger_g, smaller_g, arbitrary>
-
-In particular the -h accepts the following parameters
-
-- 1, to get h_add
-- 3, to get h_max
-- 112, to get Additive Interval Based Relaxation (as for ECAI 2016 paper)
-- exp_gc, experimental version of something which is similar to h^m relaxation
-
-There are also other settings, and new things in the frontend that can be accessed by running the planner without any parameter.
+Besides many other things, the API has some self-contained planners such as the ENHSP planner (which stands for Expressive Numeric Heuristic Search Planner). I heavily suggest you to install the planner starting from its webpage if you want to use it: 
