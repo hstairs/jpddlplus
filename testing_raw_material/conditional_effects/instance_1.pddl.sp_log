@@ -1,1 +1,0 @@
-{"distance":3.4028235E38,"visit_step":-1,"ancestor":"init_state","visited":false,"action":"init_state","action_cost_to_get_here":0.0,"state":"(:init\n  (a)\n)","descendants":[]}

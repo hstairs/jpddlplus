@@ -1,12 +1,12 @@
-# What is PPMaJal?
+# What is JPDDLPLUS?
 
-This repository contains the PPMaJal API, which is a planning manager library meant to build systems that speak the PDDL language. It supports many features that go way beyond classical planning, such as numeric representations, linear and non-linear constraints, autonomout processes, events, global constraints and other things.
+This repository contains the JPDDLPLUS API, which is a planning manager library meant to build systems that speak the PDDL language. It supports many features that go way beyond classical planning, such as numeric representations, linear and non-linear constraints, autonomout processes, events, global constraints and other things. This is an evolution of the PPMAJAL Library, now deprecated.
 
 This API has been used as basis for many projects, all related to Automated Planning (deterministic, non-deterministic), Replanning, Plan Execution, SMT Planning.
 
 For more information on its applications have a look at some of the papers in [Google Scholar](https://scholar.google.com.au/citations?user=lgfpklAAAAAJ&hl=en)
 
-The theoretical basis of the more recent advances of the library can be found in the following papers:
+The theoretical basis of some of the key features of the library can be found in the following papers:
 
 E. Scala, P. Haslum, S. Thiebaux: **Heuristics for Numeric Planning via Subgoaling**, IJCAI 2016
 
@@ -18,27 +18,16 @@ E. Scala, P. Haslum, S. Thiebaux, M. Ramirex, **Interval-Based Relaxation for Ge
 
 M Ramirez, E Scala, P Haslum, S Thiebaux, **Numerical Integration and Dynamic Discretization in Heuristic Search Planning over Hybrid Domains**, arXiv 2016
 
-Some of the planners built on top of PPMaJaL have be made public into the following bitbucket repositories:
+Some of the planners built on top of JPDDLPLUS have be made public into the following bitbucket repositories:
 
 *The SMT Planner* can be downloaded from [here](https://bitbucket.org/enricode/springroll-smt-hybrid-planner)
 
-*The ENHSP Planner* can be downloaded from [here](https://bitbucket.org/enricode/enhsp)
+*The ENHSP Planner* can be downloaded from [here](https://gitlab.com/enricos83/ENHSP-Public/-/tree/enhsp-20?ref_type=heads)
 
 
 ## Dependencies
 
-The library depends on a number of libs, some for the PDDL parsing, other for some standard algorithm on graphs, and some to interface the API with lp solvers:
-
-In particular:
-
-- [Antlr 3.4](http://www.antlr3.org) is used for parsing pddl problems. [Here](http://www.antlr3.org/download/antlr-3.4-complete.jar) the link to the actual library file that needs to be linked
-- [Jgraph](http://jgrapht.org). This is for general algorithms on graphs
-- [Ojalgo](http://ojalgo.org). The version used is the v40
-- [Json Simple](https://github.com/fangyidong/json-simple). This is used to store information of the search space explored.
-
-They are all open source projects, so is this library. For your convenience, the necessary jar files are all under the lib folder.
-
-We tested also CPLEX for some of the optimisation required, but for the instances with dealt with, we did not observe substantial improvements. To use CPLEX optimization you need to link the oplall.jar file, which comes with the library. However, CPLEX is not free, so you need to buy or get an academic licence first of being allowed to download it.
+The library depends on a number of libs, some for the PDDL parsing, other for some standard algorithm on graphs, and some to interface the API with lp solvers. All such libraries are in the jar_dependencies folder. Have a look inside to get an understanding on the dependencies.
 
 ## Compilation
 
