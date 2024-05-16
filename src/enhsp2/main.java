@@ -1,7 +1,4 @@
-package enhsp2;
-
-
-/* 
+/*
  * Copyright (C) 2015-2017, Enrico Scala, contact: enricos83@gmail.com
  *
  * This library is free software; you can redistribute it and/or
@@ -21,12 +18,14 @@ package enhsp2;
  */
 
 
+import enhsp2.ENHSP;
+
 public class main {
 
 
 
     public static void main(String[] args) throws Exception {
-        enhsp2.ENHSP p = new enhsp2.ENHSP(false);
+        ENHSP p = new ENHSP(false);
         p.parseInput(args);
         p.configurePlanner();
         p.parsingDomainAndProblem(args);
