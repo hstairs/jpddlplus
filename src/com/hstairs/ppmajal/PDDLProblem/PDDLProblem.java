@@ -454,7 +454,7 @@ public class PDDLProblem implements SearchProblem {
             final Aibr heuristic = new Aibr(this, true);
             final float v = heuristic.computeEstimate(this.init);
             if (v == Float.MAX_VALUE) {
-                out.println("Problem Detected as Unsolvable");
+                out.println("Problem Detected as Unsolvable by AIBR during preprocessing");
                 return false;
             }
             final Collection<TransitionGround> transitions = heuristic.getAllTransitions();

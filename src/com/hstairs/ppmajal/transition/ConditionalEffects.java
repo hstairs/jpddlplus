@@ -1,5 +1,6 @@
 package com.hstairs.ppmajal.transition;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLState;
 import com.hstairs.ppmajal.conditions.BoolPredicate;
 import com.hstairs.ppmajal.conditions.Condition;
 import com.hstairs.ppmajal.conditions.NotCond;
@@ -9,6 +10,10 @@ import com.hstairs.ppmajal.domain.Variable;
 import com.hstairs.ppmajal.expressions.NumEffect;
 import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.problem.RelState;
+import com.hstairs.ppmajal.problem.State;
+
 import java.util.*;
 
 public class ConditionalEffects<T> {
@@ -102,6 +107,8 @@ public class ConditionalEffects<T> {
         }
         return unconditionalEffect;
     }
+
+
 
     public Map<Condition, Collection<T>> getActualConditionalEffects() {
         if (actualConditionalEffects == null){
@@ -230,6 +237,80 @@ public class ConditionalEffects<T> {
             }
         }
         return res;
+    }
+
+    public boolean canBeRelaxedApplied(RelState s) {
+        if (actualConditionalEffects == null && unconditionalEffect == null){
+            return true;
+        }
+        if (actualConditionalEffects != null) {
+            for (var entry : actualConditionalEffects.entrySet()) {
+                for (var numF:entry.getKey().getInvolvedFluents()){
+                    if (s.functionValues(numF) == null)
+                        return false;
+                }
+                for (var eff : entry.getValue()) {
+                    if (!(checkEffect(eff,s)))
+                        return false;
+                }
+            }
+        }
+        if (unconditionalEffect != null) {
+            for (var eff : unconditionalEffect) {
+                if (!(checkEffect(eff,s)))
+                    return false;
+            }
+        }
+        return true;
+    }
+    public boolean canBeApplied(State s){
+        if (actualConditionalEffects == null && unconditionalEffect == null){
+            return true;
+        }
+        if (actualConditionalEffects != null) {
+            for (var entry : actualConditionalEffects.entrySet()) {
+                for (var numF:entry.getKey().getInvolvedFluents()){
+                    if (Double.isNaN(((PDDLState) s).fluentValue(numF)))
+                        return false;
+                }
+                for (var eff : entry.getValue()) {
+                    if (!checkEffect(eff,s))
+                        return false;
+                }
+            }
+        }
+        if (unconditionalEffect != null) {
+            for (var eff : unconditionalEffect) {
+                if (!checkEffect(eff,s))
+                    return false;
+            }
+        }
+        return true;
+    }
+    private boolean checkEffect(T eff, State s){
+        if (eff instanceof NumEffect neff) {
+            if (!neff.operator.equals("assign") && Double.isNaN(((PDDLState) s).fluentValue(((NumEffect) eff).getFluentAffected())))
+                return false;
+            for (var numFluent : neff.getInvolvedNumericFluents()) {
+                if (Double.isNaN(((PDDLState) s).fluentValue(numFluent))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    private boolean checkEffect(T eff, RelState s){
+        if (eff instanceof NumEffect neff) {
+            if (!((NumEffect) eff).operator.equals("assign") && s.functionValues(((NumEffect) eff).getFluentAffected()) == null){
+                return false;
+            }
+            for (var numFluent : neff.getInvolvedNumericFluents()) {
+                if (s.functionValues(numFluent) == null) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
     public enum VariableType {PROPEFFECT, NUMEFFECT}
 

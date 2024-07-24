@@ -276,7 +276,7 @@ public class NumEffect extends Expression implements PostCondition {
     }
 
     @Override
-    public Set getInvolvedNumericFluents ( ) {
+    public Set<NumFluent> getInvolvedNumericFluents ( ) {
         return this.right.getInvolvedNumericFluents();
     }
 

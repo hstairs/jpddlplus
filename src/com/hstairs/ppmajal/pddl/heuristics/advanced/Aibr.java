@@ -210,35 +210,37 @@ public final class Aibr implements SearchHeuristic {
                 int current = iterator.nextInt();
                 final TransitionGround tr = (TransitionGround) Transition.getTransition(supporter2transition[current]);
                 final boolean b = conditionSatisfied.get(current);
-                if (b || relState.satisfy(tr.getPreconditions())) {
-                    if (!b){
-                        conditionSatisfied.set(current,true);
-                    }
+                if (!reachability || tr.getConditionalNumericEffects().canBeRelaxedApplied(relState)) {
+                    if (b || relState.satisfy(tr.getPreconditions())) {
+                        if (!b) {
+                            conditionSatisfied.set(current, true);
+                        }
 //                if (relState.satisfy(tr.getPreconditions())) {
 ////                    if (!b){
 //                        conditionSatisfied.set(current,true);
 ////                    }
-                    final int id = tr.getId();
-                    if (!actionInserted.get(id)) {
-                        if (DEBUG) {
-                            System.out.println("Add Supporter: "+names.get(current));
-                            System.out.println("with precondition: "+tr.getPreconditions());
+                        final int id = tr.getId();
+                        if (!actionInserted.get(id)) {
+                            if (DEBUG) {
+                                System.out.println("Add Supporter: " + names.get(current));
+                                System.out.println("with precondition: " + tr.getPreconditions());
+                            }
+                            reachableActionsThisStage.add(id);
+                            actionInserted.set(id, true);
                         }
-                        reachableActionsThisStage.add(id);
-                        actionInserted.set(id, true);
-                    }
-                    //Prop effect
-                    final Collection<Terminal> terminals = supporter2propeffect[current];
-                    if (terminals != null && !terminals.isEmpty()) {
-                        iterator.remove();
-                        propAppliers.add(current);
-                    } else {
-                        final NumEffect numEffect = supporter2numeffect[current];
-                        if (numEffect != null) {
-                            final Condition condition2 = supporter2aymptoticeffects[current];
-                            if (condition2 == null || relState.satisfy(condition2)) {
-                                iterator.remove();
-                                numAppliers.add(current);
+                        //Prop effect
+                        final Collection<Terminal> terminals = supporter2propeffect[current];
+                        if (terminals != null && !terminals.isEmpty()) {
+                            iterator.remove();
+                            propAppliers.add(current);
+                        } else {
+                            final NumEffect numEffect = supporter2numeffect[current];
+                            if (numEffect != null) {
+                                final Condition condition2 = supporter2aymptoticeffects[current];
+                                if (condition2 == null || relState.satisfy(condition2)) {
+                                    iterator.remove();
+                                    numAppliers.add(current);
+                                }
                             }
                         }
                     }
