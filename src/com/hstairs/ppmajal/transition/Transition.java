@@ -191,6 +191,9 @@ public abstract class Transition {
         Collection<NumFluent> res = new ArrayList<>();
         for (NumEffect e: (Collection<NumEffect>)this.getConditionalNumericEffects().getAllEffects()){
             res.addAll(e.getRight().getInvolvedNumericFluents());
+            if (!e.operator.equals("assign")){
+                res.add(e.getFluentAffected());
+            }
         }
         return res;
     }
