@@ -598,6 +598,8 @@ public class ExtendedNormExpression extends Expression {
                     definitelyUndefined = false;
                     temp = temp.mult(a.n);
                     ret = ret.sum(temp);
+                }else{
+                    return null;
                 }
             } else {
                 definitelyUndefined = false;

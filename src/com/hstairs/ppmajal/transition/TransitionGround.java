@@ -46,8 +46,9 @@ public class TransitionGround extends Transition {
         return parameters;
     }
 
-    public boolean isApplicable(State s) {
-        //return (this.preconditions.isSatisfied(s) && this.conditionalNumericEffects.canBeApplied(s));
+    public boolean isApplicable(State s, boolean checkEffects) {
+        if (checkEffects)
+            return (this.preconditions.isSatisfied(s) && this.conditionalNumericEffects.canBeApplied(s));
         return (this.preconditions.isSatisfied(s));
 
     }

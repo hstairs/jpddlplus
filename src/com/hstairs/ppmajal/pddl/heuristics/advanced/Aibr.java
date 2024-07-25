@@ -330,7 +330,7 @@ public final class Aibr implements SearchHeuristic {
     @Override
     public Collection<TransitionGround> getAllTransitions() {
         if (reachableTransitions == null) {
-            throw new RuntimeException("Helpful Transitions can only be activatated in combination with the relaxed plan extraction");
+            throw new RuntimeException("Reachable transitions computed by AIBR is null");
         }
         return reachableTransitions;
     }
