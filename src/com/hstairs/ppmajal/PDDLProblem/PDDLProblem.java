@@ -455,25 +455,25 @@ public class PDDLProblem implements SearchProblem {
             System.out.println("Aibr Preprocessing");
             final Aibr heuristic = new Aibr(this, true);
             final float v = heuristic.computeEstimate(this.init);
-
-            final Collection<TransitionGround> transitions = heuristic.getAllTransitions();
-            actions = new ArrayList<>();
-            processesSet = new ArrayList<>();
-            eventsSet = new ArrayList<>();
-            for (final TransitionGround t : transitions) {
-                switch (t.getSemantics()) {
-                    case ACTION:
-                        actions.add(t);
-                        break;
-                    case PROCESS:
-                        processesSet.add(t);
-                        break;
-                    case EVENT:
-                        eventsSet.add(t);
-                        break;
+            if (v != Float.MAX_VALUE) {
+                final Collection<TransitionGround> transitions = heuristic.getAllTransitions();
+                actions = new ArrayList<>();
+                processesSet = new ArrayList<>();
+                eventsSet = new ArrayList<>();
+                for (final TransitionGround t : transitions) {
+                    switch (t.getSemantics()) {
+                        case ACTION:
+                            actions.add(t);
+                            break;
+                        case PROCESS:
+                            processesSet.add(t);
+                            break;
+                        case EVENT:
+                            eventsSet.add(t);
+                            break;
+                    }
                 }
-            }
-            if (v == Float.MAX_VALUE) {
+            }else {
                 out.println("Problem Detected as Unsolvable by AIBR during preprocessing");
                 return false;
             }
@@ -535,7 +535,38 @@ public class PDDLProblem implements SearchProblem {
         out.println("UFX:" + relevantUndefinedVariablesPresent);
         out.println("|F|:" + totNumberOfBoolVariables);
         out.println("|X|:" + totNumberOfNumVariables);
+
         return relSolvable;
+    }
+
+    public void printAllInfo(){
+        out.println("Numeric fluents deemed relevant for search");
+        for (NumFluent nf : NumFluent.numFluentsBank.values()) {
+            if ((this.getActualFluents().contains(nf) && nf.has_to_be_tracked())) {
+                out.println(nf);
+            }
+        }
+        out.println("Boolean fluents deemed relevant for search");
+        for (BoolPredicate p : BoolPredicate.getPredicatesDB().values()) {
+            if (this.getActualFluents().contains(p) ) {
+                out.println(p);
+            }
+
+        }
+        out.println("Actions deemed relevant for search");
+        for (var action : this.actions){
+            out.println(action);
+        }
+
+        out.println("Processes deemed relevant for search");
+        for (var action : this.processesSet){
+            out.println(action);
+        }
+
+        out.println("Events deemed relevant for search");
+        for (var action : this.eventsSet){
+            out.println(action);
+        }
     }
 
 //    private void idifyConditionsAndTransitions (Collection<GroundAction> reachableActions, ComplexCondition liftedGoals, AndCond globalConstraints) {
