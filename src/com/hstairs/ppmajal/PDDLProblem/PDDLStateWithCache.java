@@ -33,8 +33,8 @@ public class PDDLStateWithCache extends PDDLState {
 
     private int[] compSat; //0 is false //1 is true //-1 is unknown
 
-    public PDDLStateWithCache(HashMap<Integer, Double> inputNumFluents, BitSet otherBoolFluents) {
-        super(inputNumFluents, otherBoolFluents);
+    public PDDLStateWithCache(HashMap<Integer, Double> inputNumFluents, BitSet otherBoolFluents, PDDLProblem p) {
+        super(inputNumFluents, otherBoolFluents,p);
         initCompSat();
     }
     

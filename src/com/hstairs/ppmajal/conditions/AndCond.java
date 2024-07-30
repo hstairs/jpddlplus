@@ -387,7 +387,7 @@ public class AndCond extends ComplexCondition implements PostCondition {
     @Override
     public void apply (RelState s, Map modifications) {
         for (Object o : this.sons) {
-//            if ((o instanceof AndCond) 
+//            if ((o instanceof AndCond)
 //                    || (o instanceof Predicate)
 //                    || (o instanceof NotCond)
 //                    || (o instanceof NumEffect)

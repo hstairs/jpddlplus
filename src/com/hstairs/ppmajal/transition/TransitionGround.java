@@ -1,6 +1,7 @@
 package com.hstairs.ppmajal.transition;
 
 import com.google.common.collect.Sets;
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.conditions.BoolPredicate;
 import com.hstairs.ppmajal.conditions.Condition;
 import com.hstairs.ppmajal.conditions.PDDLObject;
@@ -46,9 +47,9 @@ public class TransitionGround extends Transition {
         return parameters;
     }
 
-    public boolean isApplicable(State s, boolean checkEffects) {
+    public boolean isApplicable(State s, boolean checkEffects, PDDLProblem p) {
         if (checkEffects)
-            return (this.preconditions.isSatisfied(s) && this.conditionalNumericEffects.canBeApplied(s));
+            return (this.preconditions.isSatisfied(s) && this.conditionalNumericEffects.canBeApplied(s,p));
         return (this.preconditions.isSatisfied(s));
 
     }

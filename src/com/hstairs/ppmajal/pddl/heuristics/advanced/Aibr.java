@@ -210,7 +210,7 @@ public final class Aibr implements SearchHeuristic {
                 int current = iterator.nextInt();
                 final TransitionGround tr = (TransitionGround) Transition.getTransition(supporter2transition[current]);
                 final boolean b = conditionSatisfied.get(current);
-                if (!reachability || tr.getConditionalNumericEffects().canBeRelaxedApplied(relState)) {
+                if (!reachability || tr.getConditionalNumericEffects().canBeRelaxedApplied(relState,problem)) {
                     if (b || relState.satisfy(tr.getPreconditions())) {
                         if (!b) {
                             conditionSatisfied.set(current, true);
@@ -255,11 +255,11 @@ public final class Aibr implements SearchHeuristic {
             }
             for (final int current : propAppliers) {
                 final Collection<Terminal> terminals = supporter2propeffect[current];
-                relState.apply(terminals, relState.clone());
+                relState.apply(terminals, relState.clone(),this.problem);
             }
             for (final int current : numAppliers) {
                 final NumEffect effect = supporter2numeffect[current];
-                relState.apply(effect, relState.clone());
+                relState.apply(effect, relState.clone(),this.problem);
             }
             if (DEBUG) {
                 System.out.println("State After Action Application:"+relState);
@@ -315,7 +315,7 @@ public final class Aibr implements SearchHeuristic {
                     if (!b) {
                         applicable.set(transition.getId(), true);
                     }
-                    s.apply(transition, (RelState) s.clone());
+                    s.apply(transition, (RelState) s.clone(),problem);
                     counter++;
                     if (s.satisfy(problem.getGoals())) {
                         return counter;

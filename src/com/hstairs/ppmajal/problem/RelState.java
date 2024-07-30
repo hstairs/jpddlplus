@@ -164,18 +164,6 @@ public class RelState extends Object {
 
 
 
-    public void update_values (HashMap subst) {
-        for (final Object o : subst.keySet()) {
-            if (o instanceof NumFluent) {
-                NumFluent nf = (NumFluent) o;
-                if (nf.has_to_be_tracked()) {
-                    this.setFunctionValues(nf, (HomeMadeRealInterval) subst.get(o));
-                }
-            } else {
-                this.possBollValues.put(((BoolPredicate) o).getId(), (int) subst.get(o));
-            }
-        }
-    }
 //
 //    public RelState apply_with_generalized_interval_based_relaxation (TransitionGround gr) {
 //        HashMap subst = new HashMap();
@@ -211,14 +199,14 @@ public class RelState extends Object {
 //        }
 //        return this;
 //    }
-    public void apply(PostCondition effect, RelState prev) {
+    public void apply(PostCondition effect, RelState prev, PDDLProblem prob) {
         if (effect instanceof AndCond){
             for (PostCondition c: (PostCondition[])((AndCond) effect).sons){
-                this.apply((PostCondition)c, prev);
+                this.apply((PostCondition)c, prev,prob);
             }
 
         }else if (effect instanceof Collection){
-            ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev));
+            ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev,prob));
         }else if (effect instanceof NotCond) {
             final NotCond nc = (NotCond) effect;
             final BoolPredicate p = (BoolPredicate) nc.getSon();
@@ -230,29 +218,30 @@ public class RelState extends Object {
                 this.possBollValues.put(((BoolPredicate) effect).getId(), 2);
             }
         } else if (effect instanceof NumEffect) {
-            ((NumEffect) effect).apply(this,prev);
+            if (prob.isSubgoalsRelevant(((NumEffect) effect).getFluentAffected()))
+                ((NumEffect) effect).apply(this,prev);
         }
     }
 
 
 
-    public void apply(Collection<Terminal> effect, RelState prev){
-        ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev));
+    public void apply(Collection<Terminal> effect, RelState prev, PDDLProblem prob){
+        ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev, prob));
     }
 
 
-    public void apply (TransitionGround gr, RelState prev) {
+    public void apply (TransitionGround gr, RelState prev, PDDLProblem prob) {
         final Set<ConditionalEffects> effs = Set.of(gr.getConditionalPropositionalEffects(), gr.getConditionalNumericEffects());
         for (final ConditionalEffects<PostCondition> eff: effs) {
             for (final Map.Entry<Condition, Collection<PostCondition>> entry : eff.getActualConditionalEffects().entrySet()) {
                 if (entry.getKey().isSatisfied(this)) {
                     for (final PostCondition n : entry.getValue()) {
-                        this.apply(n, prev);
+                        this.apply(n, prev,prob);
                     }
                 }
             }
             for (final PostCondition n : eff.getUnconditionalEffect()) {
-                this.apply(n, prev);
+                this.apply(n, prev,prob);
             }
         }
     }

@@ -10,7 +10,6 @@ import com.hstairs.ppmajal.domain.Variable;
 import com.hstairs.ppmajal.expressions.NumEffect;
 import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
-import com.hstairs.ppmajal.expressions.NumFluent;
 import com.hstairs.ppmajal.problem.RelState;
 import com.hstairs.ppmajal.problem.State;
 
@@ -239,7 +238,7 @@ public class ConditionalEffects<T> {
         return res;
     }
 
-    public boolean canBeRelaxedApplied(RelState s) {
+    public boolean canBeRelaxedApplied(RelState s, PDDLProblem problem) {
         if (actualConditionalEffects == null && unconditionalEffect == null){
             return true;
         }
@@ -250,20 +249,20 @@ public class ConditionalEffects<T> {
                         return false;
                 }
                 for (var eff : entry.getValue()) {
-                    if (!(checkEffect(eff,s)))
+                    if (!(checkEffect(eff,s,problem)))
                         return false;
                 }
             }
         }
         if (unconditionalEffect != null) {
             for (var eff : unconditionalEffect) {
-                if (!(checkEffect(eff,s)))
+                if (!(checkEffect(eff,s,problem)))
                     return false;
             }
         }
         return true;
     }
-    public boolean canBeApplied(State s){
+    public boolean canBeApplied(State s, PDDLProblem p){
         if (actualConditionalEffects == null && unconditionalEffect == null){
             return true;
         }
@@ -274,23 +273,30 @@ public class ConditionalEffects<T> {
                         return false;
                 }
                 for (var eff : entry.getValue()) {
-                    if (!checkEffect(eff,s))
+                    if (!checkEffect(eff,s,p))
                         return false;
                 }
             }
         }
         if (unconditionalEffect != null) {
             for (var eff : unconditionalEffect) {
-                if (!checkEffect(eff,s))
+                if (!checkEffect(eff,s,p))
                     return false;
             }
         }
         return true;
     }
-    private boolean checkEffect(T eff, State s){
+    private boolean checkEffect(T eff, State s, PDDLProblem p){
         if (eff instanceof NumEffect neff) {
-            if (!neff.operator.equals("assign") && Double.isNaN(((PDDLState) s).fluentValue(((NumEffect) eff).getFluentAffected())))
-                return false;
+            if (p.isSubgoalsRelevant(((NumEffect) eff).getFluentAffected())) {
+                if (!neff.operator.equals("assign") && Double.isNaN(((PDDLState) s).fluentValue(((NumEffect) eff).getFluentAffected())))
+                    return false;
+            }else {
+                if (p.isCostRelevant(((NumEffect) eff).getFluentAffected())) {
+                    if (p.getInitNumFluentsValues().get(((NumEffect) eff).getFluentAffected()) == null)
+                        return false;
+                }
+            }
             for (var numFluent : neff.getInvolvedNumericFluents()) {
                 if (Double.isNaN(((PDDLState) s).fluentValue(numFluent))) {
                     return false;
@@ -299,10 +305,12 @@ public class ConditionalEffects<T> {
         }
         return true;
     }
-    private boolean checkEffect(T eff, RelState s){
+    private boolean checkEffect(T eff, RelState s, PDDLProblem p){
         if (eff instanceof NumEffect neff) {
-            if (!((NumEffect) eff).operator.equals("assign") && s.functionValues(((NumEffect) eff).getFluentAffected()) == null){
-                return false;
+            if (p.isSubgoalsRelevant(((NumEffect) eff).getFluentAffected())) {
+                if (!((NumEffect) eff).operator.equals("assign") && s.functionValues(((NumEffect) eff).getFluentAffected()) == null) {
+                    return false;
+                }
             }
             for (var numFluent : neff.getInvolvedNumericFluents()) {
                 if (s.functionValues(numFluent) == null) {

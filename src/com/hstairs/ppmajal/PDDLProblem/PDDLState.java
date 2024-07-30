@@ -44,10 +44,14 @@ protected DoubleArrayList numFluents;
     private static int[] fromStateNFId2ProblemNFId;
     protected BitSet boolFluents;
     public BigDecimal time;
+
+    private PDDLProblem p;
     
-    private PDDLState(DoubleArrayList numFluents, BitSet boolFluents) {
+    private PDDLState(DoubleArrayList numFluents, BitSet boolFluents, PDDLProblem prob) {
         this.numFluents = numFluents.clone();
         this.boolFluents = (BitSet) boolFluents.clone();
+        p = prob;
+
     }
 
     public static int[] getFromStateNFId2ProblemNFId() {
@@ -72,7 +76,7 @@ protected DoubleArrayList numFluents;
         super();
     }
 
-    public PDDLState (HashMap<Integer,Double> inputNumFluents, BitSet otherBoolFluents) {
+    public PDDLState (HashMap<Integer,Double> inputNumFluents, BitSet otherBoolFluents, PDDLProblem p) {
         this.numFluents = new DoubleArrayList();
         if (NumFluent.numFluentsBank != null) {
             fromProblemNFId2StateNFId = new int[NumFluent.numFluentsBank.entrySet().size()];
@@ -90,6 +94,7 @@ protected DoubleArrayList numFluents;
         }
         this.boolFluents = (BitSet) otherBoolFluents.clone();
         time = null;
+        this.p = p;
     }
     
 
@@ -113,7 +118,7 @@ protected DoubleArrayList numFluents;
 
     @Override
     public PDDLState clone ( ) {
-        PDDLState ret_val = new PDDLState(this.numFluents, this.boolFluents);
+        PDDLState ret_val = new PDDLState(this.numFluents, this.boolFluents, p);
         ret_val.time = this.time;
         return ret_val;
     }
@@ -325,7 +330,7 @@ protected DoubleArrayList numFluents;
     }
 
 
-    public void apply(PostCondition effect, State prev) {        
+    public void apply(PostCondition effect, State prev) {
         if (effect instanceof AndCond){
             for (PostCondition c: (PostCondition[])((AndCond) effect).sons){
                 this.apply((PostCondition)c, prev);
@@ -337,7 +342,7 @@ protected DoubleArrayList numFluents;
             this.setPropFluent((BoolPredicate) effect, true);
         } else if (effect instanceof NumEffect) {
             final NumEffect nf = (NumEffect) effect;
-            if (nf.getFluentAffected().has_to_be_tracked()) {
+            if (p.isSubgoalsRelevant(nf.getFluentAffected())) {
                 if (nf.getOperator().equals("increase")) {
                     final double currentValue = this.fluentValue(nf.getFluentAffected());
                     if (currentValue != Double.NaN) {

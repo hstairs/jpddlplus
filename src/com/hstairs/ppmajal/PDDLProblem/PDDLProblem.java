@@ -60,6 +60,8 @@ import org.jgrapht.alg.util.Pair;
 public class PDDLProblem implements SearchProblem {
 
     private boolean relevantUndefinedVariablesPresent;
+    private boolean[] subgoalRelevantFluents;
+    private boolean[] costRelevantFluents;
 
     /**
      * @return the name
@@ -340,11 +342,34 @@ public class PDDLProblem implements SearchProblem {
 
             for (TransitionGround gr : transitions) {
                 gr.updateInvariantFluents(actualFluents);
-
             }
         }
 //        System.out.println(actualFluents);
         return actualFluents;
+    }
+
+    public boolean isSubgoalsRelevant(NumFluent nf){
+        return subgoalRelevantFluents != null && subgoalRelevantFluents[nf.getId()];
+    }
+
+    public boolean isCostRelevant(NumFluent nf){
+        return costRelevantFluents != null && costRelevantFluents[nf.getId()];
+    }
+
+    public void setSubgoalRelevant(NumFluent nf){
+        if (subgoalRelevantFluents == null){
+            subgoalRelevantFluents = new boolean[NumFluent.numFluentsBank.size()];
+            Arrays.fill(subgoalRelevantFluents,false);
+        }
+        subgoalRelevantFluents[nf.getId()]= true;
+    }
+
+    public void setCostRelevant(NumFluent nf){
+        if (costRelevantFluents == null){
+            costRelevantFluents = new boolean[NumFluent.numFluentsBank.size()];
+            Arrays.fill(costRelevantFluents,false);
+        }
+        costRelevantFluents[nf.getId()]= true;
     }
 
     private void generateConstraints() throws Exception {
@@ -542,7 +567,7 @@ public class PDDLProblem implements SearchProblem {
     public void printAllInfo(){
         out.println("Numeric fluents deemed relevant for search");
         for (NumFluent nf : NumFluent.numFluentsBank.values()) {
-            if ((this.getActualFluents().contains(nf) && nf.has_to_be_tracked())) {
+            if ((this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf))) {
                 out.println(nf);
             }
         }
@@ -629,7 +654,7 @@ public class PDDLProblem implements SearchProblem {
             for (final Condition c : allConditionalEffects.keySet()) {
                 involved_fluents.addAll(c.getInvolvedFluents());
             }
-            involved_fluents.addAll(a.getNumFluentsNecessaryForExecution());
+
         }
 
 
@@ -638,34 +663,36 @@ public class PDDLProblem implements SearchProblem {
         }
         involved_fluents.addAll(getGoals().getInvolvedFluents());
 
-
-        if (NumFluent.numFluentsBank != null) {
-            Iterator<NumFluent> it = NumFluent.numFluentsBank.values().iterator();
-            while (it.hasNext()) {
-                NumFluent nf2 = it.next();
-                boolean keep_it = false;
-                for (NumFluent nf : involved_fluents) {
-                    if (nf.getName().equals(nf2.getName())) {
-                        keep_it = true;
-                        break;
+        for (var ele: involved_fluents){
+            setSubgoalRelevant(ele);
+        }
+        Metric metric = this.getMetric();
+        if (metric != null){
+            for (var v: metric.getMetExpr().getInvolvedNumericFluents()){
+                setCostRelevant(v);
+            }
+        }
+        for (var t: getTransitions()){
+            for (NumEffect e: t.getConditionalNumericEffects().getAllEffects()){
+                if (this.isSubgoalsRelevant(e.getFluentAffected())) {
+                    for (var v: e.getRight().getInvolvedNumericFluents()){
+                        this.setSubgoalRelevant(v);
                     }
-                }
-                if (!keep_it) {
-                    nf2.needsTrackingInState(false);
-//                    it.remove();
-                } else {
-                    nf2.needsTrackingInState(true);
                 }
             }
         }
+
+
+
     }
+
 
 
     public Set getAllFluents() {
         Set res = new HashSet();
         if (NumFluent.numFluentsBank != null) {
             for (NumFluent nf : NumFluent.numFluentsBank.values()) {
-                if (this.getActualFluents().contains(nf) && nf.has_to_be_tracked()) {
+                if (this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf)) {
                     res.add(nf);
                 }
             }
@@ -699,7 +726,8 @@ public class PDDLProblem implements SearchProblem {
 
         if (NumFluent.numFluentsBank != null) {
             for (NumFluent nf : NumFluent.numFluentsBank.values()) {
-                if ((this.getActualFluents().contains(nf) && nf.has_to_be_tracked()) || !invAnalysis) {
+                if ((this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf)) || !invAnalysis) {
+
                     if (nf.isGrounded()) {
                         PDDLNumber number = this.getInitNumFluentsValues().get(nf);
                         if (number == null) {
@@ -734,12 +762,12 @@ public class PDDLProblem implements SearchProblem {
         }
         PDDLState pddlState = null;
         if (cacheComparison) {
-            pddlState = new PDDLStateWithCache(numFluents, boolFluents);
+            pddlState = new PDDLStateWithCache(numFluents, boolFluents, this);
         } else {
             if (smallExpensive) {
                 pddlState = new PDDLStateWithInt2Double(numFluents, boolFluents);
             } else {
-                pddlState = new PDDLState(numFluents, boolFluents);
+                pddlState = new PDDLState(numFluents, boolFluents, this);
             }
         }
 
@@ -846,7 +874,7 @@ public class PDDLProblem implements SearchProblem {
         while (true) {
             boolean at_least_one = false;
             for (TransitionGround ev : events) {
-                if (ev.isApplicable(s,this.relevantUndefinedVariablesPresent)) {
+                if (ev.isApplicable(s,this.relevantUndefinedVariablesPresent, this)) {
                     at_least_one = true;
                     s.apply(ev, s.clone());
                     ret.add(ev);
@@ -1487,7 +1515,7 @@ public class PDDLProblem implements SearchProblem {
 
                 if (current instanceof TransitionGround transitionGround) {
 
-                    if (transitionGround.isApplicable(source,relevantUndefinedVariablesPresent)) {
+                    if (transitionGround.isApplicable(source,relevantUndefinedVariablesPresent, PDDLProblem.this)) {
                         newState = source.clone();
                         newState.apply(transitionGround, source);
                         if (newState.satisfy(globalConstraints)) {
@@ -1513,7 +1541,7 @@ public class PDDLProblem implements SearchProblem {
             final State prev = source.clone();
             int i = 0;
             while (i < counter) {
-                if (act.isApplicable(prev,relevantUndefinedVariablesPresent) && prev.satisfy(globalConstraints)) {
+                if (act.isApplicable(prev,relevantUndefinedVariablesPresent, PDDLProblem.this) && prev.satisfy(globalConstraints)) {
                     prev.apply((act), prev.clone());
                     i++;
                 } else {
@@ -1703,7 +1731,7 @@ public class PDDLProblem implements SearchProblem {
             for (final TransitionGround act : this.getProcessesSet()) {
                 if (act.getSemantics() == Transition.Semantics.PROCESS) {
                     final TransitionGround gp = (TransitionGround) act;
-                    if (gp.isApplicable(next,relevantUndefinedVariablesPresent)) {
+                    if (gp.isApplicable(next,relevantUndefinedVariablesPresent, this)) {
                         atLeastOne = true;
                         for (final NumEffect eff : (Collection<NumEffect>) gp.getConditionalNumericEffects().getAllEffects()) {
                             numEffect.add(eff);
@@ -1760,7 +1788,7 @@ public class PDDLProblem implements SearchProblem {
         while (true) {
             boolean at_least_one = false;
             for (final TransitionGround ev : this.getEventsSet()) {
-                if (ev.isApplicable(s,relevantUndefinedVariablesPresent)) {
+                if (ev.isApplicable(s,relevantUndefinedVariablesPresent, this)) {
                     at_least_one = true;
                     s.apply(ev, s.clone());
                     if (ret != null)
@@ -1806,7 +1834,7 @@ public class PDDLProblem implements SearchProblem {
             }
             previous = timeAction;
             if (planSize > 1) {
-                if (v.getValue().isApplicable(s,relevantUndefinedVariablesPresent)) {
+                if (v.getValue().isApplicable(s,relevantUndefinedVariablesPresent, this)) {
                     s.apply(v.getValue(), s);
                     res.add(s.clone());
                 } else {

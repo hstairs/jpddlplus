@@ -18,6 +18,7 @@
  */
 package com.hstairs.ppmajal.transition;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.conditions.*;
 import com.hstairs.ppmajal.expressions.ExtendedNormExpression;
 import com.hstairs.ppmajal.expressions.NumEffect;
@@ -187,16 +188,7 @@ public abstract class Transition {
         }
     }
 
-    public Collection<? extends NumFluent> getNumFluentsNecessaryForExecution() {
-        Collection<NumFluent> res = new ArrayList<>();
-        for (NumEffect e: (Collection<NumEffect>)this.getConditionalNumericEffects().getAllEffects()){
-            res.addAll(e.getRight().getInvolvedNumericFluents());
-            if (!e.operator.equals("assign")){
-                res.add(e.getFluentAffected());
-            }
-        }
-        return res;
-    }
+
     //todo: cache this
     public Collection<Terminal> getAllAchievableLiterals() {
         if (achievableLiterals == null) {

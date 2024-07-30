@@ -439,9 +439,9 @@ public class NumEffect extends Expression implements PostCondition {
 
     @Override
     public void apply (State s, Map modifications) {
-        if (!fluentAffected.has_to_be_tracked()) {
-            return;
-        }
+//        if (!fluentAffected.has_to_be_tracked()) {
+//            return;
+//        }
 
         Double after = null;
         Double eval = this.getRight().eval(s);
@@ -477,9 +477,9 @@ public class NumEffect extends Expression implements PostCondition {
 
     @Override
     public void apply (RelState s, Map modifications) {
-        if (!fluentAffected.has_to_be_tracked()) {
-            return;
-        }
+//        if (!fluentAffected.has_to_be_tracked()) {
+//            return;
+//        }
         HomeMadeRealInterval after = null;
         final HomeMadeRealInterval current = s.functionValues(fluentAffected);
 
@@ -534,9 +534,9 @@ public class NumEffect extends Expression implements PostCondition {
 
 
     public RelState apply (RelState s, RelState prev) {
-        if (!fluentAffected.has_to_be_tracked()) {
-            return s;
-        }
+//        if (!fluentAffected.has_to_be_tracked()) {
+//            return s;
+//        }
         HomeMadeRealInterval after = null;
         final HomeMadeRealInterval current = prev.functionValues(fluentAffected);
 
