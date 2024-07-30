@@ -85,8 +85,10 @@ public class WAStar extends SearchEngine {
             out.println("Initial State is not valid");
             return null;
         }
-        long timeAtStart = System.currentTimeMillis();
+                long timeAtStart = System.currentTimeMillis();
         hAtInit = h.computeEstimate(initState);
+        out.println("h(I):"+hAtInit);
+
         heuristicTime += System.currentTimeMillis() - timeAtStart;
         if (hAtInit == Float.MAX_VALUE) {
             deadEndsDetected++;

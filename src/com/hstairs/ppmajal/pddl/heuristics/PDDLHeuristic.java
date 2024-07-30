@@ -6,11 +6,7 @@
 package com.hstairs.ppmajal.pddl.heuristics;
 
 import com.hstairs.ppmajal.conditions.AndCond;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.GoalCounting;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.HGen;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.LM;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.*;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.experimental.H1Fix;
@@ -42,6 +38,9 @@ public class PDDLHeuristic {
                         redundantConstraints, helpfulActionsPruning, false, helpfulTransitions,
                         false, redConstraint,toOneTransformation);
 
+            }
+            case "ngc":{
+                return new NumericGoalCounting(heuristicProblem);
             }
             case "hradd": {
                 return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false,false);

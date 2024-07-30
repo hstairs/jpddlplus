@@ -32,7 +32,7 @@ import java.util.Collection;
  */
 public class GoalCounting implements SearchHeuristic{
 
-    final private PDDLProblem problem;
+    final protected PDDLProblem problem;
     public GoalCounting(PDDLProblem problem){
         this.problem = problem;
     }
