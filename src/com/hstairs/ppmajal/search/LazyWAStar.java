@@ -98,15 +98,13 @@ public class LazyWAStar extends WAStar {
                                 if (Objects.equals(previousCost, this.G_DEFAULT) || (optimality && successorG < previousCost)) { //Otherwise already seen
                                     float hValue = hExpanded;
                                     Object t;
-                                    boolean isMultiAction = false;
-                                    if (act instanceof ImmutablePair) {
-                                        t = ((ImmutablePair<?, ?>) act).getLeft();
+                                    if (act instanceof ImmutablePair tr) {
+                                        t = tr.getLeft();
                                     } else {
                                         t = act;
-                                        isMultiAction = true;
                                     }
                                     //if (!helpfulActions || helpfulActionsWithPruning || helpful.contains(t)){
-                                    if (helpfulActions && helpful.contains(t) && isMultiAction) {
+                                    if (helpfulActions && helpful.contains(t) ) {
                                         hValue -= (successorG - currentNode.gValue);
                                         hValue = Math.max(0, hValue);
                                     } else {
