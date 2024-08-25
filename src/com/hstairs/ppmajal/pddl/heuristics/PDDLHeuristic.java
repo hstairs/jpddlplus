@@ -42,6 +42,9 @@ public class PDDLHeuristic {
             case "ngc":{
                 return new NumericGoalCounting(heuristicProblem);
             }
+            case "mgc":{
+                return new ManhattanHeuristic(heuristicProblem);
+            }
             case "hradd": {
                 return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false,false);
 
