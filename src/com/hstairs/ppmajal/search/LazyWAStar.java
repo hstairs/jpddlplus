@@ -3,6 +3,7 @@ package com.hstairs.ppmajal.search;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
@@ -10,6 +11,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.jgrapht.alg.util.Pair;
 
 import java.io.PrintStream;
+import java.sql.Array;
 import java.util.*;
 
 public class LazyWAStar extends WAStar {
@@ -25,11 +27,19 @@ public class LazyWAStar extends WAStar {
         this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false);
     }
 
-    Object[] getActionsToSearch(SimpleSearchNode currentNode, SearchProblem problem, SearchHeuristic h) {
-        if (helpfulActionsWithPruning && currentNode != null) {
-            return ((SearchNode) currentNode).helpfulActions;
+    Object[] getActionsToSearch(List helpful, SearchHeuristic h) {
+
+        ArrayList res = new ArrayList();
+        res.addAll(h.getAllTransitions());
+        if (helpful!= null){
+            for (var v: helpful) {
+                if (!(v instanceof TransitionGround)) {
+                    res.add(v);
+                }
+            }
         }
-        return h.getTransitions(false);
+
+        return res.toArray();
     }
 
     @Override
@@ -84,8 +94,10 @@ public class LazyWAStar extends WAStar {
                     heuristicTime += System.currentTimeMillis() - start;
                     bestf = printInfoDuringSearch(timeAtStart, out, bestf, fromTheBeginning,
                             nodesExpanded, nodesEvaluated, frontier, currentNode);
-                    for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,
-                            getActionsToSearch(currentNode, problem, h)); it.hasNext(); ) {
+
+                    Object[] actionsToSearch = getActionsToSearch(helpful,h);
+                    for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch
+                            ); it.hasNext(); ) {
                         final Pair<State, Object> next = it.next();
                         final State successorState = next.getFirst();
                         final Object act = next.getSecond();
@@ -98,28 +110,34 @@ public class LazyWAStar extends WAStar {
                                 if (Objects.equals(previousCost, this.G_DEFAULT) || (optimality && successorG < previousCost)) { //Otherwise already seen
                                     float hValue = hExpanded;
                                     Object t;
+                                    boolean helpT = false;
                                     if (act instanceof ImmutablePair tr) {
                                         t = tr.getLeft();
+                                        helpT = true;
                                     } else {
                                         t = act;
                                     }
                                     //if (!helpfulActions || helpfulActionsWithPruning || helpful.contains(t)){
                                     if (helpfulActions && helpful.contains(t) ) {
-                                        hValue -= (successorG - currentNode.gValue);
+                                        if (helpT) {
+                                            //hValue = h.computeEstimate(successorState);
+                                            hValue -= (successorG - currentNode.gValue);///(int)((ImmutablePair)act).getRight();
+                                        }else{
+                                            hValue -= (successorG - currentNode.gValue);
+                                        }
                                         hValue = Math.max(0, hValue);
-                                    } else {
-                                        //System.out.println("Is this done?");
-                                        //hValue*=1.9f;
                                     }
-                                    final SearchNode toExplore = new SearchNode(successorState, act,
-                                            currentNode, successorG, !optimality
-                                            ? hValue : successorG + hValue * hw, hValue, saveSearchSpace);
-                                    if (saveSearchSpace) {
-                                        currentNode.add_descendant(toExplore);
-                                    }
-                                    addInFrontier(frontier, toExplore);
-                                    gValueMap.put(successorState.getRepresentative(), successorG);
                                     nodesEvaluated++;
+                                    //if (hValue != Float.MAX_VALUE && (!helpT || hValue <hExpanded)) {
+                                        final SearchNode toExplore = new SearchNode(successorState, act,
+                                                currentNode, successorG, !optimality
+                                                ? hValue : successorG + hValue * hw, hValue, saveSearchSpace);
+                                        if (saveSearchSpace) {
+                                            currentNode.add_descendant(toExplore);
+                                        }
+                                        addInFrontier(frontier, toExplore);
+                                        gValueMap.put(successorState.getRepresentative(), successorG);
+                                    //}
                                 } else {
                                     duplicatedDetected++;
                                 }
