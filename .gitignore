@@ -10,3 +10,4 @@ nbdist/
 .DS_Store
 nbproject/
 build.xml
+.vscode

@@ -5,22 +5,34 @@
 package com.hstairs.ppmajal.pddl.heuristics.advanced;
 
 import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
 import com.hstairs.ppmajal.conditions.Comparison;
 import com.hstairs.ppmajal.conditions.Condition;
 import com.hstairs.ppmajal.conditions.OrCond;
+import com.hstairs.ppmajal.conditions.PostCondition;
 import com.hstairs.ppmajal.conditions.Terminal;
 import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.PDDLNumber;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.ppmajal.expressions.ExtendedAddendum;
+import com.hstairs.ppmajal.expressions.ExtendedNormExpression;
+import com.hstairs.ppmajal.expressions.HomeMadeRealInterval;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
+
+import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 
 /**
  *
@@ -37,6 +49,7 @@ public class ProblemTransfomer {
     private static Collection[] transition2cptransition;
     private static int[] cptransition2transition;
     private static boolean conditionalEffectsSensitive = true;
+    private static boolean linearEffectsSensitive = true;
     private static int pseudoGoal;
     private static Int2ObjectOpenHashMap preconditionFunctionMap;
     private static Int2ObjectOpenHashMap propEffectFunctionMap;
@@ -103,28 +116,99 @@ public class ProblemTransfomer {
                 nTransitions, pseudoGoal, transition2cptransition, cptransition2transition);
     }
 
+    private static <T> void addCondeff(HashSetValuedHashMap<Condition, T> condeffs, Condition condition, T eff) {
+        if (condeffs.containsKey(condition)){
+            condeffs.get(condition).add(eff);
+        } else {
+            condeffs.put(condition, eff);
+        }
+    }
+
+    private static <T> void fillSimpleCondeff(HashSetValuedHashMap<Condition, T> condeffs, Condition condition, T effect){
+        Condition res = new AndCond(new HashSet<>());
+        if (!condition.isValid()) {res = res.and(condition);}
+        addCondeff(condeffs, condition, effect);
+    }
+
+    private static void fillNewCondeffs(HashSetValuedHashMap<Condition, Object> condeffs, Condition condition, NumEffect neff, List<HomeMadeRealInterval> intervals){
+        Condition res = new AndCond(new HashSet<>());
+        if (!condition.isValid()) {res = res.and(condition);}
+
+        for (HomeMadeRealInterval interval: intervals){
+            Condition cond_interval = null;
+            double constant_effect = 0;
+            // Do some checks on the interval here!
+            if (interval.lo() == -Double.MAX_VALUE){
+                cond_interval = res.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.hi()), false));
+                constant_effect = -1;
+            } else if (interval.hi() == Double.MAX_VALUE){
+                cond_interval = res.and(Comparison.comparison(">", neff.getRight(), new PDDLNumber(interval.lo()), false));
+                constant_effect = 1;
+            } else {
+                // TEST THIS CASE
+                cond_interval = res.and(Comparison.comparison(">", neff.getRight(), new PDDLNumber(interval.lo()), false));
+                cond_interval = cond_interval.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.hi()), false));
+                constant_effect = (interval.lo() + interval.hi()) / 2.0;
+            }
+
+            NumEffect new_eff = new NumEffect(neff.operator, neff.getFluentAffected(), new ExtendedNormExpression(constant_effect));
+
+            addCondeff(condeffs, cond_interval, new_eff);
+        }
+    }
+
+
+    private static void buildCondeffsMap(Int2ObjectOpenHashMap<HashSetValuedHashMap<Condition, Object>> tr2condeffs, Collection<TransitionGround> transitions) {
+
+    // ASSUMPTION: ALL EFFECTS ARE CONDITIONAL
+        for (final TransitionGround tr : transitions) {
+
+            HashSetValuedHashMap<Condition, Object> condeffs = new HashSetValuedHashMap<>();
+            // TODO; Check if there is a superclass or an interface for Numeff and Terminal
+
+            for (var v : tr.getAllConditionalEffects().entrySet()) {
+                for (var t: v.getValue()){
+                    Condition condition = v.getKey();
+                    if (t instanceof NumEffect neff) {
+                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsSensitive) {   
+                            // Non constant effects
+                            List<HomeMadeRealInterval> intervals = new ArrayList<>(); // TODO; use AIBR to extract intervals
+                            intervals.add(new HomeMadeRealInterval(-Double.MAX_VALUE, 0));
+                            intervals.add(new HomeMadeRealInterval(0, Double.MAX_VALUE));
+                            fillNewCondeffs(condeffs, condition, neff, intervals);
+                        } 
+                        else { fillSimpleCondeff(condeffs, condition, neff);}
+                    }
+                    else { if (t instanceof Terminal term) {fillSimpleCondeff(condeffs, condition, term); }}
+                }
+            }
+
+            tr2condeffs.put(tr.getId(), condeffs);
+        }
+    }
+
     private static int fillPreEff(int offset, String redConstraints, Collection<TransitionGround> transitions) {
 
         int i = offset;
 
         if (conditionalEffectsSensitive) {
 
+            final Int2ObjectOpenHashMap<HashSetValuedHashMap<Condition, Object>> tr2condeffs = new Int2ObjectOpenHashMap<>();
+
+            buildCondeffsMap(tr2condeffs, transitions);
+
             for (final TransitionGround b : transitions) {
-                for (var v : b.getAllConditionalEffects().entrySet()) {
-                    Condition c = null;
-                    if (v.getKey().isValid()) {
-                        c = b.getPreconditions();
-                    } else {
-                        c = b.getPreconditions().and(v.getKey());
-                    }
+                HashSetValuedHashMap<Condition, Object> condeffs = tr2condeffs.get(b.getId());
+                for (Condition condition : condeffs.keySet()) {
+                    Condition c = b.getPreconditions().and(condition);
                     preconditionFunctionMap.put(i, normalizeAndTighthenCondition(c, redConstraints));
                     final IntArraySet propositional = new IntArraySet();
                     final Collection numEffect = new LinkedHashSet();
-                    for (var t : v.getValue()) {
-                        if (t instanceof Terminal term) {
+                    for (var effect : condeffs.get(condition)) {
+                        if (effect instanceof Terminal term) {
                             propositional.add(term.getId());
                         }
-                        if (t instanceof NumEffect neff) {
+                        if (effect instanceof NumEffect neff) {
                             numEffect.add(neff);
                         }
                     }
