@@ -5,18 +5,18 @@
 package com.hstairs.ppmajal.pddl.heuristics.advanced;
 
 import com.hstairs.ppmajal.conditions.AndCond;
-import com.hstairs.ppmajal.conditions.BoolPredicate;
 import com.hstairs.ppmajal.conditions.Comparison;
 import com.hstairs.ppmajal.conditions.Condition;
 import com.hstairs.ppmajal.conditions.OrCond;
-import com.hstairs.ppmajal.conditions.PostCondition;
 import com.hstairs.ppmajal.conditions.Terminal;
 import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
 import com.hstairs.ppmajal.expressions.PDDLNumber;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
+import com.hstairs.ppmajal.problem.RelState;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
-import com.hstairs.ppmajal.expressions.ExtendedAddendum;
+import com.hstairs.ppmajal.expressions.BinaryOp;
 import com.hstairs.ppmajal.expressions.ExtendedNormExpression;
 import com.hstairs.ppmajal.expressions.HomeMadeRealInterval;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -49,18 +49,27 @@ public class ProblemTransfomer {
     private static Collection[] transition2cptransition;
     private static int[] cptransition2transition;
     private static boolean conditionalEffectsSensitive = true;
-    private static boolean linearEffectsSensitive = true;
+    private static boolean linearEffectsAbstraction = false;
     private static int pseudoGoal;
     private static Int2ObjectOpenHashMap preconditionFunctionMap;
     private static Int2ObjectOpenHashMap propEffectFunctionMap;
     private static Int2ObjectOpenHashMap numericEffectFunctionMap;
     private static Int2ObjectOpenHashMap transition2cptransitionMap;
     private static Int2IntOpenHashMap cptransition2transitionMap;
+    private static Set<NumFluent> metric_vars = new HashSet<>();
 
-    public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints, boolean unitaryCost) {
+    public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints, boolean unitaryCost, boolean linearEffectsAbstraction) {
         int nTransitions = Transition.totNumberOfTransitions + 1;
         pseudoGoal = nTransitions - 1;
         p = problem;
+
+        if (p.getMetric() != null){
+            metric_vars = p.getMetric().getMetExpr().getInvolvedNumericFluents();
+        }
+
+        ProblemTransfomer.linearEffectsAbstraction = linearEffectsAbstraction;
+
+        // TODO: Call AIBR Here!
 
         if (conditionalEffectsSensitive) {
             preconditionFunctionMap = new Int2ObjectOpenHashMap();
@@ -157,10 +166,19 @@ public class ProblemTransfomer {
         }
     }
 
+    private static NumEffect normalizeAssign(NumEffect neff){
+        if (neff.getOperator().equals("assign")){
+            BinaryOp new_rhs = new BinaryOp(neff.getRight(), "-", neff.getFluentAffected(), true);
+            return new NumEffect("increase", neff.getFluentAffected(), new ExtendedNormExpression(new_rhs));
+        } else {
+            return neff;
+        }
+    }
+
 
     private static void buildCondeffsMap(Int2ObjectOpenHashMap<HashSetValuedHashMap<Condition, Object>> tr2condeffs, Collection<TransitionGround> transitions) {
 
-    // ASSUMPTION: ALL EFFECTS ARE CONDITIONAL
+        // ASSUMPTION: ALL EFFECTS ARE CONDITIONAL
         for (final TransitionGround tr : transitions) {
 
             HashSetValuedHashMap<Condition, Object> condeffs = new HashSetValuedHashMap<>();
@@ -170,13 +188,14 @@ public class ProblemTransfomer {
                 for (var t: v.getValue()){
                     Condition condition = v.getKey();
                     if (t instanceof NumEffect neff) {
-                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsSensitive) {   
+                        neff = normalizeAssign(neff);
+                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsAbstraction && !metric_vars.contains(neff.getFluentAffected())) {
                             // Non constant effects
                             List<HomeMadeRealInterval> intervals = new ArrayList<>(); // TODO; use AIBR to extract intervals
                             intervals.add(new HomeMadeRealInterval(-Double.MAX_VALUE, 0));
                             intervals.add(new HomeMadeRealInterval(0, Double.MAX_VALUE));
                             fillNewCondeffs(condeffs, condition, neff, intervals);
-                        } 
+                        }
                         else { fillSimpleCondeff(condeffs, condition, neff);}
                     }
                     else { if (t instanceof Terminal term) {fillSimpleCondeff(condeffs, condition, term); }}

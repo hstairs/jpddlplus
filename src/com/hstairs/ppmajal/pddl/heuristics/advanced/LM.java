@@ -39,7 +39,7 @@ public class LM extends H1 {
     }
 
     public LM(PDDLProblem problem, String mode, String redundantConstraints, String solver) {
-        super(problem, true, true, false, redundantConstraints, false, false, false, false, null,false);
+        super(problem, true, true, false, redundantConstraints, false, false, false, false, null,false, false);
         reachedConditions = new boolean[totNumberOfTerms];
         reachedActions = new boolean[cp.numActions()];
         lmC = new IntOpenHashSet[totNumberOfTerms];

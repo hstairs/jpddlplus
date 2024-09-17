@@ -1,5 +1,3 @@
-package enhsp2;
-
 /*
  * Copyright (C) 2015-2017, Enrico Scala, contact: enricos83@gmail.com
  *
@@ -19,6 +17,8 @@ package enhsp2;
  * MA 02110-1301  USA
  */
 
+
+import enhsp2.ENHSP;
 
 public class main {
 
