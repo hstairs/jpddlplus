@@ -36,8 +36,6 @@ import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.Transition;
 import static com.hstairs.ppmajal.transition.Transition.getTransition;
 import com.hstairs.ppmajal.transition.TransitionGround;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.ProblemTransfomer;
-import ilog.cplex.IloCplex;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import static java.lang.Math.ceil;
@@ -110,9 +108,9 @@ public class H1 implements SearchHeuristic {
     //Plan Fixing Data Structures;
     final boolean[] visited;
     protected final int[] maxNumRepetition ;
-   
-    
-    
+    private boolean hardConditionthroughNumError = true;
+
+
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
     }
@@ -303,15 +301,17 @@ public class H1 implements SearchHeuristic {
     @Override
     public float computeEstimate(State gs) {
         final FibonacciHeap h = this.smallSetup(gs);
+        //reachability = reachableTransitions == null /* First time executing it*/|| reachability;
+        final boolean dontstop = reachability || reachableTransitions == null;
         while (!h.isEmpty()) {
             final int actionId = (int) h.removeMin().getData();
 //            System.out.println(Transition.getTransition(actionId));
 //            for (int i=0;i<=Transition.totNumberOfTransitions;i++)
 //                System.out.println(cp.actionCost()[i]);
-            if (actionId == cp.goal() && !isReachability()) {
+            if (actionId == cp.goal() && !dontstop) {
                 break;
             }
-            if (isReachability() && actionId != cp.goal()) {
+            if (dontstop && actionId != cp.goal()) {
                 if (reachableTransitions == null) {
                     reachableTransitions = new IntArraySet();
                 }
@@ -485,12 +485,17 @@ public class H1 implements SearchHeuristic {
                         }
                     } else if (v == UNKNOWNEFFECT) {//this is a hard condition basically
                         float newCost = 0f;
+                        final float rep = computeRepetition(t, 1f, s);
                         if (isAdditive()) {
-                            newCost = getActionCost()[actionId];
+                            if (hardConditionthroughNumError) {
+                                newCost = rep*getActionCost()[actionId];
+                            }else{
+                                newCost = getActionCost()[actionId];
+                            }
                         }
                         if (updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost)) {
                             update = true;
-                            updateRelPlanInfo(conditionId, actionId, 1);
+                            updateRelPlanInfo(conditionId, actionId, rep);
                         }
                     }
 
@@ -713,6 +718,7 @@ public class H1 implements SearchHeuristic {
                 }
             }
             res = actions;
+
         }
         if (helpfulTransitions) {
 //            if (helpfulActionsComputation) {
@@ -722,6 +728,7 @@ public class H1 implements SearchHeuristic {
 //                }
 //            }else {
             res.addAll(getHelpfulTransitions());
+            //
 //            }
         }
         return res.toArray();

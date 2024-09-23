@@ -125,8 +125,8 @@ public class WAStar extends SearchEngine {
                 }
                 bestf = printInfoDuringSearch(timeAtStart,out,bestf,fromTheBeginning,
                         nodesExpanded,nodesEvaluated,frontier,currentNode);
-                for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,
-                        getActionsToSearch(currentNode, problem, h)); it.hasNext();) {
+                final Object[] actionsToSearch = getActionsToSearch(currentNode, problem, h);
+                for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext();) {
                     final Pair<State, Object> next = it.next();
                     final State successorState = next.getFirst();
                     final Object act = next.getSecond();
