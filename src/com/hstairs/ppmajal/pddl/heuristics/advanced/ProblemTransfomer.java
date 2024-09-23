@@ -50,8 +50,8 @@ public class ProblemTransfomer {
     private static int[] cptransition2transition;
     private static boolean conditionalEffectsSensitive = true;
     private static int linearEffectsAbstraction = -1;
-    private static int tot_intervals = 0;
-    private static int compiled_effects = 0;
+    private static int totIntervals = 0;
+    private static int compiledEffects = 0;
     private static ArrayList<RelState> relaxedStates = new ArrayList<>();
     private static int pseudoGoal;
     private static Int2ObjectOpenHashMap preconditionFunctionMap;
@@ -59,7 +59,7 @@ public class ProblemTransfomer {
     private static Int2ObjectOpenHashMap numericEffectFunctionMap;
     private static Int2ObjectOpenHashMap transition2cptransitionMap;
     private static Int2IntOpenHashMap cptransition2transitionMap;
-    private static Set<NumFluent> metric_vars = new HashSet<>();
+    private static Set<NumFluent> metricVars = new HashSet<>();
 
     public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints, boolean unitaryCost, int linearEffectsAbstraction) {
         int nTransitions = Transition.totNumberOfTransitions + 1;
@@ -67,7 +67,7 @@ public class ProblemTransfomer {
         p = problem;
 
         if (p.getMetric() != null){
-            metric_vars = p.getMetric().getMetExpr().getInvolvedNumericFluents();
+            metricVars = p.getMetric().getMetExpr().getInvolvedNumericFluents();
         }
 
         ProblemTransfomer.linearEffectsAbstraction = linearEffectsAbstraction;
@@ -110,8 +110,8 @@ public class ProblemTransfomer {
 
         if (linearEffectsAbstraction >= 0) {
 
-            System.out.printf("Average increase per effect: %f\n", (float) tot_intervals / compiled_effects);
-            System.out.printf("Number of compiled effects: %s\n", compiled_effects);
+            System.out.printf("Average increase per effect: %f\n", (float) totIntervals / compiledEffects);
+            System.out.printf("Number of compiled effects: %s\n", compiledEffects);
 
         }
         if (conditionalEffectsSensitive) {
@@ -217,15 +217,15 @@ public class ProblemTransfomer {
             intervals = sample_intervals(incrementalIntervalSequence);
         }
 
-        if (tot_intervals == 0) {
+        if (totIntervals == 0) {
             System.out.println("Example Interval Set:");
             System.out.println(intervals);
         }
 
         int i = 0;
         //System.out.println(intervals);
-        tot_intervals += intervals.size();
-        compiled_effects++;
+        totIntervals += intervals.size();
+        compiledEffects++;
         for (HomeMadeRealInterval interval: intervals){
             boolean skip = false;
             Condition cond_interval = null;
@@ -322,7 +322,7 @@ public class ProblemTransfomer {
                     Condition condition = v.getKey();
                     if (t instanceof NumEffect neff) {
                         neff = normalizeAssign(neff);
-                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsAbstraction >= 0 && !metric_vars.contains(neff.getFluentAffected())) {
+                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsAbstraction >= 0 && !metricVars.contains(neff.getFluentAffected())) {
                             // Non constant effects
                             if (linearEffectsAbstraction == 0) {
                                 List<HomeMadeRealInterval> intervals = new ArrayList<>(); // TODO; use AIBR to extract intervals
