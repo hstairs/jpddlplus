@@ -47,7 +47,7 @@
     :parameters ()
     :precondition (and )
     :effect (and 
-        (increase (k) 1)
+        (increase (k) 3)
     )
 )
 
@@ -55,7 +55,7 @@
 (:action decrease_k
     :parameters ()
     :precondition (and )
-    :effect (and 
+    :effect (and
         (decrease (k) 1)
     )
 )

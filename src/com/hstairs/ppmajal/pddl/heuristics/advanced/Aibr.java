@@ -181,6 +181,17 @@ public final class Aibr implements SearchHeuristic {
 
     @Override
     public float computeEstimate(State s0) {
+        // Call the helper method with a null StateWrapper
+        return computeEstimateInternal(s0, null);
+    }
+
+    public float computeEstimate(State s0, ArrayList<RelState> relaxedStates) {
+        // Call the helper method with the provided StateWrapper
+        return computeEstimateInternal(s0, relaxedStates);
+    }
+
+
+    public float computeEstimateInternal(State s0, ArrayList<RelState> relaxedStates) {
         final PDDLState s = (PDDLState) s0;
         final RelState relState = s.relaxState();
         final IntArraySet supporters = new IntArraySet(ContiguousSet.create(closedOpen(0, numberOfSupporters), DiscreteDomain.integers()));
@@ -294,14 +305,21 @@ public final class Aibr implements SearchHeuristic {
             if (DEBUG){
                 System.err.println("Computing actual estimate using the following transitions:"+reachableTransitions);
             }
-            return fixPointComputation(reachableTransitions, s.relaxState());
+            float res = fixPointComputation(reachableTransitions, s.relaxState(), relaxedStates);
+            if (relaxedStates != null) {
+                relaxedStates.add(relState.clone());
+            }
+            return res;
         }
         return Float.MAX_VALUE;
     }
 
-    private float fixPointComputation(Collection<TransitionGround> reachable, RelState s) {
+    private float fixPointComputation(Collection<TransitionGround> reachable, RelState s, ArrayList<RelState> relaxedStates) {
         int counter = 0;
         int horizon = Integer.MAX_VALUE;
+        if (relaxedStates != null) {
+            relaxedStates.add(s.clone());
+        }
 //        int horizon = 10000;
 //        System.out.println(s);
         BitSet applicable = new BitSet();
@@ -316,6 +334,9 @@ public final class Aibr implements SearchHeuristic {
                         applicable.set(transition.getId(), true);
                     }
                     s.apply(transition, (RelState) s.clone(),problem);
+                    if (relaxedStates != null) {
+                        relaxedStates.add(s.clone());
+                    }
                     counter++;
                     if (s.satisfy(problem.getGoals())) {
                         return counter;

@@ -81,7 +81,7 @@ public class ENHSP {
     private float endGValue;
     private boolean helpfulTransitions;
     private boolean internalValidation = false;
-    private boolean linearEffectsAbstraction = false;
+    private int linearEffectsAbstraction = -1;
     private int planLength;
     private String redundantConstraints;
     private String groundingType;
@@ -272,7 +272,7 @@ public class ENHSP {
         options.addOption("silent",false,"Activate silent modality");
         options.addOption("autoanytime",false,"Activate auto anytime modality. ");
         options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
-        options.addOption("ea",false,"Use effect abstraction for non-constants effects");
+        options.addOption("ea",true,"Effect abstraction mode for non-constants effects");
 
         CommandLineParser parser = new DefaultParser();
         try {
@@ -315,7 +315,14 @@ public class ENHSP {
             internalValidation = cmd.hasOption("ival");
             this.unitCostHeuristic = cmd.hasOption("uch");
 
-            linearEffectsAbstraction = cmd.hasOption("ea");
+            String ea = cmd.getOptionValue("ea");
+            if (ea != null) {
+                if (ea.equals("all")){
+                    linearEffectsAbstraction = Integer.MAX_VALUE;
+                } else {
+                    linearEffectsAbstraction = Integer.parseInt(ea);
+                }
+            }
 
             deltaExecution = cmd.getOptionValue("de");
             if (deltaExecution == null) {

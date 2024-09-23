@@ -49,7 +49,10 @@ public class ProblemTransfomer {
     private static Collection[] transition2cptransition;
     private static int[] cptransition2transition;
     private static boolean conditionalEffectsSensitive = true;
-    private static boolean linearEffectsAbstraction = false;
+    private static int linearEffectsAbstraction = -1;
+    private static int tot_intervals = 0;
+    private static int compiled_effects = 0;
+    private static ArrayList<RelState> relaxedStates = new ArrayList<>();
     private static int pseudoGoal;
     private static Int2ObjectOpenHashMap preconditionFunctionMap;
     private static Int2ObjectOpenHashMap propEffectFunctionMap;
@@ -58,7 +61,7 @@ public class ProblemTransfomer {
     private static Int2IntOpenHashMap cptransition2transitionMap;
     private static Set<NumFluent> metric_vars = new HashSet<>();
 
-    public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints, boolean unitaryCost, boolean linearEffectsAbstraction) {
+    public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints, boolean unitaryCost, int linearEffectsAbstraction) {
         int nTransitions = Transition.totNumberOfTransitions + 1;
         pseudoGoal = nTransitions - 1;
         p = problem;
@@ -70,6 +73,22 @@ public class ProblemTransfomer {
         ProblemTransfomer.linearEffectsAbstraction = linearEffectsAbstraction;
 
         // TODO: Call AIBR Here!
+
+        if (linearEffectsAbstraction >= 0) {
+            System.out.printf("Activated Linear Effect Abstraction.\n");
+
+            if (linearEffectsAbstraction == 0){
+                System.out.printf("Using 2 intervals (-inf, 0) and (0, +inf)\n");
+            }
+
+            if (linearEffectsAbstraction > 0){
+                if (linearEffectsAbstraction < Integer.MAX_VALUE){
+                    System.out.printf("Keeping %s positive and negative intervals\n", linearEffectsAbstraction);
+                }
+                Aibr haibr = new Aibr(problem);
+                haibr.computeEstimate(problem.getInit(), relaxedStates);
+            }
+        }
 
         if (conditionalEffectsSensitive) {
             preconditionFunctionMap = new Int2ObjectOpenHashMap();
@@ -88,6 +107,13 @@ public class ProblemTransfomer {
         var v = fillPreEff(0, redConstraints, new LinkedHashSet(p.actions));
         v = fillPreEff(v, redConstraints, new LinkedHashSet(p.getEventsSet()));
         v = fillPreEff(v, redConstraints, new LinkedHashSet(p.getProcessesSet()));
+
+        if (linearEffectsAbstraction >= 0) {
+
+            System.out.printf("Average increase per effect: %f\n", (float) tot_intervals / compiled_effects);
+            System.out.printf("Number of compiled effects: %s\n", compiled_effects);
+
+        }
         if (conditionalEffectsSensitive) {
             pseudoGoal = v;
             preconditionFunction = new Condition[v + 1];
@@ -139,31 +165,138 @@ public class ProblemTransfomer {
         addCondeff(condeffs, condition, effect);
     }
 
+    private static void addElement(ArrayList<HomeMadeRealInterval> incrementalIntervalSequence, HomeMadeRealInterval interval, double min, double max) {
+
+        if (interval.lo() < min) {
+            if (min > 0 && interval.lo() < 0){
+                incrementalIntervalSequence.add(0, new HomeMadeRealInterval(0, min));
+                incrementalIntervalSequence.add(0, new HomeMadeRealInterval(interval.lo(), 0));
+            } else {
+                incrementalIntervalSequence.add(0, new HomeMadeRealInterval(interval.lo(), min));
+            }
+        }
+
+        if (interval.hi() > max) {
+            if (max < 0  && interval.hi() > 0){
+                incrementalIntervalSequence.add(new HomeMadeRealInterval(max, 0));
+                incrementalIntervalSequence.add(new HomeMadeRealInterval(0, interval.hi()));
+            } else {
+                incrementalIntervalSequence.add(new HomeMadeRealInterval(max, interval.hi()));
+            }
+        }
+
+    }
+
+
     private static void fillNewCondeffs(HashSetValuedHashMap<Condition, Object> condeffs, Condition condition, NumEffect neff, List<HomeMadeRealInterval> intervals){
         Condition res = new AndCond(new HashSet<>());
         if (!condition.isValid()) {res = res.and(condition);}
 
+        if (intervals == null) {
+            ArrayList<HomeMadeRealInterval> incrementalIntervalSequence = new ArrayList<>();
+            int i = 0;
+            double min = Double.MAX_VALUE;
+            double max = -Double.MAX_VALUE;
+            for (RelState s: relaxedStates){
+                HomeMadeRealInterval interval = neff.getRight().eval(s);
+                interval.setSup(Math.round(interval.hi()));
+                interval.setInf(Math.round(interval.lo()));
+                if (i == 0) {
+                    incrementalIntervalSequence.add(interval);
+                } else {
+                    addElement(incrementalIntervalSequence, interval, min, max);
+                }
+                if (interval.lo() < min){
+                    min = interval.lo();
+                }
+                if (interval.hi() > max) {
+                    max = interval.hi();
+                }
+                i++;
+            }
+            intervals = sample_intervals(incrementalIntervalSequence);
+        }
+
+        if (tot_intervals == 0) {
+            System.out.println("Example Interval Set:");
+            System.out.println(intervals);
+        }
+
+        int i = 0;
+        //System.out.println(intervals);
+        tot_intervals += intervals.size();
+        compiled_effects++;
         for (HomeMadeRealInterval interval: intervals){
+            boolean skip = false;
             Condition cond_interval = null;
             double constant_effect = 0;
             // Do some checks on the interval here!
-            if (interval.lo() == -Double.MAX_VALUE){
+            if (interval.lo() < -1e9){
                 cond_interval = res.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.hi()), false));
-                constant_effect = -1;
-            } else if (interval.hi() == Double.MAX_VALUE){
+                assert interval.hi() <= 0;
+                constant_effect = interval.hi() -1 ;
+            } else if (interval.hi() > 1e9){
+                assert interval.lo() >= 0;
                 cond_interval = res.and(Comparison.comparison(">", neff.getRight(), new PDDLNumber(interval.lo()), false));
-                constant_effect = 1;
+                constant_effect = interval.lo() + 1;
             } else {
                 // TEST THIS CASE
-                cond_interval = res.and(Comparison.comparison(">", neff.getRight(), new PDDLNumber(interval.lo()), false));
-                cond_interval = cond_interval.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.hi()), false));
-                constant_effect = (interval.lo() + interval.hi()) / 2.0;
+                // constant_effect = (interval.lo() + interval.hi()) / 2.0;
+                constant_effect = interval.hi();
+                if (interval.hi() > 0) {
+                    if (interval.lo() == interval.hi() && i < (intervals.size() - 1)) {// If this is not the last interval, then we can skip.
+//                        cond_interval = res.and(Comparison.comparison(">=", neff.getRight(), new PDDLNumber(interval.lo()), false));
+//                        if (i < (intervals.size() - 1) && intervals.get(i+1).lo() == interval.hi()){
+//                            skip = true;
+//                        }
+                        skip = true;
+                    }
+
+                    cond_interval = res.and(Comparison.comparison(">", neff.getRight(), new PDDLNumber(interval.lo()), false));
+
+                } else {
+                    if (interval.lo() == interval.hi() && i > 0) {// If this is not the first interval, then we can skip.
+                        skip = true;
+                    }
+                    cond_interval = res.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.lo()), false));
+                }
             }
 
-            NumEffect new_eff = new NumEffect(neff.operator, neff.getFluentAffected(), new ExtendedNormExpression(constant_effect));
-
-            addCondeff(condeffs, cond_interval, new_eff);
+            if (!skip) {
+                NumEffect new_eff = new NumEffect(neff.operator, neff.getFluentAffected(), new ExtendedNormExpression(constant_effect));
+                addCondeff(condeffs, cond_interval, new_eff);
+            }
+            i++;
         }
+    }
+
+    private static List<HomeMadeRealInterval> sample_intervals(List<HomeMadeRealInterval> intervals) {
+        // Keep the first X intervals where X is the parameter provided
+        if (linearEffectsAbstraction > 0) {
+            ArrayList<HomeMadeRealInterval> neg_intervals = new ArrayList<>();
+            ArrayList<HomeMadeRealInterval> pos_intervals = new ArrayList<>();
+            for (HomeMadeRealInterval interval: intervals){
+                if (interval.lo() < 0) {
+                    neg_intervals.add(0, interval);
+                } else if (interval.hi() > 0) {
+                    pos_intervals.add(interval);
+                }
+            }
+            if (neg_intervals.size() > linearEffectsAbstraction) {
+                neg_intervals = new ArrayList<>(neg_intervals.subList(0, linearEffectsAbstraction));
+            }
+            if (pos_intervals.size() > linearEffectsAbstraction) {
+                pos_intervals = new ArrayList<>(pos_intervals.subList(0, linearEffectsAbstraction));
+            }
+            Collections.reverse(neg_intervals);
+
+            ArrayList<HomeMadeRealInterval> new_intervals = new ArrayList<>();
+            new_intervals.addAll(neg_intervals);
+            new_intervals.addAll(pos_intervals);
+            return new_intervals;
+        }
+
+        return intervals;
     }
 
     private static NumEffect normalizeAssign(NumEffect neff){
@@ -189,12 +322,17 @@ public class ProblemTransfomer {
                     Condition condition = v.getKey();
                     if (t instanceof NumEffect neff) {
                         neff = normalizeAssign(neff);
-                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsAbstraction && !metric_vars.contains(neff.getFluentAffected())) {
+                        if (neff.getInvolvedNumericFluents().size() > 0 && linearEffectsAbstraction >= 0 && !metric_vars.contains(neff.getFluentAffected())) {
                             // Non constant effects
-                            List<HomeMadeRealInterval> intervals = new ArrayList<>(); // TODO; use AIBR to extract intervals
-                            intervals.add(new HomeMadeRealInterval(-Double.MAX_VALUE, 0));
-                            intervals.add(new HomeMadeRealInterval(0, Double.MAX_VALUE));
-                            fillNewCondeffs(condeffs, condition, neff, intervals);
+                            if (linearEffectsAbstraction == 0) {
+                                List<HomeMadeRealInterval> intervals = new ArrayList<>(); // TODO; use AIBR to extract intervals
+                                intervals.add(new HomeMadeRealInterval(-Double.MAX_VALUE, 0));
+                                intervals.add(new HomeMadeRealInterval(0, Double.MAX_VALUE));
+                                fillNewCondeffs(condeffs, condition, neff, intervals);
+                            } else {
+                                fillNewCondeffs(condeffs, condition, neff, null);
+                            }
+
                         }
                         else { fillSimpleCondeff(condeffs, condition, neff);}
                     }
@@ -244,7 +382,6 @@ public class ProblemTransfomer {
                 }
 
             }
-
         } else {
             for (final TransitionGround b : transitions) {
                 i++;
