@@ -72,8 +72,6 @@ public class ProblemTransfomer {
 
         ProblemTransfomer.linearEffectsAbstraction = linearEffectsAbstraction;
 
-        // TODO: Call AIBR Here!
-
         if (linearEffectsAbstraction >= 0) {
             System.out.printf("Activated Linear Effect Abstraction.\n");
 
@@ -241,8 +239,9 @@ public class ProblemTransfomer {
                 constant_effect = interval.lo() + 1;
             } else {
                 // TEST THIS CASE
-                // constant_effect = (interval.lo() + interval.hi()) / 2.0;
-                constant_effect = interval.hi();
+                // TODO: make this a parameter
+                constant_effect = (interval.lo() + interval.hi()) / 2.0;
+                // constant_effect = interval.hi();
                 if (interval.hi() > 0) {
                     if (interval.lo() == interval.hi() && i < (intervals.size() - 1)) {// If this is not the last interval, then we can skip.
 //                        cond_interval = res.and(Comparison.comparison(">=", neff.getRight(), new PDDLNumber(interval.lo()), false));
