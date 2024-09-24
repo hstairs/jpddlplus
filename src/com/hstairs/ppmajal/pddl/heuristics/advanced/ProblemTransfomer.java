@@ -232,7 +232,7 @@ public class ProblemTransfomer {
             if (interval.lo() < -1e9){
                 cond_interval = res.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.hi()), false));
                 assert interval.hi() <= 0;
-                constant_effect = interval.hi() -1 ;
+                constant_effect = interval.hi() -1;
             } else if (interval.hi() > 1e9){
                 assert interval.lo() >= 0;
                 cond_interval = res.and(Comparison.comparison(">", neff.getRight(), new PDDLNumber(interval.lo()), false));
@@ -241,7 +241,12 @@ public class ProblemTransfomer {
                 // TEST THIS CASE
                 // TODO: make this a parameter
                 constant_effect = (interval.lo() + interval.hi()) / 2.0;
-                // constant_effect = interval.hi();
+//                if ((interval.lo() + interval.hi() / 2.0) > 0){
+//                    constant_effect = interval.hi();
+//                } else {
+//                    constant_effect = interval.lo();
+//                }
+
                 if (interval.hi() > 0) {
                     if (interval.lo() == interval.hi() && i < (intervals.size() - 1)) {// If this is not the last interval, then we can skip.
 //                        cond_interval = res.and(Comparison.comparison(">=", neff.getRight(), new PDDLNumber(interval.lo()), false));
@@ -257,7 +262,7 @@ public class ProblemTransfomer {
                     if (interval.lo() == interval.hi() && i > 0) {// If this is not the first interval, then we can skip.
                         skip = true;
                     }
-                    cond_interval = res.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.lo()), false));
+                    cond_interval = res.and(Comparison.comparison("<", neff.getRight(), new PDDLNumber(interval.hi()), false));
                 }
             }
 
