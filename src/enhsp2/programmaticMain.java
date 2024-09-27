@@ -1,3 +1,4 @@
+package enhsp2;
 
 import com.hstairs.ppmajal.conditions.BoolPredicate;
 import static com.hstairs.ppmajal.conditions.BoolPredicate.BoolFluent;
