@@ -460,7 +460,7 @@ public class H1 implements SearchHeuristic {
                 } else {//affecting a num comparison
                     final double v = this.numericContribution(actionId, (Comparison) t);
                     if (v > 0) {
-                       
+
                         final float rep = computeRepetition(t,v,s);
                         final float newCost = rep * getActionCost()[actionId];
                         boolean localUpdate = false;
@@ -839,7 +839,11 @@ public class H1 implements SearchHeuristic {
    
 
     private float computeRepetition(Terminal t, double v, State s) {
-        return (float) (-1f * ((Comparison) t).getLeft().eval(s) / v);
+        final double eval = ((Comparison) t).getLeft().eval(s);
+        if (Double.isNaN(eval)){
+            return 1.0f;
+        }
+        return (float) (-1f * eval / v);
     }
 
 

@@ -305,6 +305,7 @@ public final class Aibr implements SearchHeuristic {
 //        int horizon = 10000;
 //        System.out.println(s);
         BitSet applicable = new BitSet();
+                
         while (counter <= horizon) {
             if (s.satisfy(problem.getGoals())) {
                 return counter;
