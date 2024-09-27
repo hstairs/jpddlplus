@@ -81,6 +81,7 @@ public class ENHSP {
     private float endGValue;
     private boolean helpfulTransitions;
     private boolean internalValidation = false;
+    private int linearEffectsAbstraction = -1;
     private int planLength;
     private String redundantConstraints;
     private String groundingType;
@@ -271,6 +272,7 @@ public class ENHSP {
         options.addOption("silent",false,"Activate silent modality");
         options.addOption("autoanytime",false,"Activate auto anytime modality. ");
         options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
+        options.addOption("ea",true,"Effect abstraction mode for non-constants effects");
 
         CommandLineParser parser = new DefaultParser();
         try {
@@ -312,6 +314,15 @@ public class ENHSP {
             
             internalValidation = cmd.hasOption("ival");
             this.unitCostHeuristic = cmd.hasOption("uch");
+
+            String ea = cmd.getOptionValue("ea");
+            if (ea != null) {
+                if (ea.equals("all")){
+                    linearEffectsAbstraction = Integer.MAX_VALUE;
+                } else {
+                    linearEffectsAbstraction = Integer.parseInt(ea);
+                }
+            }
 
             deltaExecution = cmd.getOptionValue("de");
             if (deltaExecution == null) {
@@ -501,7 +512,7 @@ public class ENHSP {
     private void setHeuristic() {
 //        System.out.println("ha:" + helpfulActionsPruning + " ht" + helpfulTransitions);
         h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                unitCostHeuristic);
+                unitCostHeuristic, linearEffectsAbstraction);
     }
 
     private LinkedList<ImmutablePair<BigDecimal, TransitionGround>> search() throws Exception {

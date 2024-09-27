@@ -112,23 +112,29 @@ public class H1 implements SearchHeuristic {
 
 
     public H1(PDDLProblem problem) {
-        this(problem, true, false, false, "no", false, false, false, false, null, false);
+        this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
     }
 
 
     
     public H1(PDDLProblem problem, boolean additive) {
-        this(problem, additive, false, false, "no", false, false, false, false, null, false);
+        this(problem, additive, false, false, "no", false, false, false, false, null, false, -1);
+    }
+
+    public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+            boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
+                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost );
+                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, -1);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost) {
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost, int linearEffectsAbstraction) {
 
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -139,7 +145,7 @@ public class H1 implements SearchHeuristic {
         allComparisons = new IntArraySet();
         freePreconditionActions = new IntArraySet();
 //        problem.prettyPrint();
-        cp = ProblemTransfomer.generateCompactProblem(problem, redConstraints, unitaryCost);
+        cp = ProblemTransfomer.generateCompactProblem(problem, redConstraints, unitaryCost, linearEffectsAbstraction);
 //        System.out.println(cp);
         useSmartConstraints = "smart".equals(redConstraints);
 
