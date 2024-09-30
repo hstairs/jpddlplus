@@ -34,7 +34,7 @@ public class TransitionGround extends Transition {
     }
 
     public static TransitionGround createEmptyAction(){
-        return new TransitionGround(null,Semantics.PROCESS,null,null,null,null);
+        return new TransitionGround(null,Semantics.ACTION,null,null,null,null);
     }
     public TransitionGround(ArrayList<NumEffect> numEffect) {
         this(                "waiting", Transition.Semantics.PROCESS, null, null,

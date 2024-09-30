@@ -197,7 +197,7 @@ public class ENHSP {
                 LinkedList sp = search();
                 if (printTrace) {
                     String fileName = getProblem().getPddlFileReference() + "_search_" + searchEngineString + "_h_" + heuristic + "_break_ties_" + tieBreaking + ".npt";
-                    problem.validateRefactored(sp,new BigDecimal(this.deltaExecution), new BigDecimal(deltaExecution), fileName);
+                    problem.validate(sp,new BigDecimal(this.deltaExecution), new BigDecimal(deltaExecution), fileName);
                     System.out.println("Numeric Plan Trace saved to " + fileName);
                 }
                 if (sp == null) {
@@ -273,6 +273,8 @@ public class ENHSP {
         options.addOption("autoanytime",false,"Activate auto anytime modality. ");
         options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
         options.addOption("ea",true,"Effect abstraction mode for non-constants effects");
+        options.addOption("im",false,"If set, ignore metric function altogether");
+
 
         CommandLineParser parser = new DefaultParser();
         try {

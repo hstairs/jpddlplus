@@ -1563,71 +1563,22 @@ public class PDDLProblem implements SearchProblem {
         //out.println("Reachable actions and processes: |A U P U E|:" + TransitionGround.totNumberOfTransitions);
     }
 
-    public boolean validate(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, Object>> userPlan, BigDecimal execDelta, BigDecimal stepSize) throws CloneNotSupportedException {
-        return validate(userPlan, execDelta, stepSize, null);
-    }
 
-    public boolean validate(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, Object>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize, String planTrace) throws CloneNotSupportedException {
+    public List<State> getTrace(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize) throws CloneNotSupportedException {
         BigDecimal previous = BigDecimal.ZERO;
         State current = (PDDLState) this.getInit();
         System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
-        StringBuilder planTraceString = null;
-        if (planTrace != null) {
-            planTraceString = new StringBuilder();
-            planTraceString.append(current.toString()).append("\n");
-        }
-
-        for (org.apache.commons.lang3.tuple.Pair<BigDecimal, Object> ele : internalPlanRepresentation) {
-            TransitionGround right = (TransitionGround) ele.getRight();
-            if (right.getSemantics().equals(Transition.Semantics.PROCESS)) {
-                final ImmutablePair<State, Integer> stateCollectionPair
-                        = simulation(current, execDelta, stepSize, false, planTraceString);
-                if (stateCollectionPair == null) {
-                    System.out.println("Constraint violated");
-                    return false;
-                } else {
-                    current = stateCollectionPair.getLeft();
-                }
-            }
-            previous = ele.getKey();
-            if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
-                current.apply(right, current.clone());
-                if (planTrace != null) {
-                    planTraceString.append(current.toString()).append("\n");
-                }
-            }
-        }
-        if (planTrace != null) {
-            try {
-                BufferedWriter bf = new BufferedWriter(new FileWriter(planTrace));
-                bf.append(planTraceString);
-                bf.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-//        System.out.println(current);
-        return current.satisfy(this.getGoals());
-    }
-
-    public boolean validateRefactored(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize, String planTrace) throws CloneNotSupportedException {
-        BigDecimal previous = BigDecimal.ZERO;
-        State current = (PDDLState) this.getInit();
-        System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
-        StringBuilder planTraceString = null;
-        if (planTrace != null) {
-            planTraceString = new StringBuilder();
-            planTraceString.append(current.toString()).append("\n");
-        }
-
+        List<State> trace = new LinkedList();
+        trace.add(current);
+        //Important: We are assuming that all processes are equivalent to a waiting action lasting the user defined delta time
         for (org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround> ele : internalPlanRepresentation) {
             TransitionGround right = (TransitionGround) ele.getRight();
             if (right.getSemantics().equals(Transition.Semantics.PROCESS)) {
                 final ImmutablePair<State, Integer> stateCollectionPair
-                        = simulation(current, execDelta, stepSize, false, planTraceString);
+                        = simulation(current, execDelta, stepSize, false, trace);
                 if (stateCollectionPair == null) {
                     System.out.println("Constraint violated");
-                    return false;
+                    return trace;
                 } else {
                     current = stateCollectionPair.getLeft();
                 }
@@ -1635,12 +1586,21 @@ public class PDDLProblem implements SearchProblem {
             previous = ele.getKey();
             if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
                 current.apply(right, current.clone());
-                if (planTrace != null) {
-                    planTraceString.append(current.toString()).append("\n");
-                }
+                trace.add(current);
             }
         }
+//        System.out.println(current);
+        return trace;
+    }
+    public boolean validate(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize, String planTrace) throws CloneNotSupportedException {
+        System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
+        List<State> trace = this.getTrace(internalPlanRepresentation, execDelta, stepSize);
+        StringBuilder planTraceString = null;
         if (planTrace != null) {
+            planTraceString = new StringBuilder();
+            for (var v: trace) {
+                planTraceString.append(v.toString()).append("\n");
+            }
             try {
                 BufferedWriter bf = new BufferedWriter(new FileWriter(planTrace));
                 bf.append(planTraceString);
@@ -1649,8 +1609,7 @@ public class PDDLProblem implements SearchProblem {
                 e.printStackTrace();
             }
         }
-//        System.out.println(current);
-        return current.satisfy(this.getGoals());
+        return trace.get(trace.size()-1).satisfy(this.getGoals());
     }
 
 //    public ArrayList<Pair<BigDecimal,TransitionGround>> constructPlan(List<org.apache.commons.lang3.tuple.Pair<BigDecimal,Object>> internalPlanRepresentation,BigDecimal execDelta, BigDecimal stepSize, boolean events) throws CloneNotSupportedException {
@@ -1704,12 +1663,12 @@ public class PDDLProblem implements SearchProblem {
         return simulation(s, horizon, executionDelta, intelligent, null);
     }
 
-    protected ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta, boolean intelligent, StringBuilder traceString) {
-        return simulation(s, horizon, executionDelta, intelligent, traceString, null);
+    protected ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta, boolean intelligent, List<State> trace) {
+        return simulation(s, horizon, executionDelta, intelligent, trace, null);
     }
 
     protected ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta,
-                                                       boolean intelligent, StringBuilder traceString, ArrayList<TransitionGround> events) {
+                                                       boolean intelligent, List<State> trace, ArrayList<TransitionGround> events) {
         final PDDLState next = (PDDLState) s.clone();
         if (horizon.compareTo(executionDelta) == -1) {
             System.out.println("Horizon: " + horizon + " Execution Delta: " + executionDelta);
@@ -1765,8 +1724,8 @@ public class PDDLProblem implements SearchProblem {
                 events.add(TransitionGround.waitingAction());
             }
             applyAllEvents(next, events);
-            if (traceString != null) {
-                traceString.append(next.toString()).append("\n");
+            if (trace != null) {
+                trace.add(next);
             }
             if (intelligent && next.satisfy(this.getGoals())) {
                 return ImmutablePair.of(next, i + 1);
