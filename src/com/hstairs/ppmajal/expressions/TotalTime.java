@@ -22,4 +22,5 @@ package com.hstairs.ppmajal.expressions;
  * @author enrico
  */
 public class TotalTime {
+
 }

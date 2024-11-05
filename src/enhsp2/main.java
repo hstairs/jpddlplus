@@ -1,3 +1,6 @@
+package enhsp2;
+
+
 /*
  * Copyright (C) 2015-2017, Enrico Scala, contact: enricos83@gmail.com
  *
@@ -17,18 +20,15 @@
  * MA 02110-1301  USA
  */
 
-
 import enhsp2.ENHSP;
 
 public class main {
 
-
-
-    public static void main(String[] args) throws Exception {
-        ENHSP p = new ENHSP(false);
-        p.parseInput(args);
-        p.configurePlanner();
-        p.parsingDomainAndProblem(args);
-        p.planning();
-    }
+  public static void main(String[] args) throws Exception {
+    ENHSP p = new ENHSP();
+    p.parseInput(args);
+    p.configurePlanner();
+    p.parsingDomainAndProblem();
+    p.planning();
+  }
 }

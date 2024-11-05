@@ -20,6 +20,8 @@ package com.hstairs.ppmajal.problem;
 
 import com.hstairs.ppmajal.conditions.Condition;
 import com.hstairs.ppmajal.transition.TransitionGround;
+
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -27,37 +29,22 @@ import java.util.List;
  */
 public abstract class State {
 
-    private Iterable<Object> applicableActions;
+  public State() {
+    super();
+  }
 
-    public State ( ) {
-        super();
-    }
+  public abstract void apply(TransitionGround gr, State prev);
 
-    public abstract void apply (TransitionGround gr, State prev);
+  public abstract boolean satisfy(final Condition input);
 
-    public abstract boolean satisfy (final Condition input);
+  public abstract State clone();
 
-    @Override
-    public abstract State clone ( );
+  public State getRepresentative() {
+    return this;
+  }
 
-    public boolean isSafeState ( ) {
-        return true;
-    }
+  public abstract List getNumericalFluents();
 
-    public Iterable<Object> getApplicableActions ( ) {
-        return applicableActions;
-    }
-
-    public void setApplicableActions (Iterable<Object> applicableActions) {
-        this.applicableActions = applicableActions;
-    }
-
-    public State getRepresentative ( ) {
-        return this;
-    }
-
-    public abstract List getNumFluents();
-
-    public abstract int getBoolFluentsSize();
+  public abstract BitSet getBooleanFluents();
 
 }

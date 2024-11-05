@@ -29,74 +29,73 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public class Variable implements ActionParameter {
 
-    final private String Name;
-    final private Type type;
-    final private int id;
+  final private String Name;
+  final private Type type;
+  final private int id;
 
-    public static Object2ObjectMap<Pair<String,Type>,Variable> variables;
-    public static Variable variable(String Name, Type type){
-        if (variables == null){
-            variables = new Object2ObjectArrayMap<>();
-        }
-        Variable variable = variables.get(Pair.of(Name, type));
-        if (variable == null){
-            variable = new Variable(Name,type,variables.keySet().size());
-            variables.put(Pair.of(Name,type),variable);
-        }
-        return variable;
+  public static Object2ObjectMap<Pair<String, Type>, Variable> variables;
+
+  public static Variable variable(String Name, Type type) {
+    if (variables == null) {
+      variables = new Object2ObjectArrayMap<>();
     }
-    private Variable (String Name, Type type, int id) {
-        super();
-        this.Name = Name;
-        this.type = type;
-        this.id = id;
+    Variable variable = variables.get(Pair.of(Name, type));
+    if (variable == null) {
+      variable = new Variable(Name, type, variables.keySet().size());
+      variables.put(Pair.of(Name, type), variable);
     }
+    return variable;
+  }
 
-    public int getId() {
-        return id;
-    }
+  private Variable(String Name, Type type, int id) {
+    super();
+    this.Name = Name;
+    this.type = type;
+    this.id = id;
+  }
 
-    @Override
-    public PDDLObject ground (Map<Variable, PDDLObject> substitution) {
-        final PDDLObject o = substitution.get(this);
+  public int getId() {
+    return id;
+  }
 
-        if (o == null) {
-            System.out.println("Substitution Failed for " + o.toString());
-            System.exit(-1);
-        }
+  @Override
+  public PDDLObject ground(Map<Variable, PDDLObject> substitution) {
+    final PDDLObject o = substitution.get(this);
 
-        return o;
-    }
-
-    @Override
-    public String toString ( ) {
-
-        return this.getName() + " " + this.getType();
-
+    if (o == null) {
+      System.out.println("Substitution Failed for " + o.toString());
+      System.exit(-1);
     }
 
-    @Override
-    public int hashCode() {
-        return id;
-    }
+    return o;
+  }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final Variable other = (Variable) obj;
-        if (!java.util.Objects.equals(this.id, other.id)) {
-            return false;
-        }
-        return true;
+  @Override
+  public String toString() {
+
+    return this.getName() + " " + this.getType();
+
+  }
+
+  @Override
+  public int hashCode() {
+    return id;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
     }
+    if (obj == null) {
+      return false;
+    }
+    if (getClass() != obj.getClass()) {
+      return false;
+    }
+    final Variable other = (Variable) obj;
+    return java.util.Objects.equals(this.id, other.id);
+  }
 
 //    @Override
 //    public int hashCode ( ) {
@@ -120,38 +119,38 @@ public class Variable implements ActionParameter {
 //
 //    }
 
-    /**
-     * @return the Name
-     */
-    public String getName ( ) {
-        return Name;
+  /**
+   * @return the Name
+   */
+  public String getName() {
+    return Name;
+  }
+
+
+  /**
+   * @return the type
+   */
+  public Type getType() {
+    return type;
+  }
+
+  public String pddlPrint() {
+
+    return this.getName() + " " + this.getType();
+  }
+
+  public String pddlPrint(boolean typeInformation) {
+    if (typeInformation) {
+      return this.getName() + " " + this.getType();
+    } else {
+      return this.getName();
     }
+  }
 
-
-    /**
-     * @return the type
-     */
-    public Type getType ( ) {
-        return type;
+  public void pddlPrint(boolean typeInformation, StringBuilder bui) {
+    bui.append(this.getName());
+    if (typeInformation) {
+      bui.append(" ").append(this.getType());
     }
-
-    public String pddlPrint ( ) {
-
-        return this.getName() + " " + this.getType();
-    }
-
-    public String pddlPrint (boolean typeInformation) {
-        if (typeInformation) {
-            return this.getName() + " " + this.getType();
-        } else {
-            return this.getName();
-        }
-    }
-
-    public void pddlPrint (boolean typeInformation, StringBuilder bui) {
-        bui.append(this.getName());
-        if (typeInformation) {
-            bui.append(" ").append(this.getType());
-        }
-    }
+  }
 }

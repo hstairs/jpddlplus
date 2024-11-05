@@ -18,6 +18,7 @@
  */
 package com.hstairs.ppmajal.search;
 
+import java.io.PrintStream;
 import com.hstairs.ppmajal.problem.*;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import java.util.*;
@@ -26,29 +27,48 @@ import java.util.*;
 /**
  * @author enrico
  */
-public interface SearchHeuristic {
+public abstract class SearchHeuristic {
 
-    /**
-     *
-     * @param s A state of the system
-     * @return Distance to the goal
-     */
-    float computeEstimate(State s);
-    
-    default Collection getAllEstimates(){
-        return Collections.EMPTY_LIST;
+  protected boolean verboseHeuristic = false;
+  protected PrintStream out;
+  protected float cachedH;
+//  protected State cachedS;
+
+  public float computeEstimate(State s) {
+    float h = computeEstimateForStore(s);
+    cachedH = h;
+//    cachedS = s;
+    return h;
+  }
+
+  protected abstract float computeEstimateForStore(State s);
+
+  public float computeEstimateCached(State s) {
+//    assert(!cachedS.equals(s));
+    return cachedH;
+  }
+
+  public float computeEstimate(State s, boolean useCache) {
+    if (useCache) {
+      return computeEstimateCached(s);
+    } else {
+      return computeEstimate(s);
     }
+  }
 
-    /**
-     *
-     * @param onlyHelpful
-     * @return Return only the helpful actions, if the heuristic is thought to produce them
-     */
-    Object[] getTransitions(final boolean onlyHelpful);
+  public abstract Object[] getTransitions(boolean helpful);
 
-    /**
-     *
-     * @return All actions that are deemed reachable by the heuristic model
-     */
-    Collection<TransitionGround> getAllTransitions();
+  public abstract Collection<TransitionGround> getAllTransitions();
+
+  public void setVerboseHeuristic(boolean verboseHeuristic) {
+    this.verboseHeuristic = verboseHeuristic;
+  }
+
+  public void dumpHeuristicStats() {
+
+  }
+
+  public void setPrintStream(PrintStream out) {
+    this.out = out;
+  }
 }

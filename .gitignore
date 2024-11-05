@@ -9,4 +9,9 @@ nbdist/
 /target/
 .DS_Store
 nbproject/
-build.xml
+/out/
+jar_dependencies/jgrapht-1.3.0/source/jgrapht-core/target/
+jar_dependencies/jgrapht-1.3.0/source/jgrapht-io/target/
+jpddlplus.iml
+src/META-INF/
+jar_dependencies/

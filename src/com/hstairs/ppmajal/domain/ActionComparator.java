@@ -28,12 +28,12 @@ import java.util.Comparator;
  */
 class ActionComparator implements Comparator<Transition> {
 
-    public ActionComparator ( ) {
-    }
+  public ActionComparator() {
+  }
 
-    @Override
-    public int compare (Transition gat1, Transition gat2) {
-        return gat1.getName().compareTo(gat2.getName());
-    }
+  @Override
+  public int compare(Transition gat1, Transition gat2) {
+    return gat1.getName().compareTo(gat2.getName());
+  }
 
 }

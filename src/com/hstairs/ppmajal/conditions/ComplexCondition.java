@@ -22,82 +22,77 @@ import com.google.common.collect.Sets;
 import com.hstairs.ppmajal.domain.Variable;
 import com.hstairs.ppmajal.expressions.NumEffect;
 import com.hstairs.ppmajal.expressions.NumFluent;
-import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
-import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
+import com.hstairs.ppmajal.problem.PDDLObjects;
+import com.hstairs.ppmajal.problem.PDDLProblem;
 import java.util.*;
 
 /**
  * @author Enrico Scala
  */
 public abstract class ComplexCondition extends Condition {
-    final public Object[] sons; //used by formula conditions as AndCond and OrCond. Each son is another condition involved in the formula
 
-    public ComplexCondition (Collection input ) {
-        sons = input.toArray();
+  final public Object[] sons; //used by formula conditions as AndCond and OrCond. Each son is another condition involved in the formula
+
+  public ComplexCondition(Collection input) {
+    sons = input.toArray();
+  }
+
+  protected ComplexCondition(Object[] input) {
+    this.sons = input;
+  }
+
+  @Override
+  public int hashCode() {
+    int hash = 7;
+    hash = 71 * hash + Objects.hashCode(this.sons);
+    return hash;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
     }
-    
-    protected ComplexCondition(Object[] input){
-        this.sons = input;
+    if (obj == null) {
+      return false;
     }
-
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = 71 * hash + Objects.hashCode(this.sons);
-        return hash;
+    if (getClass() != obj.getClass()) {
+      return false;
     }
+    final ComplexCondition other = (ComplexCondition) obj;
+    return Objects.equals(this.sons, other.sons);
+  }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
+
+  @Override
+  public final Collection<BoolPredicate> getInvolvedPredicates() {
+    Collection<BoolPredicate> ret = new LinkedHashSet();
+    //from here it can only be an AndCond or a Or. Other cases are not instance of this
+    if (this.sons != null) {
+      for (Object c : this.sons) {
+        if (c instanceof Condition) {
+          ret.addAll(((Condition) c).getInvolvedPredicates());
         }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final ComplexCondition other = (ComplexCondition) obj;
-        if (!Objects.equals(this.sons, other.sons)) {
-            return false;
-        }
-        return true;
+      }
     }
+    return ret;
+  }
 
+  @Override
+  abstract public Condition unifyVariablesReferences(PDDLProblem p);
 
-    @Override
-    public final Collection<BoolPredicate> getInvolvedPredicates ( ) {
-        Collection<BoolPredicate> ret = new LinkedHashSet();
-        //from here it can only be an AndCond or a Or. Other cases are not instance of this
-        if (this.sons != null) {
-            for (Object c : this.sons) {
-                if (c instanceof Condition) {
-                    ret.addAll(((Condition) c).getInvolvedPredicates());
-                }
-            }
-        }
-        return ret;
+  protected Collection __unifyVariablesReferences(PDDLProblem p) {
+    Collection ret = new LinkedHashSet();
+    for (Object c : this.sons) {
+      if (c instanceof NumEffect neff) {
+        ret.add(neff.unifyVariablesReferences(p));
+      } else {
+        Condition cond = (Condition) c;
+        ret.add(cond.unifyVariablesReferences(p));
+      }
     }
-
-    @Override
-    abstract public Condition unifyVariablesReferences (PDDLProblem p);
-    
-    protected Collection __unifyVariablesReferences(PDDLProblem p){
-        Collection ret = new LinkedHashSet();
-        for (Object c : this.sons) {
-            if (c instanceof NumEffect) {
-                NumEffect neff = (NumEffect) c;
-                ret.add(neff.unifyVariablesReferences(p));
-            } else {
-                Condition cond = (Condition) c;
-                ret.add(cond.unifyVariablesReferences(p));
-            }
-        }
-        return ret;
-    }
-
-
+    return ret;
+  }
 
 //    /**
 //     * @param substitution
@@ -115,169 +110,156 @@ public abstract class ComplexCondition extends Condition {
 //        }
 //    }
 
-    @Override
-    public void extendTerms (Variable v) {
-        if (this.sons == null) {
-            return;
-        }
-        for (final var c : sons) {
-            ((Condition)c).extendTerms(v);
-        }
+  @Override
+  public void extendTerms(Variable v) {
+    if (this.sons == null) {
+      return;
     }
-
-    @Override
-    public Set<NumFluent> getInvolvedFluents ( ) {
-        Set<NumFluent> ret = new LinkedHashSet();
-        if (this.sons != null) {
-            for (Object o : this.sons) {
-                if (o instanceof NumFluent) {
-                    ret.add((NumFluent) o);
-                } else if (o instanceof Condition) {
-                    Condition c = (Condition) o;
-                    if (c.getInvolvedFluents() != null) {
-                        ret.addAll(c.getInvolvedFluents());
-                    }
-                } else if (o instanceof NumEffect) {
-                    NumEffect c = (NumEffect) o;
-                    if (c.getInvolvedFluents() != null) {
-                        ret.addAll(c.getInvolvedFluents());
-                    }
-                } else {
-                    System.out.println("Error in getting involved fluents");
-                }
-            }
-        }
-        return ret;
+    for (final var c : sons) {
+      ((Condition) c).extendTerms(v);
     }
+  }
 
-
-    @Override
-    public Set<Condition> getTerminalConditions ( ) {
-        Set ret;
-        if (this.sons == null) {
-            return new LinkedHashSet();
+  @Override
+  public Set<NumFluent> getInvolvedFluents() {
+    Set<NumFluent> ret = new LinkedHashSet();
+    if (this.sons != null) {
+      for (Object o : this.sons) {
+        if (o instanceof NumFluent) {
+          ret.add((NumFluent) o);
+        } else if (o instanceof Condition c) {
+          if (c.getInvolvedFluents() != null) {
+            ret.addAll(c.getInvolvedFluents());
+          }
+        } else if (o instanceof NumEffect c) {
+          if (c.getInvolvedFluents() != null) {
+            ret.addAll(c.getInvolvedFluents());
+          }
+        } else {
+          System.out.println("Error in getting involved fluents");
         }
-        ret = Sets.newLinkedHashSetWithExpectedSize(this.sons.length);
-        for (Object c : this.sons) {
-            ret.addAll(((Condition)c).getTerminalConditions());
+      }
+    }
+    return ret;
+  }
+
+
+  @Override
+  public Set<Condition> getTerminalConditions() {
+    Set ret;
+    if (this.sons == null) {
+      return new LinkedHashSet();
+    }
+    ret = Sets.newLinkedHashSetWithExpectedSize(this.sons.length);
+    for (Object c : this.sons) {
+      ret.addAll(((Condition) c).getTerminalConditions());
+    }
+    return ret;
+  }
+
+
+  @Override
+  public List<Condition> getTerminalConditionsInArray() {
+    ArrayList ret = new ArrayList();
+    if (this.sons == null) {
+      return Collections.emptyList();
+    }
+    for (var c : this.sons) {
+      ret.addAll(((Condition) c).getTerminalConditionsInArray());
+    }
+    return ret;
+  }
+
+  @Override
+  public Condition ground(Map<Variable, PDDLObject> substitution, PDDLObjects po) {
+    Collection ret = new HashSet();
+    //System.out.println(this.toString());
+    for (Object o : sons) {
+      final Object groundedO;
+      if (o instanceof NumEffect el) {
+        groundedO = el.ground(substitution, po);
+      } else {
+        Condition el = (Condition) o;
+        //System.out.println(el);
+        groundedO = el.ground(substitution, po);
+      }
+      if (groundedO instanceof AndCond) {
+        addAll(ret, ((AndCond) groundedO).sons);
+      } else {
+        ret.add(groundedO);
+      }
+    }
+    return new AndCond(ret);
+  }
+
+
+  /**
+   * @return the freeVarSemantic
+   */
+  public boolean isFreeVarSemantic() {
+    return freeVarSemantic;
+  }
+
+
+  protected void sonHasIncorrectType(Object son) {
+    System.out.println("Effect " + son + " is not valid. Its class is" + son.getClass()
+        + ".  Please revise your action model.");
+    System.exit(-1);
+  }
+
+  @Override
+  public void storeInvolvedVariables(Collection<Variable> vars) {
+    if (this.sons != null) {
+      for (Object o : this.sons) {
+        if (o instanceof Condition c) {
+          c.storeInvolvedVariables(vars);
+        } else if (o instanceof NumEffect c) {
+          if (c.getInvolvedVariables() != null) {
+            c.storeInvolvedVariables(vars);
+          }
+        } else {
+          System.out.println("Error in getting involved variables");
         }
-        return ret;
+      }
     }
+  }
 
 
-    @Override
-    public List<Condition> getTerminalConditionsInArray ( ) {
-        ArrayList ret = new ArrayList();
-        if (this.sons == null) {
-            return Collections.emptyList();
-        }
-        for (var c : this.sons) {
-            ret.addAll(((Condition)c).getTerminalConditionsInArray());
-        }
-        return ret;
+  @Override
+  public boolean involve(Condition c) {
+    for (Object c1 : this.sons) {
+      if (((Condition) c1).involve(c)) {
+        return true;
+      }
     }
+    return false;
+  }
 
-    @Override
-    public Condition ground (Map<Variable, PDDLObject> substitution, PDDLObjects po) {
-        Collection ret = new HashSet();
-        //System.out.println(this.toString());
-        for (Object o : sons) {
-            final Object groundedO;
-            if (o instanceof NumEffect) {
-                NumEffect el = (NumEffect) o;
-                groundedO = el.ground(substitution, po);
-            } else {
-                Condition el = (Condition) o;
-                //System.out.println(el);
-                groundedO = el.ground(substitution, po);
-            }
-            if (groundedO instanceof AndCond) {
-                addAll(ret,((AndCond) groundedO).sons);
-            } else {
-                ret.add(groundedO);
-            }
-        }
-        return new AndCond(ret);
+
+  protected Collection cloneSons() {
+    Collection ret = new LinkedHashSet();
+
+    for (Object o : this.sons) {
+      if (o instanceof AndCond a) {
+        ret.add(a.clone());
+      } else if (o instanceof NotCond a) {
+        ret.add(a.clone());
+      } else if (o instanceof OrCond a) {
+        ret.add(a.clone());
+      } else if (o instanceof BoolPredicate a) {
+        ret.add(a.clone());
+      } else if (o instanceof Comparison a) {
+        ret.add(a.clone());
+      } else if (o instanceof NumEffect a) {
+        ret.add(a.clone());
+      } else if (o instanceof ConditionalEffectAsACondition a) {
+        ret.add(a.clone());
+      } else if (o instanceof ForAll a) {
+        ret.add(a.clone());
+      }
     }
-
-
-    /**
-     * @return the freeVarSemantic
-     */
-    public boolean isFreeVarSemantic ( ) {
-        return freeVarSemantic;
-    }
-
-
-    protected void sonHasIncorrectType (Object son) {
-        System.out.println("Effect " + son + " is not valid. Its class is" + son.getClass() + ".  Please revise your action model.");
-        System.exit(-1);
-    }
-
-    @Override
-    public void storeInvolvedVariables (Collection<Variable> vars) {
-        if (this.sons != null) {
-            for (Object o : this.sons) {
-                if (o instanceof Condition) {
-                    Condition c = (Condition) o;
-                    c.storeInvolvedVariables(vars);
-                } else if (o instanceof NumEffect) {
-                    NumEffect c = (NumEffect) o;
-                    if (c.getInvolvedVariables() != null) {
-                        c.storeInvolvedVariables(vars);
-                    }
-                } else {
-                    System.out.println("Error in getting involved variables");
-                }
-            }
-        }
-    }
-
-
-
-    @Override
-    public boolean involve (Condition c) {
-        for (Object c1 :  this.sons) {
-            if (((Condition)c1).involve(c)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    
-    protected Collection cloneSons() {
-        Collection ret = new LinkedHashSet();
-
-        for (Object o : this.sons) {
-            if (o instanceof AndCond) {
-                AndCond a = (AndCond) o;
-                ret.add(a.clone());
-            } else if (o instanceof NotCond) {
-                NotCond a = (NotCond) o;
-                ret.add(a.clone());
-            } else if (o instanceof OrCond) {
-                OrCond a = (OrCond) o;
-                ret.add(a.clone());
-            } else if (o instanceof BoolPredicate) {
-                BoolPredicate a = (BoolPredicate) o;
-                ret.add(a.clone());
-            } else if (o instanceof Comparison) {
-                Comparison a = (Comparison) o;
-                ret.add(a.clone());
-            } else if (o instanceof NumEffect) {
-                NumEffect a = (NumEffect) o;
-                ret.add(a.clone());
-            } else if (o instanceof ConditionalEffectAsACondition) {
-                ConditionalEffectAsACondition a = (ConditionalEffectAsACondition) o;
-                ret.add(a.clone());
-            } else if (o instanceof ForAll) {
-                ForAll a = (ForAll) o;
-                ret.add(a.clone());
-            }
-        }
-        return ret;
-    }
+    return ret;
+  }
 
 
 }

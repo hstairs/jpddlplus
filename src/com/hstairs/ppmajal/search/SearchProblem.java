@@ -23,21 +23,20 @@ import java.util.Iterator;
 import org.jgrapht.alg.util.Pair;
 
 /**
- *
  * @author enrico
  */
 public interface SearchProblem {
 
-    public  State getInit();
+  State getInit();
 
-    public  Boolean goalSatisfied(State current);
+  Boolean goalSatisfied(State current);
 
-    public  Iterator<Pair<State, Object>> getSuccessors(State s, Object[] actionsToSearch);
+  Iterator<Pair<State, Object>> getSuccessors(State s, Object[] actionsToSearch);
 
-    public  boolean satisfyGlobalConstraints(State temp);
+  boolean satisfyGlobalConstraints(State temp);
 
-    public  Float gValue(State s, Object act, State temp, float gValue);
+  Float gValue(State s, Object act, State temp, float gValue);
 
-    public  boolean milestoneReached(Float d, Float current_value, State temp);
-    
+  boolean milestoneReached(Float d, Float current_value, State temp);
+
 }
