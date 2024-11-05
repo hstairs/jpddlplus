@@ -1,23 +1,36 @@
 This branch extends ENHSP with novelty heuristics and multi-queue search described in the SOCS-24 publication [here](https://arxiv.org/abs/2404.05235)
 
-## Building
+## Setup
 
-Not sure how to build from command line, so I used intellij to build an artifact (`.jar` file).
+I'm not sure how to build from command line, so I used intellij to build an artifact (`.jar` file). 
 1. mark src as 'source' in intellij
 2. manually download org.junit for the extra tests
 3. Add jar files in `jar_dependencies` to module dependencies, see [here](https://www.jetbrains.com/help/idea/working-with-module-dependencies.html)
 4. make sure dependencies are detected correctly, next follow the steps to configure and build the `.jar` artifact in this [stackoverflow](https://stackoverflow.com/a/4901370/13531424) or [official docs](https://www.jetbrains.com/help/idea/compiling-applications.html#run_packaged_jar)
 5. the default intellij shortcut for building the artifact is `alt + B`
 
-To test if your build passed successfully with the above method, run the `sanity_check.sh` script.
+To test if your build passed successfully with the above method, run the `sanity_check.sh` script. The jar output by intellij defaults to `out/artifacts/jpddlplus_jar/jpddlplus.jar`
 
-## Running
+If you cannot get the build to work, try using the attached `enhsp.jar` in the root. The binary is compiled with OpenJDK 17. If you are using Ubuntu, you can install the required Java Runtime Environment with
+```
+sudo apt install openjdk-17-jre
+``` 
+If you are using a different system, any JRE version `>=17` is likely to work.
 
-Call the following from command line without any arguments to see what arguments are possible
+## Usage
+The input is a PDDL domain file `<domain>`, a PDDL problem file `<problem>`, and an ENHSP configuration `<config>`. The command line instruction is
 ```
-java -jar out/artifacts/jpddlplus_jar/jpddlplus.jar <enhsp_args> 
+java -jar enhsp.jar -o <domain> -f <problem> -planner <config>
 ```
-where you could configure intellij to build the artifact to another location
+where the top new configurations ordered by total coverage in the paper are
+- `sat-mq3h3n`
+- `sat-mq3h`
+- `sat-mq3n`
+- `sat-hiqb2add`
+- `sat-hiqb2mrphj`
+- `sat-hmd`
+
+Note that performance of a configuration depends on the domain, and lower ranked configurations could perform better for your use case.
 
 -----
 
