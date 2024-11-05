@@ -16,11 +16,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package com.hstairs.ppmajal.domain;
+package jpddlplus.domain;
 
 //import java.util.Comparator;
 
-import com.hstairs.ppmajal.transition.Transition;
+import jpddlplus.transition.Transition;
 import java.util.Comparator;
 
 /**
@@ -28,12 +28,12 @@ import java.util.Comparator;
  */
 class ActionComparator implements Comparator<Transition> {
 
-    public ActionComparator ( ) {
-    }
+  public ActionComparator() {
+  }
 
-    @Override
-    public int compare (Transition gat1, Transition gat2) {
-        return gat1.getName().compareTo(gat2.getName());
-    }
+  @Override
+  public int compare(Transition gat1, Transition gat2) {
+    return gat1.getName().compareTo(gat2.getName());
+  }
 
 }

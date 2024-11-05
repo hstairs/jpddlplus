@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package com.hstairs.ppmajal.domain;
+package jpddlplus.domain;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,58 +28,59 @@ import java.util.List;
  */
 public class SchemaParameters extends ArrayList {
 
-    public static SchemaParameters createPar(Variable... input){
-        return new SchemaParameters(Arrays.asList(input));
-    }
-    
+  public static SchemaParameters createPar(Variable... input) {
+    return new SchemaParameters(Arrays.asList(input));
+  }
 
-    public SchemaParameters ( ) {
-        super();
-    }
 
-    public SchemaParameters (SchemaParameters po) {
-        super(po);
-    }
-    public SchemaParameters (List po) {
-        super(po);
-    }
+  public SchemaParameters() {
+    super();
+  }
 
-    public Variable getVar (Variable o) {
-        Iterator it = this.iterator();
-        while (it.hasNext()) {
-            Variable v = (Variable) it.next();
-            if (v.getName() == null ? o.getName() == null : v.getName().equalsIgnoreCase(o.getName())) {
-                return v;
-            }
-        }
-        return null;
+  public SchemaParameters(SchemaParameters po) {
+    super(po);
+  }
+
+  public SchemaParameters(List po) {
+    super(po);
+  }
+
+  public Variable getVar(Variable o) {
+    Iterator it = this.iterator();
+    while (it.hasNext()) {
+      Variable v = (Variable) it.next();
+      if (v.getName() == null ? o.getName() == null : v.getName().equalsIgnoreCase(o.getName())) {
+        return v;
+      }
     }
+    return null;
+  }
 
-    @Override
-    public String toString ( ) {
-        String ret = "(";
-        for (Object o : this) {
-            Variable v = (Variable) o;
-            //System.out.println(v.getName());
-            ret += v.pddlPrint();
-
-        }
-        return ret + ")";
+  @Override
+  public String toString() {
+    String ret = "(";
+    for (Object o : this) {
+      Variable v = (Variable) o;
+      //System.out.println(v.getName());
+      ret += v.pddlPrint();
 
     }
+    return ret + ")";
+
+  }
 
 
-    public void pddlPrint (boolean typeInformation, StringBuilder bui) {
-        bui.append("(");
-        for (Object o : this) {
-            Variable v = (Variable) o;
-            //System.out.println(v.getName());
-            v.pddlPrint(typeInformation, bui);
-
-        }
-        bui.append(")");
+  public void pddlPrint(boolean typeInformation, StringBuilder bui) {
+    bui.append("(");
+    for (Object o : this) {
+      Variable v = (Variable) o;
+      //System.out.println(v.getName());
+      v.pddlPrint(typeInformation, bui);
 
     }
+    bui.append(")");
+
+  }
 
 
 }

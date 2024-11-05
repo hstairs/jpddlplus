@@ -16,19 +16,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package com.hstairs.ppmajal.conditions;
+package jpddlplus.conditions;
 
-import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
-import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
-import com.hstairs.ppmajal.PDDLProblem.PDDLState;
-import com.hstairs.ppmajal.domain.ParametersAsTerms;
-import com.hstairs.ppmajal.domain.SchemaParameters;
-import com.hstairs.ppmajal.domain.Variable;
-import com.hstairs.ppmajal.expressions.NumEffect;
-import com.hstairs.ppmajal.expressions.NumFluent;
-import com.hstairs.ppmajal.problem.*;
-import com.hstairs.ppmajal.propositionalFactory.Grounder;
-import com.hstairs.ppmajal.transition.TransitionGround;
+import jpddlplus.domain.ParametersAsTerms;
+import jpddlplus.domain.SchemaParameters;
+import jpddlplus.domain.Variable;
+import jpddlplus.expressions.NumEffect;
+import jpddlplus.expressions.NumFluent;
+import jpddlplus.problem.*;
+import jpddlplus.grounding.Grounder;
+import jpddlplus.transition.TransitionGround;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,285 +35,298 @@ import java.util.logging.Logger;
  */
 public class ForAll extends ComplexCondition implements PostCondition {
 
-    public SchemaParameters parameters;
+  public SchemaParameters parameters;
 
-    ForAll(SchemaParameters parameters, Collection res) {
-        super(res);
-        this.parameters = parameters;
+  ForAll(SchemaParameters parameters, Collection res) {
+    super(res);
+    this.parameters = parameters;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
     }
 
-    @Override
-    public boolean equals (Object obj) {
-        if (this == obj) {
-            return true;
-        }
-
-        if (obj == null) {
-            return false;
-        }
-
-        if (!(obj instanceof ForAll)) {
-            return false;
-        }
-
-        final ForAll other = (ForAll) obj;
-        return other.sons.equals(this.sons) && this.parameters.equals(other.parameters);
+    if (obj == null) {
+      return false;
     }
 
-    @Override
-    public int hashCode ( ) {
-        int hash = 7;
-        hash = 83 * hash + Objects.hashCode(this.parameters);
-        hash = 83 * hash + Objects.hashCode(this.sons);
-        return hash;
+    if (!(obj instanceof ForAll other)) {
+      return false;
     }
 
+    return other.sons.equals(this.sons) && this.parameters.equals(other.parameters);
+  }
 
-    @Override
-    public String toString ( ) {
-        
-        return this.parameters + " " + Arrays.toString(this.sons);
-    }
+  @Override
+  public int hashCode() {
+    int hash = 7;
+    hash = 83 * hash + Objects.hashCode(this.parameters);
+    hash = 83 * hash + Objects.hashCode(this.sons);
+    return hash;
+  }
 
-    @Override
-    public boolean eval (State s) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
 
-    @Override
-    public String toSmtVariableString (int k, TransitionGround gr, String var) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public String toString() {
 
-    @Override
-    public boolean isSatisfied (State s) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+    return this.parameters + " " + Arrays.toString(this.sons);
+  }
+
+  @Override
+  public boolean eval(State s) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public String toSmtVariableString(int k, TransitionGround gr, String var) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public boolean isSatisfied(State s) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
 //    @Override
 //    public void changeVar (Map substitution) {
 //        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
 //    }
 
-    @Override
-    public String pddlPrintWithExtraObject ( ) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public String pddlPrintWithExtraObject() {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    @Override
-    public boolean canBeTrue (RelState aThis) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public boolean canBeTrue(RelState aThis) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    @Override
-    public boolean canBeFalse (RelState aThis) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public boolean canBeFalse(RelState aThis) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    @Override
-    public Condition normalize ( ) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public Condition normalize() {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
 
+  @Override
+  public String toSmtVariableString(int i) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    @Override
-    public String toSmtVariableString (int i) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public Set<NumFluent> getInvolvedFluents ( ) {
-        Set<NumFluent> ret = new HashSet();
-        if (this.sons != null) {
-            for (Object o : this.sons) {
-                if (o instanceof NumFluent) {
-                    ret.add((NumFluent) o);
-                } else if (o instanceof Condition) {
-                    Condition c = (Condition) o;
-                    if (c.getInvolvedFluents() != null) {
-                        ret.addAll(c.getInvolvedFluents());
-                    }
-                } else if (o instanceof NumEffect) {
-                    NumEffect c = (NumEffect) o;
-                    if (c.getInvolvedFluents() != null) {
-                        ret.addAll(c.getInvolvedFluents());
-                    }
-                } else {
-                    System.out.println("Error in getting involved fluents");
-                }
-            }
+  @Override
+  public Set<NumFluent> getInvolvedFluents() {
+    Set<NumFluent> ret = new HashSet();
+    if (this.sons != null) {
+      for (Object o : this.sons) {
+        if (o instanceof NumFluent) {
+          ret.add((NumFluent) o);
+        } else if (o instanceof Condition c) {
+          if (c.getInvolvedFluents() != null) {
+            ret.addAll(c.getInvolvedFluents());
+          }
+        } else if (o instanceof NumEffect c) {
+          if (c.getInvolvedFluents() != null) {
+            ret.addAll(c.getInvolvedFluents());
+          }
+        } else {
+          System.out.println("Error in getting involved fluents");
         }
-
-        return ret;
+      }
     }
 
-    @Override
-    public ComplexCondition transformEquality ( ) {
+    return ret;
+  }
 
-        HashSet<Condition> temp = new HashSet<>();
-        for (final var c : sons) {
-            temp.add(((Condition)c).transformEquality());
-        }
-        addAll(temp,sons);
-        return new ForAll(parameters,temp);
+  @Override
+  public ComplexCondition transformEquality() {
+
+    HashSet<Condition> temp = new HashSet<>();
+    for (final var c : sons) {
+      temp.add(((Condition) c).transformEquality());
     }
+    addAll(temp, sons);
+    return new ForAll(parameters, temp);
+  }
 
 
-    @Override
-    public void storeInvolvedVariables (Collection<Variable> vars) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  @Override
+  public void storeInvolvedVariables(Collection<Variable> vars) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public void pddlPrint(boolean typeInformation, StringBuilder bui) {
+    bui.append("(forall ");
+
+    this.parameters.pddlPrint(true, bui);
+    if (sons.length > 1) {
+      bui.append("(and ");
     }
-
-    @Override
-    public void pddlPrint (boolean typeInformation, StringBuilder bui) {
-        bui.append("(forall ");
-
-        this.parameters.pddlPrint(true, bui);
-        if (sons.length > 1)
-            bui.append("(and ");
-        for (Object o : sons) {
-            if (o instanceof Condition) {
-                Condition c = (Condition) o;
-                c.pddlPrint(typeInformation, bui);
+    for (Object o : sons) {
+      if (o instanceof Condition c) {
+        c.pddlPrint(typeInformation, bui);
 //            } else if (o instanceof Comparison) { // ??? a Comparison is already a Conditions
 //                Comparison comp = (Comparison) o;
 //                ret_val = ret_val.concat(comp.pddlPrint(typeInformation));
-            } else {
-                System.out.println("Error in pddlPrint: " + this);
-                System.exit(-1);
-            }
-        }
-        if (sons.length > 1)
-            bui.append(")");
-        bui.append(")");
+      } else {
+        System.out.println("Error in pddlPrint: " + this);
+        System.exit(-1);
+      }
+    }
+    if (sons.length > 1) {
+      bui.append(")");
+    }
+    bui.append(")");
+  }
+
+
+  @Override
+  public ComplexCondition and(Condition precondition) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+
+  @Override
+  public Condition pushNotToTerminals() {
+    if (this.sons == null) {
+      return this;
+    }
+    Collection res = new HashSet();
+    for (final var c : this.sons) {
+      Condition c1 = ((Condition) c).pushNotToTerminals();
+      if (c1 instanceof AndCond) {
+        addAll(res, ((AndCond) c1).sons);
+      } else {
+        res.add(c1);
+      }
+    }
+    return new ForAll(parameters, res);
+  }
+
+  @Override
+  public boolean isSatisfied(RelState rs, ArrayList<Integer> dist, int i) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public Condition introduce_red_constraints() {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  public void addParameter(Variable variable) {
+    this.getParameters().add(variable);
+  }
+
+  /**
+   * @return the parameters
+   */
+  public SchemaParameters getParameters() {
+    return parameters;
+  }
+
+  /**
+   * @param parameters the parameters to set
+   */
+  public void setParameters(SchemaParameters parameters) {
+    this.parameters = parameters;
+  }
+
+  @Override
+  public Condition ground(Map<Variable, PDDLObject> substitution, PDDLObjects objects) {
+
+    if (objects == null) {//this is the case where I don't want to ground really
+      Collection res = new HashSet();
+      for (final var c : this.sons) {
+        res.add(((Condition) c).ground(substitution, objects));
+      }
+      return new ForAll(parameters, res);
     }
 
-
-
-    @Override
-    public ComplexCondition and (Condition precondition) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-
-    @Override
-    public Condition pushNotToTerminals() {
-        if (this.sons == null) {
-            return this;
-        }
-        Collection res = new HashSet();
+    try {
+      Grounder g = new Grounder();
+      Set<ParametersAsTerms> combo = g.Substitutions(this.parameters, objects);
+      Collection and = new HashSet();
+      for (ParametersAsTerms ele : combo) {
+        Map sub = Grounder.ObtainSubFromInstance(parameters, ele);
+        sub.putAll(substitution);
         for (final var c : this.sons) {
-            Condition c1 = ((Condition)c).pushNotToTerminals();
-            if (c1 instanceof AndCond) {
-                addAll(res, ((AndCond) c1).sons);
-            } else {
-                res.add(c1);
-            }
+          and.add(((Condition) c).ground(sub, objects));
         }
-        return new ForAll(parameters, res);
+      }
+
+      return new AndCond(and);
+
+    } catch (Exception ex) {
+      Logger.getLogger(ForAll.class.getName()).log(Level.SEVERE, null, ex);
     }
+    return null;
 
-    @Override
-    public boolean isSatisfied (RelState rs, ArrayList<Integer> dist, int i) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  }
 
-    @Override
-    public Condition introduce_red_constraints ( ) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public Condition weakEval(PDDLProblem s, Set invF) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    public void addParameter (Variable variable) {
-        this.getParameters().add(variable);
-    }
+  @Override
+  public void apply(State s, Map modifications) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    /**
-     * @return the parameters
-     */
-    public SchemaParameters getParameters ( ) {
-        return parameters;
-    }
+  @Override
+  public void apply(RelState s, Map modifications) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    /**
-     * @param parameters the parameters to set
-     */
-    public void setParameters (SchemaParameters parameters) {
-        this.parameters = parameters;
-    }
+  @Override
+  public HashMap<Object, Object> apply(PDDLState s) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-    @Override
-    public Condition ground (Map<Variable, PDDLObject> substitution, PDDLObjects objects) {
+  @Override
+  public HashMap<Object, Object> apply(RelState s) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
+  @Override
+  public void extendTerms(Variable v) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
-        if (objects == null) {//this is the case where I don't want to ground really
-            Collection res = new HashSet();
-            for (final var  c : this.sons) {
-                res.add(((Condition)c).ground(substitution, objects));
-            }
-            return new ForAll(parameters,res);
-        }
+  @Override
+  public Condition clone() {
+    return new ForAll((SchemaParameters) this.parameters.clone(), cloneSons());
+  }
 
-
-        try {
-            Grounder g = new Grounder();
-            Set<ParametersAsTerms> combo = g.Substitutions(this.parameters, objects);
-            Collection and = new HashSet();
-            for (ParametersAsTerms ele : combo) {
-                Map sub = Grounder.ObtainSubFromInstance(parameters, ele);
-                sub.putAll(substitution);        
-                for (final var c : this.sons) {
-                    and.add(((Condition)c).ground(sub, objects));
-                }
-            }
-
-            return new AndCond(and);
-
-        } catch (Exception ex) {
-            Logger.getLogger(ForAll.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return null;
-
-    }
-
-    @Override
-    public Condition weakEval (PDDLProblem s, Set invF) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public void apply (State s, Map modifications) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public void apply (RelState s, Map modifications) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public HashMap<Object, Object> apply (PDDLState s) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public HashMap<Object, Object> apply (RelState s) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public void extendTerms (Variable v) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public Condition clone() {
-        return new ForAll((SchemaParameters) this.parameters.clone(),cloneSons());
-    }
-
-    @Override
-    public Condition unifyVariablesReferences(PDDLProblem p) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
+  @Override
+  public Condition unifyVariablesReferences(PDDLProblem p) {
+    throw new UnsupportedOperationException(
+        "Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
 
 }

@@ -16,9 +16,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package com.hstairs.ppmajal.domain;
+package jpddlplus.domain;
 
-import com.hstairs.ppmajal.conditions.PDDLObject;
+import jpddlplus.conditions.PDDLObject;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -27,34 +27,33 @@ import java.util.Iterator;
  */
 public class ParametersAsTerms<T> extends ArrayList {
 
-    private Integer cached_hash;
+  private Integer cached_hash;
 
-    public ParametersAsTerms(){
-        super();
-    }
-    
-    public ParametersAsTerms(ArrayList input) {
-        this.addAll(input);
-    }
-    
-    
+  public ParametersAsTerms() {
+    super();
+  }
 
-    public PDDLObject containsTerm (PDDLObject o) {
-        Integer ret_val = -1;
-        Iterator it = this.iterator();
-        while (it.hasNext()) {
-            PDDLObject t = (PDDLObject) it.next();
-            if (t.getName() == null ? o.getName() == null : t.getName().equalsIgnoreCase(o.getName())) {
-                return t;
-            }
-        }
-        return null;
-    }
+  public ParametersAsTerms(ArrayList input) {
+    this.addAll(input);
+  }
 
-    /**
-     * @param o
-     * @return
-     */
+
+  public PDDLObject containsTerm(PDDLObject o) {
+    Integer ret_val = -1;
+    Iterator it = this.iterator();
+    while (it.hasNext()) {
+      PDDLObject t = (PDDLObject) it.next();
+      if (t.getName() == null ? o.getName() == null : t.getName().equalsIgnoreCase(o.getName())) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * @param o
+   * @return
+   */
 //    @Override
 //    public boolean equals(Object o){
 //        ParametersAsTerms obj = (ParametersAsTerms)o;
@@ -66,26 +65,26 @@ public class ParametersAsTerms<T> extends ArrayList {
 //        }
 //        return true;
 //    }
-    public void addALLNewObjects (ParametersAsTerms a) {
-        for (Object o : a) {
-            PDDLObject obj = (PDDLObject) o;
-            if (this.containsTerm(obj) == null) {
-                this.add(obj);
-            }
-        }
-
+  public void addALLNewObjects(ParametersAsTerms a) {
+    for (Object o : a) {
+      PDDLObject obj = (PDDLObject) o;
+      if (this.containsTerm(obj) == null) {
+        this.add(obj);
+      }
     }
 
-    public String pddlPrint ( ) {
-        String ret = "";
+  }
 
-        for (Object o : this) {
-            PDDLObject t = (PDDLObject) o;
-            ret += t.pddlPrint(true);
-        }
+  public String pddlPrint() {
+    String ret = "";
 
-        return ret;
+    for (Object o : this) {
+      PDDLObject t = (PDDLObject) o;
+      ret += t.pddlPrint(true);
     }
+
+    return ret;
+  }
 
 //    @Override
 //    public int hashCode() {

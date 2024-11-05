@@ -16,10 +16,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package com.hstairs.ppmajal.conditions;
+package jpddlplus.conditions;
 
-import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
-import com.hstairs.ppmajal.problem.RelState;
+import jpddlplus.problem.PDDLProblem;
+import jpddlplus.problem.RelState;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,78 +29,78 @@ import java.util.List;
  */
 public abstract class Terminal extends Condition {
 
-    private static int totCounter = 0;
-    private static int totComparisonCounter = 0;
+  private static int totCounter = 0;
+  private static int totComparisonCounter = 0;
 
-    private static ArrayList<Terminal> id2terminal = new ArrayList();
-    private final int id;
+  private static final ArrayList<Terminal> id2terminal = new ArrayList();
+  private final int id;
 
-    public Terminal() {
-        this.id = getTotCounter();
-        id2terminal.add(this);
-        totCounter++;
+  public Terminal() {
+    this.id = getTotCounter();
+    id2terminal.add(this);
+    totCounter++;
 //        System.out.println(totCounter);
-        if (this instanceof Comparison){
-            totComparisonCounter++;
-        }
+    if (this instanceof Comparison) {
+      totComparisonCounter++;
     }
+  }
 
-    public int getId() {
-        return id;
+  public int getId() {
+    return id;
+  }
+
+  public static int getTotCounter() {
+    return totCounter;
+  }
+
+  public static Terminal getTerminal(int t) {
+    return id2terminal.get(t);
+  }
+
+
+  @Override
+  public boolean isSatisfied(RelState rs, ArrayList<Integer> dist, int i) {
+    int current_dist = dist.get(this.getId());
+    if (current_dist < i) {
+      return true;
+    } else if (this.canBeTrue(rs)) {
+      dist.set(this.getId(), i);
+      return true;
     }
+    return false;
+  }
 
-    public static int getTotCounter() {
-        return totCounter;
-    }
-
-    public static Terminal getTerminal(int t) {
-        return id2terminal.get(t);
-    }
-
-
-    @Override
-    public boolean isSatisfied (RelState rs, ArrayList<Integer> dist, int i) {
-        int current_dist = dist.get(this.getId());
-        if (current_dist < i) {
-            return true;
-        } else if (this.canBeTrue(rs)) {
-            dist.set(this.getId(), i);
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public Condition introduce_red_constraints ( ) {
-        return this;
-    }
+  @Override
+  public Condition introduce_red_constraints() {
+    return this;
+  }
 
 
-    @Override
-    public Condition unifyVariablesReferences (PDDLProblem p) {
-        return this;
-    }
+  @Override
+  public Condition unifyVariablesReferences(PDDLProblem p) {
+    return this;
+  }
 
 
-    @Override
-    public boolean involve (Condition c) {
-        return this.equals(c);
-    }
+  @Override
+  public boolean involve(Condition c) {
+    return this.equals(c);
+  }
 
 
-    @Override
-    public List<Condition> getTerminalConditionsInArray ( ) {
-        return Collections.singletonList(this);
-    }
+  @Override
+  public List<Condition> getTerminalConditionsInArray() {
+    return Collections.singletonList(this);
+  }
 
-    @Override
-    public boolean equals(Object obj) {
-        return (obj instanceof Terminal) && ((Terminal) obj).getId() == getId();
-    }
+  @Override
+  public boolean equals(Object obj) {
+    return (obj instanceof Terminal) && ((Terminal) obj).getId() == getId();
+  }
 
-    @Override
-    public int hashCode() {
-        return getId();
-    }
+  @Override
+  public int hashCode() {
+    return getId();
+  }
 
 }
