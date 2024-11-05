@@ -52,7 +52,8 @@ public class ConditionalEffects<T> {
                     }
                 }
                 final Condition condition = entry.getKey().weakEval(ePddlProblem, invariantFluents);
-                toAdd.forEach(t1 -> res.add(condition,t1));
+                if (!condition.isUnsatisfiable())
+                    toAdd.forEach(t1 -> res.add(condition,t1));
             }
         }
         if (unconditionalEffect != null) {

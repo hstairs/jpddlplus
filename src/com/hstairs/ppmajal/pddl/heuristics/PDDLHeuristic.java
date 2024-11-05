@@ -40,6 +40,9 @@ public class PDDLHeuristic {
 
             }
             case "ngc":{
+                return new StructureSensitiveNumericGoalCounting(heuristicProblem);
+            }
+            case "agnosticngc":{
                 return new NumericGoalCounting(heuristicProblem);
             }
             case "mgc":{

@@ -108,7 +108,7 @@ public class H1 implements SearchHeuristic {
     //Plan Fixing Data Structures;
     final boolean[] visited;
     protected final int[] maxNumRepetition ;
-    private boolean hardConditionthroughNumError = true;
+    private boolean hardConditionthroughNumError;
 
 
     public H1(PDDLProblem problem) {
@@ -134,7 +134,7 @@ public class H1 implements SearchHeuristic {
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost, int linearEffectsAbstraction) {
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
 
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -144,8 +144,11 @@ public class H1 implements SearchHeuristic {
         this.extractRelaxedPlan = extractRelaxedPlan;
         allComparisons = new IntArraySet();
         freePreconditionActions = new IntArraySet();
+        hardConditionthroughNumError = compNumericStrategy > -2;
 //        problem.prettyPrint();
-        cp = ProblemTransfomer.generateCompactProblem(problem, redConstraints, unitaryCost, linearEffectsAbstraction);
+        if (hardConditionthroughNumError)
+            System.out.println("Numeric Error for Complex Condition Activated");
+        cp = ProblemTransfomer.generateCompactProblem(problem, redConstraints, unitaryCost, compNumericStrategy);
 //        System.out.println(cp);
         useSmartConstraints = "smart".equals(redConstraints);
 
@@ -640,7 +643,6 @@ public class H1 implements SearchHeuristic {
 
 //        Float positiveness = numericContribution[t][comp.getId()];
         Float positiveness = getNumericContribution(t, comp.getId());
-
         if (positiveness == Float.MAX_VALUE) {
             positiveness = 0f;
             if (cp.numericEffectFunction()[t].isEmpty()) {
@@ -756,29 +758,32 @@ public class H1 implements SearchHeuristic {
             throw new RuntimeException("Helpful Transitions can only be activatated in combination with the relaxed plan extraction");
         }
         Collection<Pair<TransitionGround, Integer>> res = new ArrayList<>();
+
         for (final int actionTransitionId : plan) {
             int actionId = cp.tr2CpTrMap()[actionTransitionId].iterator().next();//Assume that there is a one-to-one relantioship between actions in the heuristic and actions in the search
             if (getActionInit()[actionId]) {
                 final IntArraySet right = repetitionsInThePlan[actionTransitionId];
-                if (maxMRP) {
-                    int max = 0;
-                    for (int i : right) {
-                        if (i > max) {
-                            max = i;
+                if (!right.isEmpty()) {
+                    if (maxMRP) {
+                        int max = 0;
+                        for (int i : right) {
+                            if (i > max) {
+                                max = i;
+                            }
                         }
-                    }
-                    if (max > 1) {
-                        res.add(Pair.of((TransitionGround) getTransition(actionTransitionId), max));
-                    }
-                } else {
-                    int min = Integer.MAX_VALUE;
-                    for (int i : right) {
-                        if (i < min) {
-                            min = i;
+                        if (max > 1) {
+                            res.add(Pair.of((TransitionGround) getTransition(actionTransitionId), max));
                         }
-                    }
-                    if (min > 1) {
-                        res.add(Pair.of((TransitionGround) getTransition(actionTransitionId), min));
+                    } else {
+                        int min = Integer.MAX_VALUE;
+                        for (int i : right) {
+                            if (i < min) {
+                                min = i;
+                            }
+                        }
+                        if (min > 1) {
+                            res.add(Pair.of((TransitionGround) getTransition(actionTransitionId), min));
+                        }
                     }
                 }
             }

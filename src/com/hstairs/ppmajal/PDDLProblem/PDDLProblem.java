@@ -417,16 +417,18 @@ public class PDDLProblem implements SearchProblem {
         while (it.hasNext()) {
             TransitionGround act = (TransitionGround) it.next();
             boolean keep = true;
-            for (final NumEffect effect : act.getAllNumericEffects()) {
-                if (true) {
-                    if (effect.weakEval(this, this.getActualFluents()) != null) {
-                        effect.normalize();
-                    } else {
-                        keep = false;
+            for (var condEffect : act.getAllConditionalEffects().entrySet()) {
+                Condition key = condEffect.getKey().weakEval(this,this.getActualFluents());
+                if (!key.isUnsatisfiable()) {
+                    for (var _e : condEffect.getValue()) {
+                        if (_e instanceof NumEffect effect) {
+                            if (effect.weakEval(this, this.getActualFluents()) != null) {
+                                effect.normalize();
+                            } else {
+                                keep = false;
+                            }
+                        }
                     }
-                } else {
-                    effect.normalize();
-
                 }
             }
             if (isSimplifyActions() && keep) {
@@ -451,7 +453,7 @@ public class PDDLProblem implements SearchProblem {
         return new ArrayList(res);
     }
 
-    protected boolean easyClexanUp() {
+    protected boolean easyCleanUp() {
         return this.easyCleanUp(false);
     }
 
@@ -1567,7 +1569,6 @@ public class PDDLProblem implements SearchProblem {
     public List<State> getTrace(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize) throws CloneNotSupportedException {
         BigDecimal previous = BigDecimal.ZERO;
         State current = (PDDLState) this.getInit();
-        System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
         List<State> trace = new LinkedList();
         trace.add(current);
         //Important: We are assuming that all processes are equivalent to a waiting action lasting the user defined delta time
@@ -1663,7 +1664,7 @@ public class PDDLProblem implements SearchProblem {
         return simulation(s, horizon, executionDelta, intelligent, null);
     }
 
-    protected ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta, boolean intelligent, List<State> trace) {
+    public ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta, boolean intelligent, List<State> trace) {
         return simulation(s, horizon, executionDelta, intelligent, trace, null);
     }
 

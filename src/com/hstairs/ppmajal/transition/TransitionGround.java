@@ -50,7 +50,7 @@ public class TransitionGround extends Transition {
     public boolean isApplicable(State s, boolean checkEffects, PDDLProblem p) {
         if (checkEffects)
             return (this.preconditions.isSatisfied(s) && this.conditionalNumericEffects.canBeApplied(s,p));
-        return (this.preconditions.isSatisfied(s));
+        return (this.preconditions == null || this.preconditions.isSatisfied(s));
 
     }
 
