@@ -21,12 +21,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package jpddlplus.heuristics;
+package com.hstairs.ppmajal.heuristics;
 
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import java.util.Collection;
 
 /**

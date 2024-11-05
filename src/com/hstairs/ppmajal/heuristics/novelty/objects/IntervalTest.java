@@ -1,4 +1,4 @@
-package jpddlplus.heuristics.novelty.objects;
+package com.hstairs.ppmajal.heuristics.novelty.objects;
 
 import org.junit.jupiter.api.Test;
 

@@ -1,8 +1,8 @@
-package jpddlplus.grounding;
+package com.hstairs.ppmajal.grounding;
 
-import jpddlplus.domain.PDDLDomain;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.domain.PDDLDomain;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 

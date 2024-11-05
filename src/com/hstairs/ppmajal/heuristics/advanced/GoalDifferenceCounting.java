@@ -16,20 +16,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.heuristics.advanced;
+package com.hstairs.ppmajal.heuristics.advanced;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Comparison;
-import jpddlplus.conditions.Condition;
-import jpddlplus.extraUtils.Pair;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Comparison;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.extraUtils.Pair;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.NotImplementedException;
 
 /**

@@ -16,10 +16,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.problem;
+package com.hstairs.ppmajal.problem;
 
-import jpddlplus.conditions.PDDLObject;
-import jpddlplus.domain.Type;
+import com.hstairs.ppmajal.conditions.PDDLObject;
+import com.hstairs.ppmajal.domain.Type;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 

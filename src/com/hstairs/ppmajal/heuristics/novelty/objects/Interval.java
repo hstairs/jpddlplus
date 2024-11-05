@@ -1,4 +1,4 @@
-package jpddlplus.heuristics.novelty.objects;
+package com.hstairs.ppmajal.heuristics.novelty.objects;
 
 import java.util.ArrayList;
 import java.util.List;

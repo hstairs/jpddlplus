@@ -3,10 +3,10 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package jpddlplus.problem;
+package com.hstairs.ppmajal.problem;
 
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.PostCondition;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.PostCondition;
 import java.util.Collection;
 import org.apache.commons.lang3.tuple.Pair;
 

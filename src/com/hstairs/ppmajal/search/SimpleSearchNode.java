@@ -1,6 +1,6 @@
-package jpddlplus.search;
+package com.hstairs.ppmajal.search;
 
-import jpddlplus.problem.State;
+import com.hstairs.ppmajal.problem.State;
 
 public class SimpleSearchNode {
 

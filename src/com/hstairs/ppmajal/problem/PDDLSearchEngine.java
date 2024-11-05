@@ -16,14 +16,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.problem;
+package com.hstairs.ppmajal.problem;
 
-import jpddlplus.search.SearchEngine;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.search.SearchNode;
-import jpddlplus.search.SimpleSearchNode;
-import jpddlplus.transition.Transition;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.search.SearchEngine;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.search.SearchNode;
+import com.hstairs.ppmajal.search.SimpleSearchNode;
+import com.hstairs.ppmajal.transition.Transition;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.io.PrintStream;

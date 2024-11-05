@@ -16,20 +16,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.extraUtils;
+package com.hstairs.ppmajal.extraUtils;
 
 import com.google.common.math.DoubleMath;
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.PDDLObject;
-import jpddlplus.conditions.Terminal;
-import jpddlplus.domain.Type;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.problem.PDDLObjects;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.PDDLState;
-import jpddlplus.transition.TransitionSchema;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.PDDLObject;
+import com.hstairs.ppmajal.conditions.Terminal;
+import com.hstairs.ppmajal.domain.Type;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.problem.PDDLObjects;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.PDDLState;
+import com.hstairs.ppmajal.transition.TransitionSchema;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import java.io.BufferedWriter;
 import java.io.File;

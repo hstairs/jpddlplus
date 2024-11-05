@@ -16,14 +16,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.expressions;
+package com.hstairs.ppmajal.expressions;
 
-import jpddlplus.conditions.ComplexCondition;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.PDDLObject;
-import jpddlplus.domain.ActionParameter;
-import jpddlplus.domain.Variable;
-import jpddlplus.problem.*;
+import com.hstairs.ppmajal.conditions.ComplexCondition;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.PDDLObject;
+import com.hstairs.ppmajal.domain.ActionParameter;
+import com.hstairs.ppmajal.domain.Variable;
+import com.hstairs.ppmajal.problem.*;
 import java.util.*;
 import org.apache.commons.lang3.tuple.Pair;
 

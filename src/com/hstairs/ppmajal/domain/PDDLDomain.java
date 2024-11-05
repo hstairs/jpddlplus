@@ -16,18 +16,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.domain;
+package com.hstairs.ppmajal.domain;
 
-import jpddlplus.conditions.*;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.extraUtils.Utils;
-import jpddlplus.parser.PddlLexer;
-import jpddlplus.parser.PddlParser;
-import jpddlplus.problem.PDDLObjects;
-import jpddlplus.transition.ConditionalEffects;
-import jpddlplus.transition.Transition.Semantics;
-import jpddlplus.transition.TransitionSchema;
+import com.hstairs.ppmajal.conditions.*;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.extraUtils.Utils;
+import com.hstairs.ppmajal.parser.PddlLexer;
+import com.hstairs.ppmajal.parser.PddlParser;
+import com.hstairs.ppmajal.problem.PDDLObjects;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.Transition.Semantics;
+import com.hstairs.ppmajal.transition.TransitionSchema;
 import java.io.*;
 import java.util.*;
 import java.util.logging.Level;

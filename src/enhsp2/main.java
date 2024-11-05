@@ -1,4 +1,4 @@
-package enhsp;
+package enhsp2;
 
 
 /*
@@ -20,6 +20,7 @@ package enhsp;
  * MA 02110-1301  USA
  */
 
+import enhsp2.ENHSP;
 
 public class main {
 

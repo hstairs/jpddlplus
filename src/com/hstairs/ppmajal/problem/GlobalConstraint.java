@@ -16,17 +16,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.problem;
+package com.hstairs.ppmajal.problem;
 
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.NotCond;
-import jpddlplus.conditions.OrCond;
-import jpddlplus.domain.PDDLDomain;
-import jpddlplus.domain.ParametersAsTerms;
-import jpddlplus.domain.SchemaGlobalConstraint;
-import jpddlplus.domain.SchemaParameters;
-import jpddlplus.expressions.NumFluent;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.NotCond;
+import com.hstairs.ppmajal.conditions.OrCond;
+import com.hstairs.ppmajal.domain.PDDLDomain;
+import com.hstairs.ppmajal.domain.ParametersAsTerms;
+import com.hstairs.ppmajal.domain.SchemaGlobalConstraint;
+import com.hstairs.ppmajal.domain.SchemaParameters;
+import com.hstairs.ppmajal.expressions.NumFluent;
 import java.util.Set;
 
 /**

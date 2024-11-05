@@ -16,24 +16,24 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.problem;
+package com.hstairs.ppmajal.problem;
 
 import com.google.common.collect.Sets;
-import jpddlplus.conditions.*;
-import jpddlplus.domain.PDDLDomain;
-import jpddlplus.domain.SchemaGlobalConstraint;
-import jpddlplus.domain.Type;
-import jpddlplus.expressions.*;
-import jpddlplus.extraUtils.Utils;
-import jpddlplus.parser.PddlLexer;
-import jpddlplus.parser.PddlParser;
-import jpddlplus.heuristics.advanced.Aibr;
-import jpddlplus.grounding.*;
-import jpddlplus.search.SearchProblem;
-import jpddlplus.transition.ConditionalEffects;
-import jpddlplus.transition.Transition;
-import jpddlplus.transition.TransitionGround;
-import jpddlplus.transition.TransitionSchema;
+import com.hstairs.ppmajal.conditions.*;
+import com.hstairs.ppmajal.domain.PDDLDomain;
+import com.hstairs.ppmajal.domain.SchemaGlobalConstraint;
+import com.hstairs.ppmajal.domain.Type;
+import com.hstairs.ppmajal.expressions.*;
+import com.hstairs.ppmajal.extraUtils.Utils;
+import com.hstairs.ppmajal.parser.PddlLexer;
+import com.hstairs.ppmajal.parser.PddlParser;
+import com.hstairs.ppmajal.heuristics.advanced.Aibr;
+import com.hstairs.ppmajal.grounding.*;
+import com.hstairs.ppmajal.search.SearchProblem;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.Transition;
+import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.ppmajal.transition.TransitionSchema;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.io.*;
 import java.math.BigDecimal;

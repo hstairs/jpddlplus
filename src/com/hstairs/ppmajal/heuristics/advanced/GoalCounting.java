@@ -16,14 +16,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.heuristics.advanced;
+package com.hstairs.ppmajal.heuristics.advanced;
 
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.Condition;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import java.util.Collection;
 
 /**

@@ -1,24 +1,24 @@
-package jpddlplus.heuristics.advanced;
+package com.hstairs.ppmajal.heuristics.advanced;
 
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 
 import static com.google.common.collect.Range.closedOpen;
 
-import jpddlplus.conditions.Comparison;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.Terminal;
-import jpddlplus.expressions.BinaryOp;
-import jpddlplus.expressions.Expression;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.PDDLNumber;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.PDDLState;
-import jpddlplus.problem.RelState;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.Transition;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.conditions.Comparison;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.Terminal;
+import com.hstairs.ppmajal.expressions.BinaryOp;
+import com.hstairs.ppmajal.expressions.Expression;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.PDDLNumber;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.PDDLState;
+import com.hstairs.ppmajal.problem.RelState;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.Transition;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.*;
 import java.io.PrintStream;
 import java.util.*;

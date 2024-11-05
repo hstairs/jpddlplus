@@ -2,17 +2,17 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package jpddlplus.heuristics.advanced;
+package com.hstairs.ppmajal.heuristics.advanced;
 
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.Comparison;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.OrCond;
-import jpddlplus.conditions.Terminal;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.transition.Transition;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.Comparison;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.OrCond;
+import com.hstairs.ppmajal.conditions.Terminal;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.transition.Transition;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArraySet;

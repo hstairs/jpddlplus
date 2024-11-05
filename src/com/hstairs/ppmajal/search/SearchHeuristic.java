@@ -16,11 +16,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.search;
+package com.hstairs.ppmajal.search;
 
 import java.io.PrintStream;
-import jpddlplus.problem.*;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.problem.*;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import java.util.*;
 
 

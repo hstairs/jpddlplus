@@ -1,5 +1,5 @@
 // $ANTLR 3.5.2 Pddl.g 2021-11-03 08:32:56
-package jpddlplus.parser;
+package com.hstairs.ppmajal.parser;
 
 import org.antlr.runtime.*;
 

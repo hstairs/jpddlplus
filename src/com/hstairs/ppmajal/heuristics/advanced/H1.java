@@ -21,23 +21,23 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package jpddlplus.heuristics.advanced;
+package com.hstairs.ppmajal.heuristics.advanced;
 
 import com.google.common.collect.Sets;
-import jpddlplus.conditions.*;
-import jpddlplus.expressions.ExtendedAddendum;
-import jpddlplus.expressions.ExtendedNormExpression;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.extraUtils.ArrayShifter;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.Transition;
+import com.hstairs.ppmajal.conditions.*;
+import com.hstairs.ppmajal.expressions.ExtendedAddendum;
+import com.hstairs.ppmajal.expressions.ExtendedNormExpression;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.extraUtils.ArrayShifter;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.Transition;
 
-import static jpddlplus.transition.Transition.getTransition;
+import static com.hstairs.ppmajal.transition.Transition.getTransition;
 
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 

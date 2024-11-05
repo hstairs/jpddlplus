@@ -1,8 +1,8 @@
-package jpddlplus.heuristics.advanced;
+package com.hstairs.ppmajal.heuristics.advanced;
 
-import jpddlplus.conditions.Condition;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.transition.Transition;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.transition.Transition;
 import java.util.Collection;
 
 /**

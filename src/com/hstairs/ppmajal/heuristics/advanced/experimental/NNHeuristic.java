@@ -2,11 +2,11 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package jpddlplus.heuristics.advanced.experimental;
+package com.hstairs.ppmajal.heuristics.advanced.experimental;
 
-import jpddlplus.heuristics.BlindHeuristic;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
+import com.hstairs.ppmajal.heuristics.BlindHeuristic;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
 //import org.deeplearning4j.nn.graph.ComputationGraph;
 //import org.deeplearning4j.nn.modelimport.keras.KerasModelImport;
 //import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;

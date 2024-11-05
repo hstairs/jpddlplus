@@ -16,15 +16,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.problem;
+package com.hstairs.ppmajal.problem;
 
 import com.carrotsearch.hppc.DoubleArrayList;
-import jpddlplus.conditions.*;
-import jpddlplus.expressions.HomeMadeRealInterval;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.transition.ConditionalEffects;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.conditions.*;
+import com.hstairs.ppmajal.expressions.HomeMadeRealInterval;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 

@@ -16,24 +16,24 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.grounding;
+package com.hstairs.ppmajal.grounding;
 
 import com.google.common.collect.Sets;
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Comparison;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.FactoryConditions;
-import jpddlplus.conditions.ForAll;
-import jpddlplus.conditions.PDDLObject;
-import jpddlplus.domain.*;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.problem.GlobalConstraint;
-import jpddlplus.problem.PDDLObjects;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.transition.ConditionalEffects;
-import jpddlplus.transition.TransitionGround;
-import jpddlplus.transition.TransitionSchema;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Comparison;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.FactoryConditions;
+import com.hstairs.ppmajal.conditions.ForAll;
+import com.hstairs.ppmajal.conditions.PDDLObject;
+import com.hstairs.ppmajal.domain.*;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.problem.GlobalConstraint;
+import com.hstairs.ppmajal.problem.PDDLObjects;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.ppmajal.transition.TransitionSchema;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;

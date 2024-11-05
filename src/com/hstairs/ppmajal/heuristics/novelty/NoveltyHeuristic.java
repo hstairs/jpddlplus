@@ -1,12 +1,12 @@
-package jpddlplus.heuristics.novelty;
+package com.hstairs.ppmajal.heuristics.novelty;
 
 import java.io.PrintStream;
 import java.util.Map;
-import jpddlplus.extraUtils.Pair;
-import jpddlplus.heuristics.novelty.objects.NumericIntervalAssignment;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
+import com.hstairs.ppmajal.extraUtils.Pair;
+import com.hstairs.ppmajal.heuristics.novelty.objects.NumericIntervalAssignment;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
 
 public abstract class NoveltyHeuristic extends SearchHeuristic {
 

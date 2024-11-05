@@ -16,25 +16,25 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.grounding;
+package com.hstairs.ppmajal.grounding;
 
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Comparison;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.ForAll;
-import jpddlplus.conditions.OrCond;
-import jpddlplus.conditions.PostCondition;
-import jpddlplus.domain.PDDLDomain;
-import jpddlplus.domain.PredicateSet;
-import jpddlplus.domain.Type;
-import jpddlplus.domain.Variable;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.transition.ConditionalEffects;
-import jpddlplus.transition.TransitionGround;
-import jpddlplus.transition.TransitionSchema;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Comparison;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.ForAll;
+import com.hstairs.ppmajal.conditions.OrCond;
+import com.hstairs.ppmajal.conditions.PostCondition;
+import com.hstairs.ppmajal.domain.PDDLDomain;
+import com.hstairs.ppmajal.domain.PredicateSet;
+import com.hstairs.ppmajal.domain.Type;
+import com.hstairs.ppmajal.domain.Variable;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.ppmajal.transition.TransitionSchema;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;

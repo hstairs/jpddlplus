@@ -1,4 +1,4 @@
-package jpddlplus.heuristics.novelty;
+package com.hstairs.ppmajal.heuristics.novelty;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -6,14 +6,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import jpddlplus.extraUtils.Pair;
-import jpddlplus.heuristics.novelty.objects.Interval;
-import jpddlplus.heuristics.novelty.objects.NumericIntervalAssignment;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.PDDLState;
-import jpddlplus.problem.State;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.extraUtils.Pair;
+import com.hstairs.ppmajal.heuristics.novelty.objects.Interval;
+import com.hstairs.ppmajal.heuristics.novelty.objects.NumericIntervalAssignment;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.PDDLState;
+import com.hstairs.ppmajal.problem.State;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.TransitionGround;
 
 /**
  * @author Dillon

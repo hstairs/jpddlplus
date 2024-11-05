@@ -1,15 +1,15 @@
-package enhsp;
+package enhsp2;
 
 import java.util.HashMap;
 import java.util.Map;
-import jpddlplus.domain.PDDLDomain;
-import jpddlplus.heuristics.HeuristicFactory;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.PDDLSearchEngine;
-import jpddlplus.problem.PDDLState;
-import jpddlplus.search.SearchEngine;
-import jpddlplus.search.SearchHeuristic;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.domain.PDDLDomain;
+import com.hstairs.ppmajal.heuristics.HeuristicFactory;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.PDDLSearchEngine;
+import com.hstairs.ppmajal.problem.PDDLState;
+import com.hstairs.ppmajal.search.SearchEngine;
+import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -505,6 +505,7 @@ public class ENHSP {
         helpfulTransitionsList = booleans;
         tieBreaking = "arbitrary";
         break;
+      case "sat-mq3h3n":
       case "sat-mq-3e-3eiqb2":
         searchEngineString = "mq";
         heuristicList = new ArrayList<>(
@@ -517,6 +518,7 @@ public class ENHSP {
         helpfulTransitionsList = booleans;
         tieBreaking = "arbitrary";
         break;
+      case "sat-mq3h":
       case "sat-mq-3e":
         searchEngineString = "mq";
         heuristicList = new ArrayList<>(
@@ -526,6 +528,7 @@ public class ENHSP {
         helpfulTransitionsList = booleans;
         tieBreaking = "arbitrary";
         break;
+      case "sat-mq3n":
       case "sat-mq-3eiqb2":
         searchEngineString = "mq";
         heuristicList = new ArrayList<>(
@@ -614,13 +617,14 @@ public class ENHSP {
         helpfulTransitionsList = booleans;
         tieBreaking = "arbitrary";
         break;
-      //////// existing ENHSP planners ////////
-      case "sat-hgdc": case "sat-gdc":
+        // manhatten goal count
+        case "sat-hgdc": case "sat-gdc": case "sat-hmd":
         heuristic = "gdc";
         searchEngineString = "gbfs";
         tieBreaking = "arbitrary";
         break;
-      case "sat-hgc": case "sat-gc":
+    //////// existing ENHSP planners ////////
+        case "sat-hgc": case "sat-gc":
         heuristic = "gc";
         searchEngineString = "gbfs";
         tieBreaking = "arbitrary";

@@ -1,15 +1,21 @@
+This branch extends ENHSP with novelty heuristics and multi-queue search described in the SOCS-24 publication [here](https://arxiv.org/abs/2404.05235)
+
 ## Building
 
 Not sure how to build from command line, so I used intellij to build an artifact (`.jar` file).
-- in order to do so, see https://stackoverflow.com/a/4901370/13531424 or
-- https://www.jetbrains.com/help/idea/compiling-applications.html#run_packaged_jar
-- the default intellij shortcut for building the artifact is `alt + B`
+1. mark src as 'source' in intellij
+2. manually download org.junit for the extra tests
+3. Add jar files in `jar_dependencies` to module dependencies, see [here](https://www.jetbrains.com/help/idea/working-with-module-dependencies.html)
+4. make sure dependencies are detected correctly, next follow the steps to configure and build the `.jar` artifact in this [stackoverflow](https://stackoverflow.com/a/4901370/13531424) or [official docs](https://www.jetbrains.com/help/idea/compiling-applications.html#run_packaged_jar)
+5. the default intellij shortcut for building the artifact is `alt + B`
+
+To test if your build passed successfully with the above method, run the `sanity_check.sh` script.
 
 ## Running
 
-Simply call from command line 
+Call the following from command line without any arguments to see what arguments are possible
 ```
-java -jar out/artifacts/jpddlplus.jar <enhsp_args> 
+java -jar out/artifacts/jpddlplus_jar/jpddlplus.jar <enhsp_args> 
 ```
 where you could configure intellij to build the artifact to another location
 

@@ -16,9 +16,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.domain;
+package com.hstairs.ppmajal.domain;
 
-import jpddlplus.conditions.PDDLObject;
+import com.hstairs.ppmajal.conditions.PDDLObject;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import java.util.Map;

@@ -1,16 +1,16 @@
-package jpddlplus.transition;
+package com.hstairs.ppmajal.transition;
 
 import com.google.common.collect.Sets;
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.PDDLObject;
-import jpddlplus.expressions.ExtendedAddendum;
-import jpddlplus.expressions.ExtendedNormExpression;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.problem.Metric;
-import jpddlplus.problem.PDDLState;
-import jpddlplus.problem.State;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.PDDLObject;
+import com.hstairs.ppmajal.expressions.ExtendedAddendum;
+import com.hstairs.ppmajal.expressions.ExtendedNormExpression;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.problem.Metric;
+import com.hstairs.ppmajal.problem.PDDLState;
+import com.hstairs.ppmajal.problem.State;
 
 import java.util.ArrayList;
 import java.util.Collection;

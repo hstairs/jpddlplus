@@ -16,11 +16,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.domain;
+package com.hstairs.ppmajal.domain;
 
-import jpddlplus.conditions.Condition;
-import jpddlplus.problem.GlobalConstraint;
-import jpddlplus.problem.PDDLObjects;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.problem.GlobalConstraint;
+import com.hstairs.ppmajal.problem.PDDLObjects;
 import java.util.HashMap;
 import java.util.Map;
 

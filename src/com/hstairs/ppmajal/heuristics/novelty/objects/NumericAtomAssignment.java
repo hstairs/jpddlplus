@@ -1,4 +1,4 @@
-package jpddlplus.heuristics.novelty.objects;
+package com.hstairs.ppmajal.heuristics.novelty.objects;
 
 public record NumericAtomAssignment(int var, double val) {
 

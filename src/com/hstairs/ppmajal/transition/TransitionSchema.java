@@ -1,16 +1,16 @@
-package jpddlplus.transition;
+package com.hstairs.ppmajal.transition;
 
-import jpddlplus.conditions.AndCond;
-import jpddlplus.conditions.BoolPredicate;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.ConditionalEffectAsACondition;
-import jpddlplus.conditions.ForAll;
-import jpddlplus.conditions.PostCondition;
-import jpddlplus.conditions.Terminal;
-import jpddlplus.domain.SchemaParameters;
-import jpddlplus.expressions.NumEffect;
-import jpddlplus.expressions.NumFluent;
-import jpddlplus.problem.Printer;
+import com.hstairs.ppmajal.conditions.AndCond;
+import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.ConditionalEffectAsACondition;
+import com.hstairs.ppmajal.conditions.ForAll;
+import com.hstairs.ppmajal.conditions.PostCondition;
+import com.hstairs.ppmajal.conditions.Terminal;
+import com.hstairs.ppmajal.domain.SchemaParameters;
+import com.hstairs.ppmajal.expressions.NumEffect;
+import com.hstairs.ppmajal.expressions.NumFluent;
+import com.hstairs.ppmajal.problem.Printer;
 import java.util.Collection;
 import java.util.HashSet;
 

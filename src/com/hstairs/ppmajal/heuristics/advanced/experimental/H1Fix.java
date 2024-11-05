@@ -3,15 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package jpddlplus.heuristics.advanced.experimental;
+package com.hstairs.ppmajal.heuristics.advanced.experimental;
 
-import jpddlplus.conditions.Comparison;
-import jpddlplus.conditions.Condition;
-import jpddlplus.conditions.Terminal;
-import jpddlplus.expressions.Expression;
-import jpddlplus.heuristics.advanced.H1;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.problem.State;
+import com.hstairs.ppmajal.conditions.Comparison;
+import com.hstairs.ppmajal.conditions.Condition;
+import com.hstairs.ppmajal.conditions.Terminal;
+import com.hstairs.ppmajal.expressions.Expression;
+import com.hstairs.ppmajal.heuristics.advanced.H1;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.problem.State;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 
 import static java.lang.Math.ceil;

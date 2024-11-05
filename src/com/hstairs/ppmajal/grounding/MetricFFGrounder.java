@@ -16,10 +16,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-package jpddlplus.grounding;
+package com.hstairs.ppmajal.grounding;
 
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.transition.TransitionGround;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.transition.TransitionGround;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.*;

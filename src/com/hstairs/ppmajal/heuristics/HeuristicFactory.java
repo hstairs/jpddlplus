@@ -3,19 +3,19 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package jpddlplus.heuristics;
+package com.hstairs.ppmajal.heuristics;
 
 import java.util.function.Supplier;
-import jpddlplus.heuristics.advanced.Aibr;
-import jpddlplus.heuristics.advanced.GoalCounting;
-import jpddlplus.heuristics.advanced.GoalDifferenceCounting;
-import jpddlplus.heuristics.advanced.H1;
-import jpddlplus.heuristics.novelty.AtomWidthHeuristic;
-import jpddlplus.heuristics.novelty.AtomQuantifiedBothHeuristic;
-import jpddlplus.heuristics.novelty.IntervalQuantifiedBothHeuristic;
-import jpddlplus.heuristics.novelty.IntervalWidthHeuristic;
-import jpddlplus.problem.PDDLProblem;
-import jpddlplus.search.SearchHeuristic;
+import com.hstairs.ppmajal.heuristics.advanced.Aibr;
+import com.hstairs.ppmajal.heuristics.advanced.GoalCounting;
+import com.hstairs.ppmajal.heuristics.advanced.GoalDifferenceCounting;
+import com.hstairs.ppmajal.heuristics.advanced.H1;
+import com.hstairs.ppmajal.heuristics.novelty.AtomWidthHeuristic;
+import com.hstairs.ppmajal.heuristics.novelty.AtomQuantifiedBothHeuristic;
+import com.hstairs.ppmajal.heuristics.novelty.IntervalQuantifiedBothHeuristic;
+import com.hstairs.ppmajal.heuristics.novelty.IntervalWidthHeuristic;
+import com.hstairs.ppmajal.problem.PDDLProblem;
+import com.hstairs.ppmajal.search.SearchHeuristic;
 
 /**
  * @author enrico
