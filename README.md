@@ -1,5 +1,16 @@
 This branch extends ENHSP with novelty heuristics and multi-queue search described in the SOCS-24 publication [here](https://arxiv.org/abs/2404.05235)
 
+**Note**: there's currently a bug in plan extraction of multi-queue methods using jumping actions found by @matteocarde. We have removed jumping actions of the associated configurations for now as a temporary fix. The new scores with this change are 
+
+| mq3h | mq3n | mq3h3n |
+| ---- | ---- | ------ |
+| 242  | 249  | 272    |
+
+in comparison to the published version 
+| mq3h | mq3n | mq3h3n |
+| ---- | ---- | ------ |
+| 261  | 244  | 274    |
+
 ## Setup
 
 I'm not sure how to build from command line, so I used intellij to build an artifact (`.jar` file). 
