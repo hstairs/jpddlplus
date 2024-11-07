@@ -469,158 +469,36 @@ public class ENHSP {
         tieBreaking = "arbitrary";
         break;
       // multi queue methods
-      case "beluga":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(
-            List.of(new String[]{"hgdc", "hadd", "hiqb2add", "hmrp"}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-4-4iqb2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(List.of(
-            new String[]{"hgc", "hadd", "hradd", "hmrp", "hiqb2gc", "hiqb2add", "hiqb2radd",
-                "hiqb2mrp"}));
-        booleans = new ArrayList<>(
-            List.of(new Boolean[]{false, false, false, true, false, false, false, true}));
-        reuseHeuristic.put(4, 0);
-        reuseHeuristic.put(5, 1);
-        reuseHeuristic.put(6, 2);
-        reuseHeuristic.put(7, 3);
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-3d-3diqb2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(
-            List.of(new String[]{"hgc", "hadd", "hmrp", "hiqb2gc", "hiqb2add", "hiqb2mrp"}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true, false, false, true}));
-        reuseHeuristic.put(3, 0);
-        reuseHeuristic.put(4, 1);
-        reuseHeuristic.put(5, 2);
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
       case "sat-mq3h3n":
-      case "sat-mq-3e-3eiqb2":
         searchEngineString = "mq";
+
         heuristicList = new ArrayList<>(
-            List.of(new String[]{"hgdc", "hadd", "hmrp", "hiqb2gdc", "hiqb2add", "hiqb2mrp"}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true, false, false, true}));
+                List.of(new String[]{"hgdc", "hadd", "hmrp", "hiqb2gdc", "hiqb2add", "hiqb2mrp"}));
+        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false, false, false, false}));
         reuseHeuristic.put(3, 0);
         reuseHeuristic.put(4, 1);
         reuseHeuristic.put(5, 2);
+
         helpfulActionsPruningList = booleans;
         helpfulTransitionsList = booleans;
         tieBreaking = "arbitrary";
         break;
       case "sat-mq3h":
-      case "sat-mq-3e":
         searchEngineString = "mq";
         heuristicList = new ArrayList<>(
             List.of(new String[]{"hgdc", "hadd", "hmrp"}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true}));
+        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false}));
         helpfulActionsPruningList = booleans;
         helpfulTransitionsList = booleans;
         tieBreaking = "arbitrary";
         break;
       case "sat-mq3n":
-      case "sat-mq-3eiqb2":
         searchEngineString = "mq";
         heuristicList = new ArrayList<>(
             List.of(new String[]{"hiqb2gdc", "hiqb2add", "hiqb2mrp"}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true}));
+        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false}));
         helpfulActionsPruningList = booleans;
         helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-3a-3aiqb2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(
-            List.of(new String[]{"hadd", "hradd", "hmrp", "hiqb2add", "hiqb2radd", "hiqb2mrp"}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true, false, false, true}));
-        reuseHeuristic.put(3, 0);
-        reuseHeuristic.put(4, 1);
-        reuseHeuristic.put(5, 2);
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-4iqb2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(
-            List.of(new String[]{"hiqb2gc", "hiqb2add", "hiqb2radd", "hiqb2mrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-3diqb2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(List.of(new String[]{"hiqb2gc", "hiqb2add", "hiqb2mrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-3aiqb2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(
-            List.of(new String[]{"hiqb2add", "hiqb2radd", "hiqb2mrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-4w2":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(
-            List.of(new String[]{"hw2gc", "hw2add", "hw2radd", "hw2mrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-4":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(List.of(new String[]{"hgc", "hadd", "hradd", "hmrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-3d":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(List.of(new String[]{"hgc", "hadd", "hmrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mq-3a":
-        searchEngineString = "mq";
-        heuristicList = new ArrayList<>(List.of(new String[]{"hadd", "hradd", "hmrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-      case "sat-mqc-4":
-        searchEngineString = "mqc";
-        heuristicList = new ArrayList<>(List.of(new String[]{"hgc", "hadd", "hradd", "hmrp",}));
-        booleans = new ArrayList<>(List.of(new Boolean[]{false, false, false, true}));
-        helpfulActionsPruningList = booleans;
-        helpfulTransitionsList = booleans;
-        tieBreaking = "arbitrary";
-        break;
-        // manhatten goal count
-        case "sat-hgdc": case "sat-gdc": case "sat-hmd":
-        heuristic = "gdc";
-        searchEngineString = "gbfs";
         tieBreaking = "arbitrary";
         break;
     //////// existing ENHSP planners ////////
@@ -809,18 +687,6 @@ public class ENHSP {
       case "WAStar":
         System.out.println("Running WA-STAR");
         rawPlan = searchEngine.WAStar(getProblem(), timeOut);
-        break;
-      case "ngbfs":
-        System.out.println("Running Numeric Greedy Best First Search");
-        rawPlan = searchEngine.NumericGBFS(getProblem(), timeOut);
-        break;
-      case "egbfs":
-        System.out.println("Running Numeric Greedy Best First Search");
-        rawPlan = searchEngine.EnthusiasticGBFS(getProblem(), timeOut);
-        break;
-      case "jgbfs":
-        System.out.println("Running Jumping Greedy Best First Search");
-        rawPlan = searchEngine.JumpingGBFS(getProblem(), timeOut);
         break;
       case "gbfs":
         System.out.println("Running Greedy Best First Search");

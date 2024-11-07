@@ -88,10 +88,10 @@ public class SearchEngine {
   private List<Float> hValues;
 
   public SearchEngine(
-      PrintStream out,
-      List<SearchHeuristic> heuristics,
-      SearchProblem problem,
-      boolean verboseHeuristic
+          PrintStream out,
+          List<SearchHeuristic> heuristics,
+          SearchProblem problem,
+          boolean verboseHeuristic
   ) {
     wh = 1;
     depthLimit = Long.MAX_VALUE;
@@ -218,15 +218,15 @@ public class SearchEngine {
           // this is the debugLevel for when the planner is run in optimality modality
           bestf = currentNode.gValue + hValueInCurrentNode;
           out.println(
-              "f(n) = " + bestf + " (Expanded Nodes: " + getNodesExpanded() + ", Evaluated States: "
-                  + getNumberOfEvaluatedStates() + ", Time: "
-                  + (float) ((System.currentTimeMillis() - startGlobal)) / 1000.0 + ")"
-                  + " Frontier Size: " + frontier.size());
+                  "f(n) = " + bestf + " (Expanded Nodes: " + getNodesExpanded() + ", Evaluated States: "
+                          + getNumberOfEvaluatedStates() + ", Time: "
+                          + (float) ((System.currentTimeMillis() - startGlobal)) / 1000.0 + ")"
+                          + " Frontier Size: " + frontier.size());
         }
         if (!optimality && hAtInit > (hValueInCurrentNode)) {
           out.println(
-              " h(n)=" + (hValueInCurrentNode) + ", g(n)=" + currentNode.gValue + ", evaluated "
-                  + numberOfEvaluatedStates + ", expanded " + nodesExpanded);
+                  " h(n)=" + (hValueInCurrentNode) + ", g(n)=" + currentNode.gValue + ", evaluated "
+                          + numberOfEvaluatedStates + ", expanded " + nodesExpanded);
           hAtInit = hValueInCurrentNode;
           currentG = currentNode.gValue;
         }
@@ -246,7 +246,7 @@ public class SearchEngine {
 
         // successors
         for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,
-            getActionsToSearch(currentNode)
+                getActionsToSearch(currentNode)
         ); it.hasNext(); ) {
           final Pair<State, Object> next = it.next();
           final State successorState = next.getFirst();
@@ -254,7 +254,7 @@ public class SearchEngine {
 
           // skip this if violates global constraints
           final float successorG = problem.gValue(currentNode.s, action, successorState,
-              currentNode.gValue
+                  currentNode.gValue
           );
           if (Objects.equals(successorG, this.G_DEFAULT)) {
             this.deadEndsDetected++;
@@ -282,7 +282,7 @@ public class SearchEngine {
 
             final float fVal = hValue * wh + (gbfs ? 0 : successorG);
             final SearchNode node = new SearchNode(successorState, action, currentNode, successorG,
-                fVal
+                    fVal
             );
             if (this.helpfulActionsPruning) {
               node.helpfulActions = heuristic.getTransitions(helpfulActionsPruning);
@@ -333,6 +333,13 @@ public class SearchEngine {
     }
     gMap.put(initState, 0f);
 
+    if (completeSearch) {
+      throw new UnsupportedOperationException("Complete search not implemented");
+    }
+    if (lazySearch) {
+      throw new UnsupportedOperationException("Lazy search not implemented");
+    }
+
     // Main search loop
     List<Float> bestH = initHValues;
     previousTime = 0;
@@ -359,38 +366,20 @@ public class SearchEngine {
       final SearchNode curNode = queues.get(curQueueCount).dequeue();
       final State curState = curNode.s;
       curHeuristicIndex = curQueueCount;
-      if (completeSearch && helpfulActionsPruningList.get(curHeuristicIndex)) {
-        if (poppedFromIncompleteQueue.contains(curState)) {
-          continue;
-        }
-        poppedFromIncompleteQueue.add(curState);
-      } else {
-        if (poppedFromCompleteQueue.contains(curState)) {
-          continue;
-        }
-        poppedFromCompleteQueue.add(curState);
+      if (poppedFromCompleteQueue.contains(curState)) {
+        continue;
       }
+      poppedFromCompleteQueue.add(curState);
 
       // continue search logic after popping node
-      float currentQueueH;
-      if (lazySearch) {
-        // LAZY heuristic computation
-        hValues = computeMultiHeuristic(curState);
-        if (deadEnd) {
-          continue;
-        }
-        computeHelpfulActions(curNode);
-        currentQueueH = hValues.get(curHeuristicIndex);
-      } else {
-        currentQueueH = curNode.f.get(curHeuristicIndex);
-      }
+      float currentQueueH = curNode.f.get(curHeuristicIndex);
       currentG = curNode.gValue;
 
       onlineLogging();
 
       if (currentQueueH < bestH.get(curHeuristicIndex)) {
         out.println(" h_" + curHeuristicIndex + "(n)=" + (currentQueueH) + ", g(n)=" + currentG
-            + ", evaluated " + numberOfEvaluatedStates + ", expanded " + nodesExpanded);
+                + ", evaluated " + numberOfEvaluatedStates + ", expanded " + nodesExpanded);
         bestH.set(curHeuristicIndex, currentQueueH);
       }
 
@@ -408,7 +397,7 @@ public class SearchEngine {
       // successors
       Object[] successorActions = getActionsToSearch(curNode, curHeuristicIndex);
       for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(
-          curState, successorActions); it.hasNext(); ) {
+              curState, successorActions); it.hasNext(); ) {
         final Pair<State, Object> next = it.next();
         final State succState = next.getFirst();
         final Object action = next.getSecond();
@@ -419,206 +408,18 @@ public class SearchEngine {
         }
 
         // EAGER heuristic computation
-        if (!lazySearch) {
-          hValues = computeMultiHeuristic(succState);
-          if (deadEnd) {
-            continue;
-          }
+        hValues = computeMultiHeuristic(succState);
+        if (deadEnd) {
+          continue;
         }
 
         // init node and add to multiple queues
         final float succG = problem.gValue(curState, action, succState, currentG);
         setGValue(succState, succG);
         final SearchNode node = new SearchNode(succState, action, curNode, succG, hValues);
-
-        if (!lazySearch) {
-          computeHelpfulActions(node);
-        }
+        computeHelpfulActions(node);
         for (int i = 0; i < numQueues; i++) {
           queues.get(i).enqueue(node);
-        }
-      }
-    }
-
-    System.out.println("Search space exhausted!");
-    return null;
-  }
-
-  /**
-   * The method implements numeric GBFS.
-   *
-   * @param problem the task planning problem to be solved.
-   * @param timeout in milliseconds
-   * @return null if the problem is unsolvable, SearchNode of goal state otherwise.
-   */
-  private SearchNode NumericGBFSAlg(
-      SearchProblem problem,
-      final long timeout,
-      final boolean JUMPING,
-      final boolean ADD_ALL
-  ) throws TimeoutException {
-    initSearch();
-    assert (!optimality && gbfs);
-
-    if (!problem.satisfyGlobalConstraints(initState)) {
-      out.println("Initial State is not valid");
-      return null;
-    }
-
-    boolean use_greedy_frontier = false;
-    ObjectHeapPriorityQueue<SearchNode> greedy_frontier = new ObjectHeapPriorityQueue<>(
-        new TieBreaker(this.tbRule, 0));
-    Set<State> pooped = new HashSet<>();
-
-    // initial node
-    float hAtInit = heuristic.computeEstimate(initState);
-    out.println("h(s_0)=" + hAtInit);
-    SearchNode init = new SearchNode(initState.clone(), 0, wh * hAtInit);
-    if (this.helpfulActionsPruning) {
-      init.helpfulActions = heuristic.getTransitions(helpfulActionsPruning);
-    }
-    frontier.enqueue(init);
-    gMap.put(initState, 0f);
-
-    // Main search loop
-    float bestH = hAtInit;
-    previousTime = 0;
-    previousTimeShort = 0;
-    while (!frontier.isEmpty() || !greedy_frontier.isEmpty()) {
-      timeSinceBeginning = (System.currentTimeMillis() - startGlobal);
-      if (timeSinceBeginning >= timeout) {
-        throw new TimeoutException("Timeout has been reached: bailing out");
-      }
-
-      SearchNode curNode = null;
-      State curState;
-
-      if (JUMPING || ADD_ALL) {
-        curNode = frontier.dequeue();
-        curState = curNode.s;
-      } else {
-        if (!use_greedy_frontier && !frontier.isEmpty()) {
-          curNode = frontier.dequeue();
-        } else if (!use_greedy_frontier && frontier.isEmpty()) {
-          use_greedy_frontier = true;
-          continue;
-        } else if (use_greedy_frontier && !greedy_frontier.isEmpty()) {
-          curNode = greedy_frontier.dequeue();
-        } else if (use_greedy_frontier && greedy_frontier.isEmpty()) {
-          use_greedy_frontier = false;
-          continue;
-        }
-        curState = curNode.s;
-        if (pooped.contains(curState)) {
-          continue;
-        }
-        pooped.add(curState);
-        use_greedy_frontier = !use_greedy_frontier;
-      }
-
-      // continue search logic after popping node
-      float currentH = curNode.f.get(curHeuristicIndex);
-      currentG = curNode.gValue;
-
-      onlineLogging();
-
-      if (currentH < bestH) {
-        out.println(
-            " h_" + curHeuristicIndex + "(n)=" + (currentH) + ", g(n)=" + currentG + ", evaluated "
-                + numberOfEvaluatedStates + ", expanded " + nodesExpanded);
-        bestH = currentH;
-      }
-
-      nodesExpanded++;
-
-      // successors
-      Object[] successorActions = getActionsToSearch(curNode, curHeuristicIndex);
-      for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(
-          curState, successorActions); it.hasNext(); ) {
-        final Pair<State, Object> next = it.next();
-        State succState = next.getFirst();
-        final TransitionGround action = (TransitionGround) next.getSecond();
-
-        if (gMap.containsKey(succState)) {
-          duplicatesNumber++;
-          continue;
-        }
-
-        float succH = heuristic.computeEstimate(succState);
-        numberOfEvaluatedStates++;
-
-        // init node and add to normal queue
-        final float succG = problem.gValue(curState, action, succState, currentG);
-        setGValue(succState, succG);
-        SearchNode succNode = new SearchNode(succState, action, curNode, succG, succH);
-        if (problem.goalSatisfied(succState)) {
-          setOverallSearchTime(System.currentTimeMillis() - startGlobal);
-          return succNode;
-        }
-
-        if (!JUMPING) {
-          frontier.enqueue(succNode);
-        }
-
-        // don't try to tunnel when states suck
-        if (succH > currentH) {
-          continue;
-        }
-
-//        System.out.println();
-//        System.out.println("curH:" + currentH);
-//        System.out.println("succH:" + succH);
-
-        // try to keep applying; this is probably quite suboptimal, profile this later
-        float nextG = succG;
-        int jumps = 0;
-        float nextH;
-        State nextState;
-
-        while (action.isApplicable(succState)) {
-          nextState = succState.clone();
-          nextState.apply(action, succState);
-
-          if (gMap.containsKey(nextState)) {
-            duplicatesNumber++;
-            break;
-          }
-
-          nextH = heuristic.computeEstimate(nextState);
-          numberOfEvaluatedStates++;
-
-//          System.out.println(nextH);
-//          System.out.println(nextState);
-
-          if (problem.goalSatisfied(nextState)) {
-            setOverallSearchTime(System.currentTimeMillis() - startGlobal);
-            succNode = new SearchNode(nextState, action, succNode, nextG, nextH);
-            return succNode;
-          }
-
-          if (nextH < succH) {
-            jumps++;
-            nextG = problem.gValue(succState, action, nextState, nextG);
-            setGValue(nextState, nextG);
-            succNode = new SearchNode(nextState, action, succNode, nextG, nextH);
-
-            if (ADD_ALL) {
-              frontier.enqueue(succNode);
-            }
-
-            succState = nextState;
-            succH = nextH;
-          } else {
-            break;
-          }
-        }
-
-        if (JUMPING) {
-          frontier.enqueue(succNode);
-        } else if (jumps > 0 && !ADD_ALL && !JUMPING) {
-          System.out.println((jumps + 1) + " " + action + "," + currentH + " -> " + succH);
-//          System.out.println(succState);
-          greedy_frontier.enqueue(succNode);
         }
       }
     }
@@ -649,7 +450,7 @@ public class SearchEngine {
     for (int i = 0; i < numHeuristics; i++) {
       if (helpfulActionsPruningList.get(i)) {
         node.helpfulActionsList.set(i,
-            heuristics.get(i).getTransitions(helpfulActionsPruningList.get(i))
+                heuristics.get(i).getTransitions(helpfulActionsPruningList.get(i))
         );
       }
     }
@@ -659,9 +460,9 @@ public class SearchEngine {
     if (timeSinceBeginning >= previousTime + 10000) {
       final float speed = (float) getNodesExpanded() / ((float) timeSinceBeginning / 1000);
       out.println(
-          "---Time: " + timeSinceBeginning / 1000 + "s; " + "Expanded Nodes: " + getNodesExpanded()
-              + " (Avg-Speed " + speed + " n/s); " + "Evaluated States: "
-              + getNumberOfEvaluatedStates());
+              "---Time: " + timeSinceBeginning / 1000 + "s; " + "Expanded Nodes: " + getNodesExpanded()
+                      + " (Avg-Speed " + speed + " n/s); " + "Evaluated States: "
+                      + getNumberOfEvaluatedStates());
       previousTime = timeSinceBeginning;
     }
 
@@ -705,30 +506,6 @@ public class SearchEngine {
     this.gbfs = true;
     this.multiQueue = true;
     SearchNode end = this.AltGBFSAlg(problem, timeout);
-    return this.extractPlan(end);
-  }
-
-  public LinkedList NumericGBFS(SearchProblem problem, long timeout) throws TimeoutException {
-    this.optimality = false;
-    this.gbfs = true;
-    this.multiQueue = false;
-    SearchNode end = this.NumericGBFSAlg(problem, timeout, false, false);
-    return this.extractPlan(end);
-  }
-
-  public LinkedList JumpingGBFS(SearchProblem problem, long timeout) throws TimeoutException {
-    this.optimality = false;
-    this.gbfs = true;
-    this.multiQueue = false;
-    SearchNode end = this.NumericGBFSAlg(problem, timeout, true, false);
-    return this.extractPlan(end);
-  }
-
-  public LinkedList EnthusiasticGBFS(SearchProblem problem, long timeout) throws TimeoutException {
-    this.optimality = false;
-    this.gbfs = true;
-    this.multiQueue = false;
-    SearchNode end = this.NumericGBFSAlg(problem, timeout, false, true);
     return this.extractPlan(end);
   }
 
