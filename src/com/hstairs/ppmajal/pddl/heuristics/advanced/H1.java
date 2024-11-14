@@ -703,7 +703,9 @@ public class H1 implements SearchHeuristic {
                 } else {
                     reachableTransitionsInstances = new LinkedHashSet<TransitionGround>();
                     for (final int i : reachableTransitions) {
-                        reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
+                        Transition transition = getTransition(cp.cpTr2TrMap()[i]);
+                        if (transition.getSemantics().equals(Transition.Semantics.ACTION))
+                            reachableTransitionsInstances.add((TransitionGround)transition);
                     }
                     reachableTransitionsInstances = new ArrayList<>(reachableTransitionsInstances);
                     res = reachableTransitionsInstances;

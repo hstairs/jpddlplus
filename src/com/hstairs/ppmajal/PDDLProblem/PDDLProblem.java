@@ -1500,7 +1500,7 @@ public class PDDLProblem implements SearchProblem {
 
         @Override
         public boolean hasNext() {
-            if (!processesSet.isEmpty()) {
+            if (!processesSet.isEmpty() || !eventsSet.isEmpty()) {
                 if (!processDone) {
                     processDone = true;
                     final ImmutablePair<State, Integer> intelligentSimulation = intelligentSimulation(source, planningDelta, executionDelta, true);
@@ -1516,7 +1516,6 @@ public class PDDLProblem implements SearchProblem {
                 i++;
 
                 if (current instanceof TransitionGround transitionGround) {
-
                     if (transitionGround.isApplicable(source,relevantUndefinedVariablesPresent, PDDLProblem.this)) {
                         newState = source.clone();
                         newState.apply(transitionGround, source);

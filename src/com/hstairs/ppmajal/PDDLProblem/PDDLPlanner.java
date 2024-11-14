@@ -174,7 +174,7 @@ public class PDDLPlanner {
                         finalPlan.add(ImmutablePair.
                                 of(currentTime, right));
                     }else{
-                        throw new RuntimeException("We can't have something different from actions or processes");
+                        throw new RuntimeException("We can't have something different from actions or processes. Instead I got:"+right);
                     }
                 }
             }
