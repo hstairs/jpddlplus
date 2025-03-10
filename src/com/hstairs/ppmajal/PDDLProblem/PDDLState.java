@@ -31,6 +31,8 @@ import com.hstairs.ppmajal.transition.TransitionGround;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
+
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -361,6 +363,21 @@ protected DoubleArrayList numFluents;
     }
 
 
+    public List<Integer> getBoolIds() {
+        BitSet sBoolFluents = getBooleanFluents();
+        List<Integer> setBits = new ArrayList<>();
+        for (int i = sBoolFluents.nextSetBit(0); i!=-1; i = sBoolFluents.nextSetBit(i+1)) {
+            setBits.add(i);
+        }
+        return setBits;
 
+    }
 
+    private BitSet getBooleanFluents() {
+        return boolFluents;
+    }
+
+    public List<Double> getNumericalFluents() {
+        return Arrays.asList(ArrayUtils.toObject(numFluents.toArray()));
+    }
 }

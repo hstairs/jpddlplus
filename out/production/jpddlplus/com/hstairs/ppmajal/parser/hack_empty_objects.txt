@@ -1,0 +1,6 @@
+    root_1 = (Object)adaptor.becomeRoot((Object)adaptor.create(OBJECTS, "OBJECTS"), root_1);
+           
+	if (stream_typedNameList.hasNext()){//This is a hack to handle empty lists. Something could be probably done in the parser
+                                        adaptor.addChild(root_1, stream_typedNameList.nextTree());
+                                        adaptor.addChild(root_0, root_1);
+                                    }

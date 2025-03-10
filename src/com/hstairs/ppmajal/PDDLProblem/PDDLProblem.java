@@ -1482,6 +1482,14 @@ public class PDDLProblem implements SearchProblem {
         liftedGoals = con;
     }
 
+    public int getTotNumberOfBoolVariables() {
+        return totNumberOfBoolVariables;
+    }
+
+    public int getTotNumberOfNumVariables(){
+        return totNumberOfNumVariables;
+    }
+
     protected class stateIterator implements ObjectIterator<Pair<State, Object>> {
         protected final State source;
         final private Object[] actionsSet;

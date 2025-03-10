@@ -3,6 +3,7 @@ import com.hstairs.ppmajal.PDDLProblem.*;
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.cli.*;
@@ -53,6 +54,7 @@ public class ENHSP {
     private String searchEngineString;
     private String wh;
     private String heuristic = "aibr";
+    private String novelty;
     private String gw;
     private boolean savingSearchSpaceJson = false;
     private String deltaExecution;
@@ -237,6 +239,11 @@ public class ENHSP {
                 + "lazygbfs, Greedy Best First Search (f(n) = h(n)) with lazy evaluation\n"
                 + "WAStar, WA* (f(n) = g(n) + h_w*h(n))\n"
                 + "wa_star_4, WA* (f(n) = g(n) + 4*h(n))\n");
+        options.addOption("nov", true, "heuristic novelty: options:\n"
+                + "aqb, Atom Quantified Both novelty heuristic"
+                + "aw, Atom Width novelty heuristic"
+                + "iqb, Interval Quantified Both novelty heuristic"
+                + "iw, Interval Width novelty heuristic" );
         options.addOption("ties", true, "tie-breaking (default is arbitrary): larger_g, smaller_g, arbitrary");
         options.addOption("dp", "delta_planning", true, "planning decision executionDelta: float");
         options.addOption("de", "delta_execution", true, "planning execution executionDelta: float");
@@ -283,6 +290,7 @@ public class ENHSP {
             problemFile = cmd.getOptionValue("f");
             planner = cmd.getOptionValue("planner");
             heuristic = cmd.getOptionValue("h");
+            novelty = cmd.getOptionValue("nov");
             String optionValue = cmd.getOptionValue("tolerance");
             if (optionValue != null){
                 System.out.println(optionValue);
@@ -513,8 +521,11 @@ public class ENHSP {
 
     private void setHeuristic() {
 //        System.out.println("ha:" + helpfulActionsPruning + " ht" + helpfulTransitions);
-        h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
+        SearchHeuristic h_temp;
+        h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
                 unitCostHeuristic, linearEffectsAbstraction);
+        h=new IntervalQuantifiedBothHeuristic(problem, 1, h_temp);
+
     }
 
     private LinkedList<ImmutablePair<BigDecimal, TransitionGround>> search() throws Exception {
