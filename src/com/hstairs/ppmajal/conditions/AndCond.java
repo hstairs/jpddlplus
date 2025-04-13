@@ -327,7 +327,7 @@ public class AndCond extends ComplexCondition implements PostCondition {
                         newSons.add(o);
                     }
                 } else {
-                    newSons.add(c1);
+                    newSons.add(res);
                 }
             }
 
