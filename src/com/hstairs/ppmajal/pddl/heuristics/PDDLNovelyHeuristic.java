@@ -7,6 +7,8 @@ import com.hstairs.ppmajal.pddl.heuristics.advanced.experimental.H1Fix;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.experimental.H1Res;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.AtomQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.AtomWidthHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalWidthHeuristic;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 
@@ -17,18 +19,36 @@ public class PDDLNovelyHeuristic {
 
     public static SearchHeuristic getNoveltyHeuristic(String novelty,
                                                PDDLProblem heuristicProblem, Integer k, SearchHeuristic searchHeuristic) {
+        SearchHeuristic h = searchHeuristic;
         switch (novelty) {
             case "aqb": {
-                return new AtomQuantifiedBothHeuristic(heuristicProblem, k, searchHeuristic);
+                switch (k){
+                    case 1: return new AtomQuantifiedBothHeuristic(heuristicProblem, 1, h);
+                    case 2: return new AtomQuantifiedBothHeuristic(heuristicProblem, 2, h);
+                }
             }
             case "aw": {
-                return new AtomWidthHeuristic(heuristicProblem, k, searchHeuristic);
+                switch (k){
+                    case 1: return new AtomWidthHeuristic(heuristicProblem, 1, new SearchHeuristic[]{h});
+                    case 2: return new AtomWidthHeuristic(heuristicProblem, 2, new SearchHeuristic[]{h});
+                }
+
+            }
+            case "iqb": {
+                switch (k){
+                    case 1: return new IntervalQuantifiedBothHeuristic(heuristicProblem, 1, h);
+                    case 2: return new IntervalQuantifiedBothHeuristic(heuristicProblem, 2, h);
+                }
+            }
+            case "iw": {
+                switch (k){
+                    case 1: return new IntervalWidthHeuristic(heuristicProblem, 1, new SearchHeuristic[]{h});
+                    case 2: return new IntervalWidthHeuristic(heuristicProblem, 2, new SearchHeuristic[]{h});
+                }
             }
             default:
-                if (heuristic != null) {
-                    System.out.println("Folding back to 1-0 heuristic. Input heuristic is not supported");
-                }
-                return new GoalSensitiveHeuristic(heuristicProblem);
+                System.out.println("Input heuristic is not supported. Interval quantified both novelty is used.");
+                return new IntervalQuantifiedBothHeuristic(heuristicProblem, 1, h);
 
         }
     }

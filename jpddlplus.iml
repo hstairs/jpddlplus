@@ -9,7 +9,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="jar_dependencies" level="project" />
+    <orderEntry type="library" exported="" name="jar_dependencies" level="project" />
     <orderEntry type="library" name="antlr-3.5.2-complete-no-st3" level="project" />
     <orderEntry type="module-library">
       <library name="JUnit5.8.1">

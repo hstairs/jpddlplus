@@ -80,4 +80,6 @@ public abstract class NoveltyHeuristic implements SearchHeuristic {
   public enum NoveltyType {
     ATOM, INTERVAL,
   }
+
+  //Implementare il getTransition per verificare helpful/jumping actions
 }

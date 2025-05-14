@@ -27,7 +27,7 @@ public class IntervalWidthHeuristic extends NoveltyHeuristic {
 
   private final Map<List<Float>, UnionNumericState> heuristicTuplesToUnionState;
 
-  public IntervalWidthHeuristic(PDDLProblem problem, int k, SearchHeuristic[] heuristics, boolean cachedHeuristic) {
+  public IntervalWidthHeuristic(PDDLProblem problem, int k, SearchHeuristic[] heuristics) {
     super(problem, k, NoveltyValue.WIDTH, NoveltyType.INTERVAL);
     this.heuristics = heuristics;
     this.numHeuristics = heuristics.length;

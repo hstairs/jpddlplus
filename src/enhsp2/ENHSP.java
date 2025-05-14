@@ -3,6 +3,7 @@ import com.hstairs.ppmajal.PDDLProblem.*;
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
@@ -55,6 +56,7 @@ public class ENHSP {
     private String wh;
     private String heuristic = "aibr";
     private String novelty;
+    private Integer k_nov;
     private String gw;
     private boolean savingSearchSpaceJson = false;
     private String deltaExecution;
@@ -244,6 +246,7 @@ public class ENHSP {
                 + "aw, Atom Width novelty heuristic"
                 + "iqb, Interval Quantified Both novelty heuristic"
                 + "iw, Interval Width novelty heuristic" );
+        options.addOption("knov", true, "novelty k parameter, 1 or 2");
         options.addOption("ties", true, "tie-breaking (default is arbitrary): larger_g, smaller_g, arbitrary");
         options.addOption("dp", "delta_planning", true, "planning decision executionDelta: float");
         options.addOption("de", "delta_execution", true, "planning execution executionDelta: float");
@@ -291,7 +294,12 @@ public class ENHSP {
             planner = cmd.getOptionValue("planner");
             heuristic = cmd.getOptionValue("h");
             novelty = cmd.getOptionValue("nov");
-            String optionValue = cmd.getOptionValue("tolerance");
+            String optionValue = cmd.getOptionValue("knov");
+            if(optionValue != null) {
+                k_nov = Integer.parseInt(optionValue);
+            }
+            else k_nov = 2;
+            optionValue = cmd.getOptionValue("tolerance");
             if (optionValue != null){
                 System.out.println(optionValue);
                 Utils.tolerance = Double.parseDouble(optionValue);
@@ -520,11 +528,18 @@ public class ENHSP {
     }
 
     private void setHeuristic() {
-//        System.out.println("ha:" + helpfulActionsPruning + " ht" + helpfulTransitions);
-        SearchHeuristic h_temp;
-        h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
+
+
+        if(novelty!=null){
+            SearchHeuristic h_temp;
+            h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
+                    unitCostHeuristic, linearEffectsAbstraction);
+            h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
+        }
+        else
+            h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
                 unitCostHeuristic, linearEffectsAbstraction);
-        h=new IntervalQuantifiedBothHeuristic(problem, 1, h_temp);
+
 
     }
 

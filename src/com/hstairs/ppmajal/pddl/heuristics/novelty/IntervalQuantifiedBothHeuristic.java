@@ -60,6 +60,7 @@ public class IntervalQuantifiedBothHeuristic extends NoveltyHeuristic {
     tempNumIntAssignments = new ArrayList<>(Collections.nCopies(nNumFluents, null));
   }
 
+
   private void hqb1() {
     qbl1 = C1;  // = h_qn
     qbu1 = C1;  // = second case in Eqn. (3) in [Katz et al., ICAPS-17]
@@ -152,7 +153,6 @@ public class IntervalQuantifiedBothHeuristic extends NoveltyHeuristic {
       return qbl1 < C1 ? qbl1 : qbu1;
     }
 
-    // k = 2
     hqb2();
     if (qbl1 < C1) {
       return qbl1;
