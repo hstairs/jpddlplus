@@ -62,6 +62,7 @@ public class PDDLProblem implements SearchProblem {
     private boolean relevantUndefinedVariablesPresent;
     private boolean[] subgoalRelevantFluents;
     private boolean[] costRelevantFluents;
+    private boolean aibrDebugPreprocessing = false;
 
     /**
      * @return the name
@@ -480,7 +481,7 @@ public class PDDLProblem implements SearchProblem {
 //        final Collection<TransitionGround> transitions = h1.getTransitions(false);
         if (aibrPreprocessing) {
             System.out.println("Aibr Preprocessing");
-            final Aibr heuristic = new Aibr(this, true);
+            final Aibr heuristic = new Aibr(this, true, aibrDebugPreprocessing);
             final float v = heuristic.computeEstimate(this.init);
             if (v != Float.MAX_VALUE) {
                 final Collection<TransitionGround> transitions = heuristic.getAllTransitions();
@@ -676,11 +677,11 @@ public class PDDLProblem implements SearchProblem {
         }
         for (var t: getTransitions()){
             for (NumEffect e: t.getConditionalNumericEffects().getAllEffects()){
-                if (this.isSubgoalsRelevant(e.getFluentAffected())) {
+                //if (this.isSubgoalsRelevant(e.getFluentAffected())) {
                     for (var v: e.getRight().getInvolvedNumericFluents()){
                         this.setSubgoalRelevant(v);
                     }
-                }
+                //}
             }
         }
 

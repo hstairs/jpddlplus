@@ -306,9 +306,9 @@ protected DoubleArrayList numFluents;
         for (int i = 0; i < this.numFluents.size(); i++) {
             double n = this.numFluents.get(i);
             if (Double.isNaN(n)) {
-                ret_val.possNumValues.put(fromStateNFId2ProblemNFId[i], null);
+                ret_val.getPossNumValues().put(fromStateNFId2ProblemNFId[i], null);
             } else {
-                ret_val.possNumValues.put(fromStateNFId2ProblemNFId[i], new HomeMadeRealInterval(n));
+                ret_val.getPossNumValues().put(fromStateNFId2ProblemNFId[i], new HomeMadeRealInterval(n));
             }
         }
 

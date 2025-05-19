@@ -144,7 +144,7 @@ public class BoolPredicate extends Terminal implements PostCondition {
 
     @Override
     public boolean canBeFalse (RelState s) {
-        if (s.possNumValues.isEmpty())
+        if (s.getPossNumValues().isEmpty())
             return true;
         if (this.isValid())
             return false;
