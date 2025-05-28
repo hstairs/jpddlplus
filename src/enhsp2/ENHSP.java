@@ -44,7 +44,7 @@ import java.util.logging.Logger;
 /**
  *
  * @author enrico
- *
+ * Sara Berselli e Alessio Ferrari
  *
  *
  */
