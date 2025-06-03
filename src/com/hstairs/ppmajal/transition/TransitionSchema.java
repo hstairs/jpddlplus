@@ -93,13 +93,15 @@ public class TransitionSchema extends Transition {
     @Override
     public Iterable<? extends BoolPredicate> getPropositionAffected() {
         Collection<BoolPredicate> ret = (Collection<BoolPredicate>) super.getPropositionAffected();
-        for (var f : this.forallEffects){
-            for (var s : f.sons){
-                if (s instanceof ConditionalEffectAsACondition){
-                    PostCondition effect = ((ConditionalEffectAsACondition) s).effect;
-                    ret.addAll(getBoolPredicates(effect));
-                }else{
-                    ret.addAll(getBoolPredicates((PostCondition) s));
+        if (this.forallEffects != null) {
+            for (var f : this.forallEffects) {
+                for (var s : f.sons) {
+                    if (s instanceof ConditionalEffectAsACondition) {
+                        PostCondition effect = ((ConditionalEffectAsACondition) s).effect;
+                        ret.addAll(getBoolPredicates(effect));
+                    } else {
+                        ret.addAll(getBoolPredicates((PostCondition) s));
+                    }
                 }
             }
         }

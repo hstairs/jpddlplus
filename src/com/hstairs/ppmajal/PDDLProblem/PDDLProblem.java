@@ -1483,6 +1483,7 @@ public class PDDLProblem implements SearchProblem {
         liftedGoals = con;
     }
 
+
     protected class stateIterator implements ObjectIterator<Pair<State, Object>> {
         protected final State source;
         final private Object[] actionsSet;
@@ -1491,6 +1492,7 @@ public class PDDLProblem implements SearchProblem {
         private int i;
         private boolean processDone;
         private boolean eventsPriority = false;
+
 
         public stateIterator(State source, Object[] actionsSet) {
             this.source = source;

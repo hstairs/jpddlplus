@@ -459,6 +459,8 @@ public class BoolPredicate extends Terminal implements PostCondition {
     }
 
     public boolean isGrounded() {
+        if (this.variables == null)
+            return true;
         for (var v: this.variables){
             if (v instanceof Variable){
                 return false;

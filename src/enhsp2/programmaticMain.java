@@ -1,5 +1,7 @@
 package enhsp2;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLPlanner;
+import com.hstairs.ppmajal.PDDLProblem.PDDLSolution;
 import com.hstairs.ppmajal.conditions.BoolPredicate;
 import static com.hstairs.ppmajal.conditions.BoolPredicate.BoolFluent;
 import static com.hstairs.ppmajal.conditions.Comparison.comparison;
@@ -21,6 +23,8 @@ import com.hstairs.ppmajal.expressions.PDDLNumber;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.PDDLProblem.PDDLSearchEngine;
+import com.hstairs.ppmajal.search.WAStar;
+import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
 import static com.hstairs.ppmajal.transition.ConditionalEffects.numEffects;
 import static com.hstairs.ppmajal.transition.ConditionalEffects.stripsEffects;
@@ -79,10 +83,10 @@ public class programmaticMain {
         problem.prepareForSearch();
         problem.saveProblem("/tmp/p1.pddl");
 
-        final PDDLSearchEngine searchEngine = new PDDLSearchEngine(problem, new H1(problem)); //manager of the search strategies
-        LinkedList<Pair<BigDecimal, Object>> plan = searchEngine.WAStar();
-        System.out.println(plan);
-
+        PDDLPlanner planner = new PDDLPlanner();
+        PDDLSolution plan = planner.plan(problem, new H1(problem));
+        System.out.println(plan.rawPlan());
+        System.out.println(plan.lastState());
     }
 
     public static void fullSchemaProblem() throws Exception {
