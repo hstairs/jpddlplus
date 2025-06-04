@@ -34,7 +34,7 @@ public final class Aibr implements SearchHeuristic {
     //The following are built around supporters
     private final Int2ObjectMap<String> names = new Int2ObjectArrayMap();
     private Collection<TransitionGround> reachableTransitions = null;
-    private boolean DEBUG = false;
+    private boolean DEBUG = true;
     private AibrLogger logger;
 
     public Aibr(PDDLProblem problem) {
@@ -221,7 +221,7 @@ public final class Aibr implements SearchHeuristic {
             logUnsupportedSupporters(supporters);
         }
 
-        while (!goalReached && !supporters.isEmpty()) {
+        while ((reachability && !supporters.isEmpty()) || (!supporters.isEmpty() && !reachability && goalReached)) {
             stepCount++;
             // Log the current state before applying actions
             if (DEBUG) {
