@@ -23,7 +23,7 @@ public class PDDLHeuristic {
 
     public static SearchHeuristic getHeuristic(String heuristic,
                                                PDDLProblem heuristicProblem, String redundantConstraints,
-            boolean helpfulActionsPruning, boolean helpfulTransitions, boolean toOneTransformation, int linearEffectsAbstraction) {
+            boolean helpfulActionsPruning, boolean helpfulTransitions, boolean toOneTransformation, int linearEffectsAbstraction, boolean aibrDebugging) {
         Map<AndCond, Collection<IntArraySet>> redConstraint = null;
         if ("smart".equals(redundantConstraints)) {
             final H1 h1 = new H1(heuristicProblem, true, true, false, "smart", false, true, false, false, false, linearEffectsAbstraction);
@@ -103,8 +103,7 @@ public class PDDLHeuristic {
             }
             case "aibr": {
                 System.out.println("AIBR selected");
-                return new Aibr(heuristicProblem);
-
+                return new Aibr(heuristicProblem, false, aibrDebugging);
             }
             case "hlm-count": {
                 System.out.println("HLM selected");

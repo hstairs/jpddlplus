@@ -136,8 +136,7 @@ public class AtomQuantifiedBothHeuristic extends NoveltyHeuristic {
     if (k == 1) {
       return qbl1 < C1 ? qbl1 : qbu1;
     }
-
-    // k = 2
+    
     hqb2();
     if (qbl1 < C1) {
       return qbl1;

@@ -144,7 +144,7 @@ public class BoolPredicate extends Terminal implements PostCondition {
 
     @Override
     public boolean canBeFalse (RelState s) {
-        if (s.possNumValues.isEmpty())
+        if (s.getPossNumValues().isEmpty())
             return true;
         if (this.isValid())
             return false;
@@ -459,6 +459,8 @@ public class BoolPredicate extends Terminal implements PostCondition {
     }
 
     public boolean isGrounded() {
+        if (this.variables == null)
+            return true;
         for (var v: this.variables){
             if (v instanceof Variable){
                 return false;

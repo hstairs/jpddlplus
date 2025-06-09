@@ -28,7 +28,6 @@ import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,7 +37,7 @@ import java.util.Set;
 public class RelState extends Object {
 
     final public Int2IntArrayMap possBollValues;//0 is negative, 1 positive, 2 both
-    final public Int2ObjectArrayMap<HomeMadeRealInterval> possNumValues;
+    private final Int2ObjectArrayMap<HomeMadeRealInterval> possNumValues;
 
     public RelState (Int2IntArrayMap a, Int2ObjectArrayMap<HomeMadeRealInterval> b ) {
         super();
@@ -54,9 +53,9 @@ public class RelState extends Object {
     @Override
     public String toString() {
         StringBuilder str = new StringBuilder("");
-        for (int i: possNumValues.keySet()){
+        for (int i: getPossNumValues().keySet()){
             NumFluent fluent = NumFluent.fromIdToNumFluents.get(i);
-            str.append(fluent).append("=").append(possNumValues.get(i)).append("");
+            str.append(fluent).append("=").append(getPossNumValues().get(i)).append("");
         }
         str.append("\n");
         for (BoolPredicate fluent : PDDLProblem.booleanFluents){
@@ -75,13 +74,13 @@ public class RelState extends Object {
 
     @Override
     public RelState clone ( ) {
-        final RelState ret_val = new RelState(this.possBollValues.clone(),this.possNumValues.clone());
+        final RelState ret_val = new RelState(this.possBollValues.clone(), this.getPossNumValues().clone());
         return ret_val;
     }
 
 
     public double functionInfValue (NumFluent f) {
-        final HomeMadeRealInterval n = this.possNumValues.get(f.getId());
+        final HomeMadeRealInterval n = this.getPossNumValues().get(f.getId());
         if (n != null) {
             return n.lo();
         }
@@ -90,8 +89,8 @@ public class RelState extends Object {
 
     public HomeMadeRealInterval functionValues (NumFluent f) {
 
-        if (!this.possNumValues.isEmpty()) {
-            final HomeMadeRealInterval a = this.possNumValues.get(f.getId());
+        if (!this.getPossNumValues().isEmpty()) {
+            final HomeMadeRealInterval a = this.getPossNumValues().get(f.getId());
             if (a != null) {
                 return a;
             } else {
@@ -103,7 +102,7 @@ public class RelState extends Object {
     }
 
     public double functionSupValue (NumFluent f) {
-        final HomeMadeRealInterval a = this.possNumValues.get(f.getId());
+        final HomeMadeRealInterval a = this.getPossNumValues().get(f.getId());
         if (a != null) {
             return a.hi();
         }
@@ -158,7 +157,7 @@ public class RelState extends Object {
     }
 
     public void setFunctionValues (NumFluent f, HomeMadeRealInterval after) {
-        this.possNumValues.put(f.getId(), after);
+        this.getPossNumValues().put(f.getId(), after);
 
     }
 
@@ -246,4 +245,7 @@ public class RelState extends Object {
         }
     }
 
+    public Int2ObjectArrayMap<HomeMadeRealInterval> getPossNumValues() {
+        return possNumValues;
+    }
 }

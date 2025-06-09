@@ -590,7 +590,7 @@ public class NumEffect extends Expression implements PostCondition {
             }
 
         }
-        s.possNumValues.put(fluentAffected.getId(),after);
+        s.getPossNumValues().put(fluentAffected.getId(),after);
         return s;
     }
 

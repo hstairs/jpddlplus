@@ -1,4 +1,6 @@
 package enhsp2;
+
+
 import com.hstairs.ppmajal.PDDLProblem.*;
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.extraUtils.Utils;
@@ -62,6 +64,8 @@ public class ENHSP {
     private String deltaExecution;
     private float depthLimit;
     private String savePlan;
+    private int linearEffectsAbstraction = -1;
+
     private boolean printTrace;
     private String tieBreaking;
     private String planner;
@@ -85,7 +89,6 @@ public class ENHSP {
     private float endGValue;
     private boolean helpfulTransitions;
     private boolean internalValidation = false;
-    private int linearEffectsAbstraction = -1;
     private int planLength;
     private String redundantConstraints;
     private String groundingType;
@@ -101,6 +104,9 @@ public class ENHSP {
     private PrintStream out;
     private boolean autoAnytime;
     private boolean unitCostHeuristic;
+    private boolean printAllInfo;
+    private boolean printMakespan;
+    public static boolean aibrDebug = false;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
@@ -127,11 +133,17 @@ public class ENHSP {
             out.println("Problem parsed");
             out.println("Grounding..");
 
-            localProblem.prepareForSearch(aibrPreprocessing, stopAfterGrounding);
+            if (!localProblem.prepareForSearch(aibrPreprocessing, stopAfterGrounding)) {
+                return null;
+            }
 
-            
+
+
             if (printActions){
                 System.out.println(localProblem.getTransitions());
+            }
+            if (printAllInfo){
+                localProblem.printAllInfo();
             }
             if (stopAfterGrounding) {
                 System.exit(1);
@@ -143,10 +155,12 @@ public class ENHSP {
         return null;
     }
 
-    public void parsingDomainAndProblem(String[] args) {
+    public boolean parsingDomainAndProblem(String[] args) {
         try {
             overallStart = System.currentTimeMillis();
             Pair<PDDLDomain, PDDLProblem> res = parseDomainProblem(domainFile, problemFile, deltaExecution, System.out);
+            if (res == null)
+                return false;
             domain = res.getKey();
             problem = res.getRight();
             if (pddlPlus) {
@@ -162,6 +176,7 @@ public class ENHSP {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+        return true;
     }
 
     public void configurePlanner() {
@@ -262,7 +277,7 @@ public class ENHSP {
         options.addOption("ht", "helpful-transitions", true, "activate up-to-macro actions");
         options.addOption("sp", true, "Save plan. Argument is filename");
         options.addOption("pt", false, "print state trajectory (Experimental)");
-//        options.addOption("im", false, "Ignore Metric in the heuristic");
+        options.addOption("im", false, "Ignore Metric in the heuristic");
         options.addOption("dap", false, "Disable Aibr Preprocessing");
         options.addOption("red", "redundant_constraints", true, "Choose mechanism for redundant constraints generation among, "
                 + "no, brute and smart. No redundant constraints generation is the default");
@@ -282,9 +297,10 @@ public class ENHSP {
         options.addOption("silent",false,"Activate silent modality");
         options.addOption("autoanytime",false,"Activate auto anytime modality. ");
         options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
+        options.addOption("npm",false,"PDDL+ feature: Do not print makespan in the plan");
+        options.addOption("pai",false,"Print all info before search");
         options.addOption("ea",true,"Effect abstraction mode for non-constants effects");
-        options.addOption("im",false,"If set, ignore metric function altogether");
-
+        options.addOption("aibr-debug",false,"Enable AIBR debug logging");
 
         CommandLineParser parser = new DefaultParser();
         try {
@@ -304,7 +320,7 @@ public class ENHSP {
                 System.out.println(optionValue);
                 Utils.tolerance = Double.parseDouble(optionValue);
             }
-            
+
             if (heuristic == null) {
                 heuristic = "hadd";
             }
@@ -329,9 +345,6 @@ public class ENHSP {
             } else {
                 groundingType = "internal";
             }
-            
-            internalValidation = cmd.hasOption("ival");
-            this.unitCostHeuristic = cmd.hasOption("uch");
 
             String ea = cmd.getOptionValue("ea");
             if (ea != null) {
@@ -341,6 +354,10 @@ public class ENHSP {
                     linearEffectsAbstraction = Integer.parseInt(ea);
                 }
             }
+
+
+            internalValidation = cmd.hasOption("ival");
+            this.unitCostHeuristic = cmd.hasOption("uch");
 
             deltaExecution = cmd.getOptionValue("de");
             if (deltaExecution == null) {
@@ -375,8 +392,7 @@ public class ENHSP {
                 deltaPlanning = delta;
                 deltaExecution = delta;
             }
-            
-            inputPlan = cmd.getOptionValue("inputplan");
+
             inputPlan = cmd.getOptionValue("inputplan");
 
             String k = cmd.getOptionValue("k");
@@ -400,6 +416,7 @@ public class ENHSP {
             }
 
             sdac = cmd.hasOption("sdac");
+            printMakespan = !cmd.hasOption("npm");
             helpfulActions = cmd.getOptionValue("ha") != null && "true".equals(cmd.getOptionValue("ha"));
             autoAnytime = cmd.hasOption("autoanytime");
 
@@ -414,6 +431,8 @@ public class ENHSP {
             helpfulTransitions = cmd.getOptionValue("ht") != null && "true".equals(cmd.getOptionValue("ht"));
             ignoreMetric = cmd.hasOption("im");
             printActions = cmd.hasOption("print_actions");
+            printAllInfo = cmd.hasOption("pai");
+            aibrDebug = cmd.hasOption("aibr-debug");
         } catch (ParseException exp) {
 //            Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
             System.err.println("Parsing failed.  Reason: " + exp.getMessage());
@@ -533,20 +552,18 @@ public class ENHSP {
         if(novelty!=null){
             SearchHeuristic h_temp;
             h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction);
+                    unitCostHeuristic, linearEffectsAbstraction, false);
             h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
         }
         else
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                unitCostHeuristic, linearEffectsAbstraction);
-
+                unitCostHeuristic, linearEffectsAbstraction, false);
 
     }
 
     private LinkedList<ImmutablePair<BigDecimal, TransitionGround>> search() throws Exception {
 
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
-                heuristic,
                 redundantConstraints,
                 helpfulActions,
                 helpfulTransitions,
@@ -554,14 +571,14 @@ public class ENHSP {
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
                 tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit
-                );
+        );
 
         if (savingSearchSpaceJson) {
             Runtime.getRuntime().addShutdownHook(new Thread() {//this is to save json also when the planner is interrupted
                 @Override
                 public void run() {
-                        planner.getSearchSpaceHandle().printJson(
-                                getProblem().getPddlFileReference() + ".sp_log");
+                    planner.getSearchSpaceHandle().printJson(
+                            getProblem().getPddlFileReference() + ".sp_log");
                 }
             });
         }
@@ -655,7 +672,8 @@ public class ENHSP {
         if (fileName != null) {
             try {
                 if (temporal){
-                    fileContent.add(par.time+": @PlanEND ");
+                    if (printMakespan)
+                        fileContent.add(par.time+": @PlanEND ");
                 }
                 Files.write(Path.of(fileName), fileContent);
 

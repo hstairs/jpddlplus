@@ -174,7 +174,7 @@ public class Comparison extends Terminal {
     @Override
     public boolean canBeTrue (RelState s) {
 
-        if (s.possNumValues.isEmpty()) {
+        if (s.getPossNumValues().isEmpty()) {
             return false;
         }
         final HomeMadeRealInterval first = left.eval(s);
@@ -514,7 +514,7 @@ public class Comparison extends Terminal {
     @Override
     public boolean canBeFalse (RelState s) {
 
-        if (s.possNumValues.isEmpty()) {
+        if (s.getPossNumValues().isEmpty()) {
             return true;
         }
 

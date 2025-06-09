@@ -111,7 +111,6 @@ public class HomeMadeRealInterval {
         if (lo == hi){
             return new HomeMadeRealInterval(lo+number);
         }
-                
         final RealInterval ret = IAMath.add(new RealInterval(lo(), hi()),
                 new RealInterval(number, number));
         return new HomeMadeRealInterval(ret.lo(),ret.hi());
