@@ -97,8 +97,7 @@ public class LazyWAStar extends WAStar {
 
                     Object[] actionsToSearch = getActionsToSearch(helpful,h);
 
-                    for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch
-                            ); it.hasNext(); ) {
+                    for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext(); ) {
 
                         final Pair<State, Object> next = it.next();
                         final State successorState = next.getFirst();

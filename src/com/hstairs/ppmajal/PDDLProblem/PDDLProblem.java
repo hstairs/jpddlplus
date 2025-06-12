@@ -28,9 +28,12 @@ import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.parser.PddlLexer;
 import com.hstairs.ppmajal.parser.PddlParser;
+import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.problem.*;
 import com.hstairs.ppmajal.propositionalFactory.*;
+import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.SearchProblem;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
@@ -43,6 +46,7 @@ import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.logging.Level;
@@ -870,8 +874,6 @@ public class PDDLProblem implements SearchProblem {
         switch (successorGenerator) {
             case stateBased:
                 return new optimisedSuccessorsGenerator(s, acts, getDecActionRepresentation(acts));
-            case h1:
-                throw new UnsupportedOperationException("To be implemented");
             case traditional:
                 return new naiveSuccessorIterator(s, acts);
         }
@@ -1934,6 +1936,4 @@ public class PDDLProblem implements SearchProblem {
         }
         return res;
     }
-
-
 }
