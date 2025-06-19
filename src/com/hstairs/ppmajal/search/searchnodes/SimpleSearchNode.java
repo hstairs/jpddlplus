@@ -19,4 +19,5 @@ public class SimpleSearchNode {
         this.father = father;
         this.gValue = g;
     }
+
 }

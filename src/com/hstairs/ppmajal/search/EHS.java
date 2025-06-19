@@ -3,130 +3,143 @@ package com.hstairs.ppmajal.search;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
-import it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
-import org.apache.commons.lang3.tuple.Pair;
+import com.hstairs.ppmajal.search.searchnodes.SearchEventLogger;
+import it.unimi.dsi.fastutil.objects.Object2FloatMap;
+import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
+import org.jgrapht.alg.util.Pair;
 
 import java.io.PrintStream;
-import java.math.BigDecimal;
 import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.Objects;
 import java.util.Queue;
 
 public class EHS extends SearchEngine {
 
+    protected final float hw;
+    protected final TieBreaker tieBreaker;
+    protected final boolean saveSearchSpace;
+    protected final boolean enableEventLogging;
 
-    public EHS(boolean helpfulActionsPruning) {
+    public EHS(float hw, boolean helpfulActionsPruning, TieBreaker tieBreaker, boolean saveSearchSpace, boolean enableEventLogging) {
         super(helpfulActionsPruning);
+        this.hw = hw;
+        this.tieBreaker = tieBreaker;
+        this.saveSearchSpace = saveSearchSpace;
+        this.enableEventLogging = enableEventLogging;
     }
 
     @Override
     public SearchStats getStats() {
-        return new SearchStats(nodesExpanded,nodesEvaluated,deadEndsDetected,duplicatedDetected,
-                totalTime,heuristicTime);
+        return new SearchStats(nodesExpanded, nodesEvaluated, deadEndsDetected, duplicatedDetected, totalTime, heuristicTime);
     }
 
     @Override
-    public SimpleSearchNode search(SearchProblem p, SearchHeuristic h, PrintStream out) {
+    public SimpleSearchNode search(SearchProblem problem, SearchHeuristic h, PrintStream out) {
         zeroCounters();
-        totalTime = 0;
-        heuristicTime = 0;
-        long startTime = System.currentTimeMillis();
-        if (!p.satisfyGlobalConstraints(p.getInit())) {
+        final State initState = problem.getInit();
+
+        final ObjectHeapPriorityQueue<SearchNode> frontier = new ObjectHeapPriorityQueue<>(tieBreaker);
+
+        if (!problem.satisfyGlobalConstraints(initState)) {
             out.println("Initial State is not valid");
             return null;
         }
-        SearchNode current = new SearchNode(p.getInit(),null,null,0,0);
-        LinkedList<Pair<BigDecimal, Object>> plan = new LinkedList<>();
-        Object visited = null;
-        visited = new Object2BooleanLinkedOpenHashMap();
-        ((Object2BooleanMap<State>) visited).put(current.s, true);
-        while (true) {
-            final Boolean b = p.goalSatisfied(current.s);
-            if (b == null) {
-                break;
-            }else if (b) {
-                    totalTime = System.currentTimeMillis()-startTime;
-                    return current;
-                }
-            final SearchNode succ = oldBreathFirstSearchImplementation(current, p,h,
-                    (Object2BooleanMap<State>) visited, System.out);
 
-            if (succ == null) {
-                out.println("No plan exists with EHC");
-                break;
-            }else {
-                current = succ;
-            }
+        long timeAtStart = System.currentTimeMillis();
+        float hInit = h.computeEstimate(initState);
+        heuristicTime += System.currentTimeMillis() - timeAtStart;
+
+        if (hInit == Float.MAX_VALUE) {
+            deadEndsDetected++;
+            return null;
         }
-        totalTime = System.currentTimeMillis()-startTime;
-        return null;
-    }
-    private SearchNode oldBreathFirstSearchImplementation(SearchNode init, SearchProblem problem,
-                                                          SearchHeuristic heuristic,
-                                                          Object2BooleanMap<State> visited,
-                                                          PrintStream out) {
-        //out.println("Visited size:"+visited.size());
+        nodesEvaluated++;
 
-        Queue<SearchNode> frontier = new LinkedList<>();
-        float currentValue = heuristic.computeEstimate(init.s);
-        frontier.add(init);
+        SearchNode init = new SearchNode(initState.clone(), null, null, 0, hInit * hw, hInit, saveSearchSpace);
         if (this.helpfulActions) {
-            //throw new UnsupportedOperationException();
-            init.helpfulActions = heuristic.getTransitions(true);
+            init.helpfulActions = h.getTransitions(helpfulActions);
         }
-//        out.println(init.relaxed_plan_from_heuristic);
-        out.println("h(n):" + currentValue + " ");
-        float current_gn = 0;
-        while (!frontier.isEmpty()) {
-            SearchNode node = frontier.poll();
-            nodesExpanded++;
-            if (node.gValue > current_gn) {
-                out.println(" " + node.gValue);
-                current_gn = node.gValue;
-            }
-            for (Iterator<org.jgrapht.alg.util.Pair<State, Object>> it = problem.getSuccessors(node.s,
-                    getActionsToSearch(node, problem,heuristic)); it.hasNext();) {
-                final org.jgrapht.alg.util.Pair<State, Object> next = (org.jgrapht.alg.util.Pair<State, Object>) it.next();
 
-                final Object act = next.getSecond();
-                State temp = next.getFirst();
-                if (!problem.satisfyGlobalConstraints(temp)) {
-                    continue;
+        // Log evento "generate"
+        if (eventLogger != null && enableEventLogging) {
+            eventLogger.logGenerate(init, null);
+        }
+        super.initHandle(init);
+        frontier.enqueue(init);
+
+        Object2FloatMap<State> gValueMap = new Object2FloatOpenHashMap<>();
+        gValueMap.put(initState, 0f);
+
+        while (!frontier.isEmpty()) {
+            final SearchNode currentNode = frontier.dequeue();
+
+            float prev_cost = gValueMap.getOrDefault(currentNode.s.getRepresentative(), Float.NaN);
+            if (currentNode.gValue != prev_cost) continue;
+
+            // Log evento "expand"
+            if (eventLogger != null && enableEventLogging) {
+                eventLogger.logExpand(currentNode);
+            }
+
+            nodesExpanded++;
+
+            Boolean res = problem.goalSatisfied(currentNode.s);
+            if (res == null) break;
+            if (res) {
+                totalTime = System.currentTimeMillis() - timeAtStart;
+
+                // Log evento "close"
+                if (eventLogger != null && enableEventLogging) {
+                    eventLogger.logClose(currentNode);
                 }
-                boolean visitedTemp = visited.getOrDefault(temp, false);
-                if (!visitedTemp) {
-                    visited.put(temp, true);
-                    final Float newG;
-                    newG = problem.gValue(node.s, act, temp, node.gValue);
-                    if (newG == null) {
-                        continue;
-                    }
+
+                return currentNode;
+            }
+
+            for (Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s, getActionsToSearch(currentNode, problem, h)); it.hasNext(); ) {
+                final Pair<State, Object> transition = it.next();
+                float gNew = problem.gValue(currentNode.s, transition.getSecond(), transition.getFirst(), currentNode.gValue);
+                float oldCost = gValueMap.getOrDefault(transition.getFirst().getRepresentative(), Float.NaN);
+                if (Objects.equals(oldCost, Float.NaN) || gNew < oldCost) {
                     long start = System.currentTimeMillis();
-                    final Float d = heuristic.computeEstimate(temp);
+                    float hValue = h.computeEstimate(transition.getFirst());
                     heuristicTime += System.currentTimeMillis() - start;
-                    //out.println("try");
-                    if (d != Float.MAX_VALUE) {// && d <= current_value) {
-                        nodesEvaluated++;
-                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0);
-                        frontier.add(newNode);
+
+                    if (hValue != Float.MAX_VALUE) {
+                        SearchNode node = new SearchNode(transition.getFirst(), transition.getSecond(), currentNode,
+                                gNew, hValue * hw, hValue, saveSearchSpace);
+
                         if (this.helpfulActions) {
-                            newNode.helpfulActions = heuristic.getTransitions(true);
+                            node.helpfulActions = h.getTransitions(helpfulActions);
                         }
-                        if (problem.milestoneReached(d, currentValue, temp)) {
-                            out.println("h(n):" + d);
-                            return newNode;
+                        if (saveSearchSpace) {
+                            currentNode.add_descendant(node);
                         }
+
+                        // Log evento "generate"
+                        if (eventLogger != null && enableEventLogging) {
+                            eventLogger.logGenerate(node, currentNode);
+                        }
+
+                        frontier.enqueue(node);
+                        gValueMap.put(transition.getFirst().getRepresentative(), gNew);
+                        nodesEvaluated++;
                     } else {
                         deadEndsDetected++;
                     }
-                }else{
+                } else {
                     duplicatedDetected++;
                 }
+            }
 
+            // Log evento "close"
+            if (eventLogger != null && enableEventLogging) {
+                eventLogger.logClose(currentNode);
             }
         }
-        return null;
 
+        totalTime = System.currentTimeMillis() - timeAtStart;
+        return null;
     }
 }

@@ -3,6 +3,7 @@ package com.hstairs.ppmajal.search;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
+import com.hstairs.ppmajal.search.searchnodes.SearchEventLogger;
 
 import java.io.PrintStream;
 import java.util.LinkedList;
@@ -13,16 +14,26 @@ public abstract class SearchEngine {
     protected int nodesExpanded;
     protected int nodesEvaluated;
     protected int duplicatedDetected;
-    //Timing information
     protected long totalTime;
     protected long heuristicTime;
     State lastState;
     final boolean helpfulActions;
     private SearchNode searchSpaceHandle;
 
+
+    // 🔹 Aggiunto logger per eventi
+    protected SearchEventLogger eventLogger;
+
     protected SearchEngine(boolean helpfulActionsPruning) {
         this.helpfulActions = helpfulActionsPruning;
     }
+
+    // 🔹 Setter per permettere a PDDLPlanner di passare il logger
+    public void setEventLogger(SearchEventLogger logger) {
+        this.eventLogger = logger;
+        SearchNode.setEventLogger(logger);  // in modo che anche i nodi possano accedervi
+    }
+
     public abstract SearchStats getStats();
 
     protected void zeroCounters() {
@@ -34,31 +45,32 @@ public abstract class SearchEngine {
     }
 
     public void initHandle(SearchNode init){
-            searchSpaceHandle = init;//this needs to have an handle on the initial state for saving it into a json file
+        searchSpaceHandle = init;
+    }
 
+    public SearchNode getSearchSpaceHandle() {
+        return searchSpaceHandle;
     }
 
     public abstract SimpleSearchNode search(SearchProblem p, SearchHeuristic h, PrintStream out);
+
     public LinkedList extractDecisions(SimpleSearchNode c) {
         LinkedList plan = new LinkedList<>();
         lastState = c.s;
         while (c.transition != null) {
-            if (c.transition != null) {//this is an action
+            if (c.transition != null) {
                 plan.addFirst(c.transition);
             }
             c = c.father;
         }
         return plan;
     }
+
     Object[] getActionsToSearch(SimpleSearchNode currentNode, SearchProblem problem, SearchHeuristic h) {
         if (helpfulActions && currentNode != null) {
-            return ((SearchNode)currentNode).helpfulActions;
+            return ((SearchNode) currentNode).helpfulActions;
         }
         return h.getTransitions(false);
-    }
-
-    public SearchNode getSearchSpaceHandle() {
-        return searchSpaceHandle;
     }
 
     public enum TieBreaking {

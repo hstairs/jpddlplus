@@ -546,7 +546,8 @@ public class ENHSP {
                 wh != null ? Float.parseFloat(this.wh) : (float) 1.0,
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
-                tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit
+                tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
+                savingSearchSpaceJson                // abilita logging eventi
         );
 
         if (savingSearchSpaceJson) {
