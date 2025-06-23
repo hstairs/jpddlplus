@@ -37,7 +37,7 @@ public class PDDLPlanner {
         this("wastar", "no", false,
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
-                "", false, Float.POSITIVE_INFINITY);
+                "", false, Float.POSITIVE_INFINITY, false);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
@@ -93,10 +93,10 @@ public class PDDLPlanner {
                 searchEngine = new IDAStar(hWeigth, helpfulActions, saveSearchSpace, enableEventLogging);
                 break;
             case "lazygbfs":
-                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG);
+                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG, enableEventLogging);
                 break;
             case "lazywastar":
-                searchEngine = new LazyWAStar(hWeigth, true, helpfulActions, saveSearchSpace, tb, boundG);
+                searchEngine = new LazyWAStar(hWeigth, true, helpfulActions, saveSearchSpace, tb, boundG, enableEventLogging);
                 break;
             default:
                 searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, enableEventLogging, boundG);

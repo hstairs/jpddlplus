@@ -19,12 +19,16 @@ public class LazyWAStar extends WAStar {
 
     final private boolean helpfulActionsWithPruning;
 
-    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace, TieBreaker tb, float boundG,boolean helpfulActionsWithPruning) {
-        super(hw, optimality, helpfulActions, tb, saveSearchSpace, boundG);
+    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace, TieBreaker tb, float boundG,boolean helpfulActionsWithPruning, boolean enableEventLogging) {
+
+        super(hw, optimality, helpfulActions, tb, saveSearchSpace, enableEventLogging, boundG);
         this.helpfulActionsWithPruning = helpfulActionsWithPruning;
     }
     public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace, TieBreaker tb, float boundG) {
-        this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false);
+        this(hw, optimality, helpfulActions, saveSearchSpace, tb, boundG, false, false);
+    }
+    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace, TieBreaker tb, float boundG, boolean enableEventLogging) {
+        this(hw, optimality, helpfulActions, saveSearchSpace, tb, boundG, false, enableEventLogging);
     }
 
     Object[] getActionsToSearch(List helpful, SearchHeuristic h) {
@@ -67,6 +71,10 @@ public class LazyWAStar extends WAStar {
         if (this.helpfulActions) {
             init.helpfulActions = h.getTransitions(helpfulActions);
         }
+        // Log evento "generate" init
+        if (eventLogger != null && enableEventLogging) {
+            eventLogger.logGenerate(init, null);
+        }
         super.initHandle(init); //This is to inspect the search space if needed
         frontier.enqueue(init);
         Object2FloatMap<State> gValueMap = new Object2FloatOpenHashMap<>();
@@ -76,6 +84,10 @@ public class LazyWAStar extends WAStar {
         while (!frontier.isEmpty()) {
             final SearchNode currentNode = frontier.dequeue();
             if (currentNode.gValue == getPreviousCost(gValueMap, currentNode.s)) {
+                // Log evento "expand"
+                if (eventLogger != null && enableEventLogging) {
+                    eventLogger.logExpand(currentNode);
+                }
                 nodesExpanded++;
                 long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);
                 final Boolean res = problem.goalSatisfied(currentNode.s);
@@ -84,6 +96,10 @@ public class LazyWAStar extends WAStar {
                     continue;
                 } else if (res) {
                     totalTime = (System.currentTimeMillis() - timeAtStart);
+                    // Log evento "close"
+                    if (eventLogger != null && enableEventLogging) {
+                        eventLogger.logClose(currentNode);
+                    }
                     return currentNode;
                 }
                 final long start = System.currentTimeMillis();
@@ -136,6 +152,10 @@ public class LazyWAStar extends WAStar {
                                         if (saveSearchSpace) {
                                             currentNode.add_descendant(toExplore);
                                         }
+                                        // Log evento "generate"
+                                        if (eventLogger != null && enableEventLogging) {
+                                            eventLogger.logGenerate(toExplore, currentNode);
+                                        }
                                         addInFrontier(frontier, toExplore);
                                         gValueMap.put(successorState.getRepresentative(), successorG);
                                     //}
@@ -144,6 +164,10 @@ public class LazyWAStar extends WAStar {
                                 }
                             }
                         }
+                    }
+                    // Log evento "close"
+                    if (eventLogger != null && enableEventLogging) {
+                        eventLogger.logClose(currentNode);
                     }
                 }else{
                     deadEndsDetected++;
