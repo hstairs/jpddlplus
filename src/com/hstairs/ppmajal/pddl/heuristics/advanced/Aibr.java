@@ -221,7 +221,8 @@ public final class Aibr implements SearchHeuristic {
             logUnsupportedSupporters(supporters);
         }
 
-        while (!goalReached && !supporters.isEmpty()) {
+        //while ((reachability && !supporters.isEmpty()) || (!supporters.isEmpty() && !reachability && goalReached)) {
+        while (!supporters.isEmpty()){
             stepCount++;
             // Log the current state before applying actions
             if (DEBUG) {

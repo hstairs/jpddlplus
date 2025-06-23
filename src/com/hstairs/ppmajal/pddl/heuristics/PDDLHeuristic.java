@@ -50,12 +50,10 @@ public class PDDLHeuristic {
             }
             case "hradd": {
                 return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false,false, linearEffectsAbstraction);
-
             }
 
             case "hrmax": {
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false,false, linearEffectsAbstraction);
-
             }
             case "h1res": {
                 return new H1Res(heuristicProblem, redundantConstraints, false, false);

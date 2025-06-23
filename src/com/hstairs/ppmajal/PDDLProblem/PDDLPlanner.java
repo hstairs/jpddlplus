@@ -15,7 +15,6 @@ import java.util.LinkedList;
 
 public class PDDLPlanner {
     final String search;
-    final String heuristic;
     final String redundantConstraints;
     final boolean helpfulTransitions;
     final boolean helpfulActions;
@@ -33,13 +32,20 @@ public class PDDLPlanner {
     public SearchNode searchSpaceHandle;
 
 
-    public PDDLPlanner(String search, String heuristic, String redundantConstraints,
+
+    public PDDLPlanner() {
+        this("wastar", "no", false,
+                false, 1,
+                new BigDecimal(1.0), new BigDecimal(1.0),
+                "", false, Float.POSITIVE_INFINITY);
+    }
+
+    public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
                        boolean saveSearchSpace, float depthLimit,
                        boolean enableEventLogging) {
         this.search = search;
-        this.heuristic = heuristic;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
         this.helpfulActions = helpfulActionPruning;
@@ -87,10 +93,10 @@ public class PDDLPlanner {
                 searchEngine = new IDAStar(hWeigth, helpfulActions, saveSearchSpace, enableEventLogging);
                 break;
             case "lazygbfs":
-                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, enableEventLogging);
+                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG);
                 break;
             case "lazywastar":
-                searchEngine = new LazyWAStar(hWeigth, true, helpfulActions, tb, saveSearchSpace, enableEventLogging);
+                searchEngine = new LazyWAStar(hWeigth, true, helpfulActions, saveSearchSpace, tb, boundG);
                 break;
             default:
                 searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, enableEventLogging, boundG);
@@ -105,7 +111,6 @@ public class PDDLPlanner {
 
         if (solutionHandle == null)
             return new PDDLSolution(null, null, searchEngine.getStats(), -1);
-
         return new PDDLSolution(this.extractPlan(solutionHandle, p),
                 (PDDLState) solutionHandle.s, searchEngine.getStats(), solutionHandle.gValue);
     }
@@ -124,9 +129,11 @@ public class PDDLPlanner {
         State lastState = input.s;
 
         if (!(input instanceof SearchNode c)) {
-            while (input.transition != null) {
-                plan.addFirst(ImmutablePair.of(BigDecimal.ZERO, (TransitionGround) input.transition));
-                input = input.father;
+            SimpleSearchNode temp = input;
+            while (temp.transition != null) {
+                Double time = null;
+                plan.addFirst(ImmutablePair.of(BigDecimal.ZERO, (TransitionGround) temp.transition));
+                temp = temp.father;
             }
             return plan;
         }
@@ -159,7 +166,7 @@ public class PDDLPlanner {
             while (c != null) {
                 if (c.transition != null) {
                     plan.addFirst(ImmutablePair.of(((PDDLState) c.s).time, (TransitionGround) c.transition));
-                } else {
+                } else { //This is when I am waiting
                     for (int i = 0; i < c.waitingPoints; i++) {
                         time = time.subtract(executionDelta);
                         plan.addFirst(ImmutablePair.of(time, waiting));
@@ -168,35 +175,41 @@ public class PDDLPlanner {
                 current = c.s;
                 c = (SearchNode) c.father;
             }
-
             final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> finalPlan = new LinkedList<>();
-            BigDecimal currentTime = BigDecimal.ZERO;
-            for (var ele : plan) {
+            BigDecimal currentTime = new BigDecimal(0);
+            for (org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround> ele : plan) {
                 TransitionGround right = ele.getRight();
                 if (right.getSemantics().equals(Transition.Semantics.PROCESS)) {
-                    ArrayList<TransitionGround> spontaneousTransitions = new ArrayList<>();
-                    final var stateCollectionPair = p.simulation(current, executionDelta, executionDelta, false, null, spontaneousTransitions);
+                    ArrayList<TransitionGround> sponteneousTransitions = new ArrayList();
+                    final ImmutablePair<State, Integer> stateCollectionPair
+                            = p.simulation(current, executionDelta,
+                            executionDelta, false, null, sponteneousTransitions);
                     if (stateCollectionPair == null) {
                         throw new RuntimeException("This can't be possible");
                     } else {
-                        if (spontaneousTransitions.isEmpty()) {
+                        if (sponteneousTransitions.isEmpty()) {
                             System.out.println("something fishy just happened");
                         }
-                        for (var v : spontaneousTransitions) {
-                            finalPlan.add(ImmutablePair.of(currentTime, v));
+                        for (var v : sponteneousTransitions) {
+                            finalPlan.add(ImmutablePair.
+                                    of(currentTime, v));
                             if (v.getSemantics().equals(Transition.Semantics.PROCESS)) {
                                 currentTime = currentTime.add(executionDelta);
                             }
                         }
                     }
                     current = stateCollectionPair.getLeft();
-                } else if (right.getSemantics().equals(Transition.Semantics.ACTION)) {
-                    current.apply(right, current.clone());
-                    finalPlan.add(ImmutablePair.of(currentTime, right));
                 } else {
-                    throw new RuntimeException("Invalid transition type: " + right);
+                    if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
+                        current.apply(right, current.clone());
+                        finalPlan.add(ImmutablePair.
+                                of(currentTime, right));
+                    } else {
+                        throw new RuntimeException("We can't have something different from actions or processes. Instead I got:" + right);
+                    }
                 }
             }
+
             return finalPlan;
         }
         return plan;

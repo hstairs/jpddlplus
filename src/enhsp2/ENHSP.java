@@ -539,7 +539,6 @@ public class ENHSP {
     private LinkedList<ImmutablePair<BigDecimal, TransitionGround>> search() throws Exception {
 
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
-                heuristic,
                 redundantConstraints,
                 helpfulActions,
                 helpfulTransitions,

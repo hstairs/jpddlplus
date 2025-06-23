@@ -1,5 +1,6 @@
 package enhsp2;
 
+import com.hstairs.ppmajal.PDDLProblem.*;
 import com.hstairs.ppmajal.conditions.BoolPredicate;
 import static com.hstairs.ppmajal.conditions.BoolPredicate.BoolFluent;
 import static com.hstairs.ppmajal.conditions.Comparison.comparison;
@@ -19,8 +20,8 @@ import static com.hstairs.ppmajal.expressions.NumEffect.easyNumEffect;
 import static com.hstairs.ppmajal.expressions.NumFluent.numericFluent;
 import com.hstairs.ppmajal.expressions.PDDLNumber;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
-import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
-import com.hstairs.ppmajal.PDDLProblem.PDDLSearchEngine;
+import com.hstairs.ppmajal.search.WAStar;
+import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
 import static com.hstairs.ppmajal.transition.ConditionalEffects.numEffects;
 import static com.hstairs.ppmajal.transition.ConditionalEffects.stripsEffects;
@@ -31,6 +32,8 @@ import com.hstairs.ppmajal.transition.TransitionSchema;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedList;
+
+import it.unimi.dsi.fastutil.ints.IntArraySet;
 import org.apache.commons.lang3.tuple.Pair;
 
 /*
@@ -79,11 +82,21 @@ public class programmaticMain {
         problem.prepareForSearch();
         problem.saveProblem("/tmp/p1.pddl");
 
-        final PDDLSearchEngine searchEngine = new PDDLSearchEngine(problem, new H1(problem)); //manager of the search strategies
-        LinkedList<Pair<BigDecimal, Object>> plan = searchEngine.WAStar();
-        System.out.println(plan);
 
+        IntArraySet actions = new IntArraySet();
+        for (var action: problem.getTransitions()){
+            System.out.println("Action:"+action+" Action Id:"+action.getId());
+            actions.add(action.getId());
+        }
+        DecActionRepresentation decActionRepresentation = new DecActionRepresentation(actions);
+        System.out.println("Total Number of Transitions:"+TransitionGround.totNumberOfTransitions);
+        decActionRepresentation.prettyPrint();
+        PDDLPlanner planner = new PDDLPlanner();
+        PDDLSolution plan = planner.plan(problem, new H1(problem));
+        System.out.println(plan.rawPlan());
+        System.out.println(plan.lastState());
     }
+
 
     public static void fullSchemaProblem() throws Exception {
         PDDLDomain pddlDomain = new PDDLDomain();
