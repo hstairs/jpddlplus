@@ -19,33 +19,26 @@ public class SearchNode extends SimpleSearchNode {
     public int waitingPoints;
     public Object[] helpfulActions;
 
-    private static int NEXT_ID = 0;
+    private static int nextId = 0; //only way tohav a global ID for all nodes
     private final int id;
     private final Integer parentId;
 
-    private static SearchEventLogger eventLogger;
-
-
-    public static void setEventLogger(SearchEventLogger logger) {
-        eventLogger = logger;
-    }
-
-    // Costruttore base senza salvataggio JSON
+    // Costruttuctor without JSON savings
     public SearchNode(State s1, Object action, SearchNode father, float g, float h) {
         super(s1, action, father, g);
-        this.f = h; //controlla
+        this.f = h; 
         this.jsonRepresentation = null;
-        this.id = -1;
-        this.parentId = null;
+        this.id = nextId++;
+        this.parentId = (father != null) ? father.getId() : null;
     }
 
-    // Costruttore principale con supporto JSON ed eventi
+    // Constrructor with JSON savings
     public SearchNode(State s1, Object action, SearchNode father, float gValue, float fExt, float hValue, boolean jsonSaving) {
         super(s1, action, father, gValue);
         this.f = fExt;
         this.hValue = hValue;
-        this.id = NEXT_ID++;
         this.parentId = (father != null) ? father.getId() : null;
+        this.id = nextId++;
 
         if (action instanceof Integer act) {
             this.waitingPoints = act;
@@ -82,11 +75,11 @@ public class SearchNode extends SimpleSearchNode {
         }
     }
 
-    // Costruttore alternativo usato per casi speciali
+    // Constructor only used for init-state
     public SearchNode(State s1, float gValue, float fExt, float hValue, boolean savingJson) {
         super(s1, 0, null, gValue);
         this.f = fExt;
-        this.id = NEXT_ID++;
+        this.id = 0;
         this.parentId = null;
 
         if (savingJson) {
@@ -123,7 +116,6 @@ public class SearchNode extends SimpleSearchNode {
     }
 
     
-    // Getter per transition
     public Object getTransition() {
         return transition;
     }
@@ -144,11 +136,6 @@ public class SearchNode extends SimpleSearchNode {
         }
     }
 
-    public void notifyClosed() {
-        if (eventLogger != null) {
-            eventLogger.logClose(this);
-        }
-    }
 
     public void printJson(String file_name) {
         try (FileWriter file = new FileWriter(file_name)) {
@@ -171,14 +158,12 @@ public class SearchNode extends SimpleSearchNode {
         return s.toString();
     }
 
+    //Give the JSON representation of the state
     public Object getJsonState() {
-        // Prova a restituire lo stato in formato JSON, anche se jsonRepresentation è null
         String stateStr = s.toString();
         try {
-            // Prova a parsare la stringa come JSON
             return new JSONParser().parse(stateStr);
         } catch (ParseException ex) {
-            // Se fallisce, restituisci la stringa originale
             return stateStr;
         }
     }

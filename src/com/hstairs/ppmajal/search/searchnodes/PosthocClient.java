@@ -13,7 +13,6 @@ public class PosthocClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake handshakedata) {
         System.out.println("Connessione aperta");
-        // Messaggio di benvenuto opzionale
         send("{\"event\":\"test\",\"message\":\"Connessione stabilita\"}");
     }
 

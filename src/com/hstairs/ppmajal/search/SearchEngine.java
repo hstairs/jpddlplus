@@ -20,18 +20,14 @@ public abstract class SearchEngine {
     final boolean helpfulActions;
     private SearchNode searchSpaceHandle;
 
-
-    // 🔹 Aggiunto logger per eventi
     protected SearchEventLogger eventLogger;
 
     protected SearchEngine(boolean helpfulActionsPruning) {
         this.helpfulActions = helpfulActionsPruning;
     }
 
-    // 🔹 Setter per permettere a PDDLPlanner di passare il logger
     public void setEventLogger(SearchEventLogger logger) {
         this.eventLogger = logger;
-        SearchNode.setEventLogger(logger);  // in modo che anche i nodi possano accedervi
     }
 
     public abstract SearchStats getStats();

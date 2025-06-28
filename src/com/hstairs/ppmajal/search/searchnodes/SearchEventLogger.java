@@ -35,11 +35,9 @@ public class SearchEventLogger {
         event.put("g", node.getG());
         event.put("heuristicValue", node.getHValue());
 
-        // Usa sempre node.getJsonState() per ottenere lo stato, come già fatto.
         Object state = node.getJsonState();
         event.put("state", state);
 
-        // Per il diff puoi lasciare vuoto o adattare se necessario
         //event.put("diff", new JSONObject());
 
         events.put(event);
@@ -99,14 +97,13 @@ public class SearchEventLogger {
         root.put("events", events);
         System.out.println("Successfully Copied JSON Events to File...");
         try (FileWriter file = new FileWriter(filename)) {
-            file.write(root.toString(2)); // formato leggibile
+            file.write(root.toString(2)); 
             file.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // Estrae lo stato come mappa chiave/valore da una stringa di stato
     private Map<String, String> extractStateMap(String stateStr) {
         Map<String, String> stateMap = new HashMap<>();
         String[] lines = stateStr.split("\\n");
@@ -115,12 +112,10 @@ public class SearchEventLogger {
             for (String atom : atoms) {
                 atom = atom.trim();
                 if (atom.isEmpty()) continue;
-                // Gestione predicati booleani e funzioni numeriche
                 if (atom.contains("=")) {
-                    // Esempio: (d)=0.0
                     int idx = atom.indexOf(")=");
                     if (idx > 0) {
-                        String key = atom.substring(0, idx+1); // include la parentesi
+                        String key = atom.substring(0, idx+1); 
                         String value = atom.substring(idx+2);
                         stateMap.put(key, value);
                     }
@@ -132,7 +127,6 @@ public class SearchEventLogger {
                         stateMap.put(key, value);
                     }
                 } else if (atom.startsWith("(") && atom.endsWith(")")) {
-                    // Predicato booleano true implicito
                     stateMap.put(atom, "true");
                 }
             }
@@ -140,13 +134,12 @@ public class SearchEventLogger {
         return stateMap;
     }
 
-    // Calcola il diff tra due stati (padre e figlio)
+    // Compute diff between 2 states (father and son)
     private JSONObject computeDiff(String parentStateStr, String childStateStr) {
         Map<String, String> parent = extractStateMap(parentStateStr);
         Map<String, String> child = extractStateMap(childStateStr);
         JSONObject diff = new JSONObject();
 
-        // Trova cambiamenti e nuovi valori
         for (String key : child.keySet()) {
             String childVal = child.get(key);
             String parentVal = parent.get(key);
@@ -157,7 +150,6 @@ public class SearchEventLogger {
                 diff.put(key, change);
             }
         }
-        // Trova valori rimossi
         for (String key : parent.keySet()) {
             if (!child.containsKey(key)) {
                 JSONObject change = new JSONObject();

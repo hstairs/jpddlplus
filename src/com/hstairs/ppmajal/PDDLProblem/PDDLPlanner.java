@@ -59,7 +59,6 @@ public class PDDLPlanner {
 
         if (enableEventLogging) {
             this.eventLogger = new SearchEventLogger();
-            SearchNode.setEventLogger(eventLogger);
         }
     }
 
