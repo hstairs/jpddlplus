@@ -1936,5 +1936,22 @@ public class PDDLProblem implements SearchProblem {
         return res;
     }
 
+    public int getTotNumberOfNumVariables(){
+        return totNumberOfNumVariables;
+    }
+
+    public int getTotNumberOfBoolVariables(){
+        return totNumberOfBoolVariables;
+    }
+
+    /*public void createSubGoals(){
+        for(var action : this.actions){
+            Condition c = action.getPreconditions();
+        }
+    }
+    public int getNumSubGoals(){
+        return nSubGoals;
+    }*/
+
 
 }
