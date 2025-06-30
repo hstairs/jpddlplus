@@ -15,6 +15,7 @@ public abstract class NoveltyHeuristic implements SearchHeuristic {
   protected final int nNumFluents;
   protected final int nBoolFluents;
   protected final int nFluents;
+  //protected final int nSubgoals;
   protected final PDDLProblem problem;
   int level0Novel = 0;
   int level1Novel = 0;
@@ -32,6 +33,7 @@ public abstract class NoveltyHeuristic implements SearchHeuristic {
     nBoolFluents = problem.getTotNumberOfBoolVariables();
     nNumFluents = problem.getTotNumberOfNumVariables();
     nFluents = nBoolFluents + nNumFluents;
+    //nSubgoals = problem.getNumSubgoals();
 
     // technically we can have negative QB heuristics, but ensuring positivity is nice
     C1 = nFluents;

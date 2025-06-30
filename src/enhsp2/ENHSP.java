@@ -300,7 +300,7 @@ public class ENHSP {
         options.addOption("npm",false,"PDDL+ feature: Do not print makespan in the plan");
         options.addOption("pai",false,"Print all info before search");
         options.addOption("ea",true,"Effect abstraction mode for non-constants effects");
-        options.addOption("aibr-debug",false,"Enable AIBR debug logging");
+        options.addOption("aibr_debug",false,"Enable AIBR debug logging");
 
         CommandLineParser parser = new DefaultParser();
         try {
