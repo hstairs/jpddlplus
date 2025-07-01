@@ -5,10 +5,7 @@ import com.hstairs.ppmajal.conditions.AndCond;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.*;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.experimental.H1Fix;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.experimental.H1Res;
-import com.hstairs.ppmajal.pddl.heuristics.novelty.AtomQuantifiedBothHeuristic;
-import com.hstairs.ppmajal.pddl.heuristics.novelty.AtomWidthHeuristic;
-import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
-import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalWidthHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.novelty.*;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 
@@ -45,6 +42,9 @@ public class PDDLNovelyHeuristic {
                     case 1: return new IntervalWidthHeuristic(heuristicProblem, 1, new SearchHeuristic[]{h});
                     case 2: return new IntervalWidthHeuristic(heuristicProblem, 2, new SearchHeuristic[]{h});
                 }
+            }
+            case "subG": {
+                return new SubGoalingNoveltyHeuristic(heuristicProblem, 1, h);
             }
             default:
                 System.out.println("Input heuristic is not supported. Interval quantified both novelty is used.");

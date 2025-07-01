@@ -1,9 +1,12 @@
 package com.hstairs.ppmajal.pddl.heuristics.novelty;
 
+import com.hstairs.ppmajal.conditions.Terminal;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.objects.NumericIntervalAssignment;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
+
+import java.util.List;
 
 public abstract class NoveltyHeuristic implements SearchHeuristic {
 
@@ -15,7 +18,7 @@ public abstract class NoveltyHeuristic implements SearchHeuristic {
   protected final int nNumFluents;
   protected final int nBoolFluents;
   protected final int nFluents;
-  //protected final int nSubgoals;
+  protected final int nSubgoals;
   protected final PDDLProblem problem;
   int level0Novel = 0;
   int level1Novel = 0;
@@ -33,11 +36,12 @@ public abstract class NoveltyHeuristic implements SearchHeuristic {
     nBoolFluents = problem.getTotNumberOfBoolVariables();
     nNumFluents = problem.getTotNumberOfNumVariables();
     nFluents = nBoolFluents + nNumFluents;
-    //nSubgoals = problem.getNumSubgoals();
-
     // technically we can have negative QB heuristics, but ensuring positivity is nice
     C1 = nFluents;
     C2 = (nFluents * (nFluents - 1)) / 2;
+
+    // For subgoalHeursitic
+    nSubgoals = problem.createSubgoals().size();
   }
 
   protected float computeHeuristic(SearchHeuristic h, State s) {
@@ -80,8 +84,7 @@ public abstract class NoveltyHeuristic implements SearchHeuristic {
   }
 
   public enum NoveltyType {
-    ATOM, INTERVAL,
+    ATOM, INTERVAL, SUBGOAL
   }
 
-  //Implementare il getTransition per verificare helpful/jumping actions
 }
