@@ -7,16 +7,15 @@ import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.Set;
 
 public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
 
     final SearchHeuristic heuristic;
     Terminal[] subgoalConditions;
     Float[] subgoalHeuristic;
-    List<Terminal> subgoalsList;
+    Set<Terminal> subgoalsList;
     float qbl1, qbu1;
     float h;
 

@@ -17,11 +17,7 @@
  * MA 02110-1301  USA
  */
 
-
-import com.hstairs.ppmajal.conditions.Terminal;
 import enhsp2.ENHSP;
-
-import java.util.List;
 
 public class main {
 
@@ -30,7 +26,6 @@ public class main {
         p.parseInput(args);
         p.configurePlanner();
         p.parsingDomainAndProblem(args);
-        List<Terminal> subgoals = p.getProblem().createSubgoals();
         p.planning();
     }
 }

@@ -1944,7 +1944,7 @@ public class PDDLProblem implements SearchProblem {
         return totNumberOfBoolVariables;
     }
 
-    private void getSubgoalsFromPreconditions(Condition c, List<Terminal> results){
+    private void getSubgoalsFromPreconditions(Condition c, Set<Terminal> results){
         if(c instanceof Terminal){
             results.add((Terminal) c);
         } else if (c instanceof ComplexCondition){
@@ -1956,15 +1956,15 @@ public class PDDLProblem implements SearchProblem {
         }
     }
 
-    private List<Terminal> collectTerminalConditions(Condition c)
+    private Set<Terminal> collectTerminalConditions(Condition c)
     {
-        List<Terminal> result = new ArrayList();
+        Set<Terminal> result = new HashSet<>();
         getSubgoalsFromPreconditions(c, result);
         return result;
     }
 
-    public List<Terminal> createSubgoals(){
-        List<Terminal> subgoals = new ArrayList<>();
+    public Set<Terminal> createSubgoals(){
+        Set<Terminal> subgoals = new HashSet<>();
         for(var action: this.actions){
             Condition c = action.getPreconditions();
             subgoals.addAll(collectTerminalConditions(c));
