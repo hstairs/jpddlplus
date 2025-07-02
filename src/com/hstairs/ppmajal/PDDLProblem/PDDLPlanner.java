@@ -86,11 +86,10 @@ public class PDDLPlanner {
                 searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, enableEventLogging, boundG);
                 break;
             case "ehs":
-                searchEngine = new EHS(hWeigth, helpfulActions, tb, saveSearchSpace, enableEventLogging);
+                searchEngine = new EHS(helpfulActions);
                 break;
             case "ida":
-                searchEngine = new IDAStar(hWeigth, helpfulActions, saveSearchSpace, enableEventLogging);
-                break;
+                searchEngine = new IDAStar(helpfulActions, hWeigth, false, false, false, System.out);
             case "lazygbfs":
                 searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG, enableEventLogging);
                 break;
