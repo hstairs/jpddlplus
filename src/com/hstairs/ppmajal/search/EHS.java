@@ -14,10 +14,12 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 public class EHS extends SearchEngine {
+    final protected boolean enableEventLogging;
 
 
-    public EHS(boolean helpfulActionsPruning) {
+    public EHS(boolean helpfulActionsPruning, boolean enableEventLogging) {
         super(helpfulActionsPruning);
+        this.enableEventLogging = enableEventLogging;
     }
 
     @Override
@@ -37,17 +39,29 @@ public class EHS extends SearchEngine {
             return null;
         }
         SearchNode current = new SearchNode(p.getInit(),null,null,0,0);
+        //generazione del nodo iniziale
+        if (eventLogger != null && enableEventLogging) {
+            eventLogger.logGenerate(current, null);
+        }
         LinkedList<Pair<BigDecimal, Object>> plan = new LinkedList<>();
         Object visited = null;
         visited = new Object2BooleanLinkedOpenHashMap();
         ((Object2BooleanMap<State>) visited).put(current.s, true);
         while (true) {
             final Boolean b = p.goalSatisfied(current.s);
+            // Log event "expand" (when checked if the state satisfies the goal)
+            if (eventLogger != null && enableEventLogging) {
+                eventLogger.logExpand(current);
+            }
             if (b == null) {
                 break;
             }else if (b) {
                     totalTime = System.currentTimeMillis()-startTime;
-                    return current;
+                    // Log event "close" for the goal node
+                    if (eventLogger != null && enableEventLogging) {
+                        eventLogger.logClose(current);
+                    }
+                    return current;    
                 }
             final SearchNode succ = oldBreathFirstSearchImplementation(current, p,h,
                     (Object2BooleanMap<State>) visited, System.out);
@@ -109,6 +123,10 @@ public class EHS extends SearchEngine {
                     if (d != Float.MAX_VALUE) {// && d <= current_value) {
                         nodesEvaluated++;
                         SearchNode newNode = new SearchNode(temp, act, node, newG, 0);
+                        // Log evento "generate"
+                        if (eventLogger != null && enableEventLogging) {
+                            eventLogger.logGenerate(newNode, node);
+                        }
                         frontier.add(newNode);
                         if (this.helpfulActions) {
                             newNode.helpfulActions = heuristic.getTransitions(true);

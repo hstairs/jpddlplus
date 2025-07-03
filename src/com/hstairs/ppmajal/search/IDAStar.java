@@ -24,14 +24,17 @@ public class IDAStar extends SearchEngine {
     private long startTime;
     private long previousTime;
     private long timeout = Long.MAX_VALUE;
+    final protected boolean enableEventLogging;
 
-    public IDAStar(boolean helpfulActionsPruning, float hWeigth, boolean idaStarWithMemory, boolean checkAlongPrefix, boolean showExpansion, PrintStream out) {
+
+    public IDAStar(boolean helpfulActionsPruning, float hWeigth, boolean idaStarWithMemory, boolean checkAlongPrefix, boolean showExpansion, PrintStream out, boolean enableEventLogging) {
         super(helpfulActionsPruning);
         this.hWeigth = hWeigth;
         this.idaStarWithMemory = idaStarWithMemory;
         this.checkAlongPrefix = checkAlongPrefix;
         this.showExpansion = showExpansion;
         this.out = out;
+        this.enableEventLogging = enableEventLogging;
     }
 
     @Override
@@ -91,6 +94,10 @@ public class IDAStar extends SearchEngine {
         final Stack<IdaStarSearchNode> frontier = new Stack();
 
         IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0);
+        //generazione del nodo iniziale
+        if (eventLogger != null && enableEventLogging) {
+            eventLogger.logGenerateIda(init, null);
+        }
         causalDeadEnds = 0;
         frontier.push(init);
         float newBound = Float.POSITIVE_INFINITY;
@@ -148,6 +155,10 @@ public class IDAStar extends SearchEngine {
                     }
                 } else {
                     final Boolean goalSatisfied = problem.goalSatisfied(node.s);
+                    // Log evento "expand"
+                    if (eventLogger != null && enableEventLogging) {
+                        eventLogger.logExpandIda(node);
+                    }
                     if (goalSatisfied != null) {
                         if (goalSatisfied) {
                             if (anytime) {
@@ -155,7 +166,11 @@ public class IDAStar extends SearchEngine {
                                 out.println("Found solution of cost:" + bound);
                                 bestSol = node;
                             } else {
-                                return new Pair(node, newBound);
+                                // Log evento "close" (goal found)
+                                if (eventLogger != null && enableEventLogging) {
+                                    eventLogger.logCloseIda(node);
+                                }
+                                return new Pair(node, newBound);                              
                             }
                         } else {
 
@@ -170,8 +185,17 @@ public class IDAStar extends SearchEngine {
                                 if (push) {
                                     node.numberOfSons++;
                                     atLeastOne = true;
-                                    frontier.push(new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g));
+                                    IdaStarSearchNode nextNode = new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g);
+                                    // Log evento "generate"
+                                    if (eventLogger != null && enableEventLogging) {
+                                        eventLogger.logGenerateIda(nextNode, node);
+                                    }
+                                    frontier.push(nextNode);
                                 }
+                            }
+                            // Log evento "close"
+                            if (eventLogger != null && enableEventLogging) {
+                                eventLogger.logCloseIda(node);
                             }
                             if (!atLeastOne) {
                                 if (idastarWithMemory) {

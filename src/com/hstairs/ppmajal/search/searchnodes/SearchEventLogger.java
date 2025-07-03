@@ -44,6 +44,22 @@ public class SearchEventLogger {
         sendEventWS(event);
     }
 
+    public void logExpandIda(IdaStarSearchNode node) {
+        JSONObject event = new JSONObject();
+        event.put("type", "expand");
+        event.put("id", node.getId());
+        event.put("pId", node.getParentId());
+        event.put("g", node.getG());
+
+        Object state = node.getJsonState();
+        event.put("state", state);
+
+        //event.put("diff", new JSONObject());
+
+        events.put(event);
+        sendEventWS(event);
+    }
+
     public void logGenerate(SearchNode node, SearchNode parent) {
         JSONObject event = new JSONObject();
         event.put("type", "generate");
@@ -52,6 +68,33 @@ public class SearchEventLogger {
         event.put("f", node.getF());
         event.put("g", node.getG());
         event.put("heuristicValue", node.getHValue());
+        if (node.getParentId() == null) {
+            event.put("action", "init_state");
+        } else if (node.getTransition() == null) {
+            event.put("list_of_actions", "waiting");
+        } else {
+            event.put("action", node.getTransition().toString());
+        }
+
+        Object state = node.getJsonState();
+        event.put("state", state);
+
+        String childStateStr = node.getState();
+        String parentStateStr = parent != null ? parent.getState() : "";
+        JSONObject diff = computeDiff(parentStateStr, childStateStr);
+
+        event.put("diff", diff);
+
+        events.put(event);
+        sendEventWS(event);
+    }
+
+    public void logGenerateIda(IdaStarSearchNode node, IdaStarSearchNode parent) {
+        JSONObject event = new JSONObject();
+        event.put("type", "generate");
+        event.put("id", node.getId());
+        event.put("pId", node.getParentId());
+        event.put("g", node.getG());
         if (node.getParentId() == null) {
             event.put("action", "init_state");
         } else if (node.getTransition() == null) {
@@ -82,6 +125,22 @@ public class SearchEventLogger {
         event.put("g", node.getG());
         event.put("heuristicValue", node.getHValue());
 
+
+        Object state = node.getJsonState();
+        event.put("state", state);
+
+        //event.put("diff", new JSONObject());
+
+        events.put(event);
+        sendEventWS(event);
+    }
+
+    public void logCloseIda(IdaStarSearchNode node) {
+        JSONObject event = new JSONObject();
+        event.put("type", "close");
+        event.put("id", node.getId());
+        event.put("pId", node.getParentId());
+        event.put("g", node.getG());
 
         Object state = node.getJsonState();
         event.put("state", state);
