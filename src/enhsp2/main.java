@@ -18,7 +18,6 @@
  */
 
 import enhsp2.ENHSP;
-
 public class main {
 
     public static void main(String[] args) throws Exception {
@@ -27,5 +26,6 @@ public class main {
         p.configurePlanner();
         p.parsingDomainAndProblem(args);
         p.planning();
+
     }
 }
