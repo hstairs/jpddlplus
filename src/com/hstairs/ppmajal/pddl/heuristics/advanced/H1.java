@@ -656,6 +656,7 @@ public class H1 implements SearchHeuristic {
                         for (final NumEffect ne : cp.numericEffectFunction()[t]) {
                             NumFluent fluentAffected = ne.getFluentAffected();
                             if (ad.bin.getInvolvedNumericFluents().contains(fluentAffected)) {
+                                setNumericContribution(t, comp.getId(), UNKNOWNEFFECT);
                                 return UNKNOWNEFFECT;
                             }
                         }
@@ -679,6 +680,7 @@ public class H1 implements SearchHeuristic {
                                     positiveness += (-1) * rhs.getNumber().floatValue() * ad.n.floatValue();
                                 }
                             } else {//The effect is state dependent.
+                                setNumericContribution(t, comp.getId(), UNKNOWNEFFECT);
                                 return UNKNOWNEFFECT;
                             }
                         }
