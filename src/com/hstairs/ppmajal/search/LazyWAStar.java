@@ -65,6 +65,7 @@ public class LazyWAStar extends WAStar {
         previous = 0;
         while (!frontier.isEmpty()) {
             final SearchNode currentNode = frontier.dequeue();
+            if(this.extenalLogger != null) this.extenalLogger.log(currentNode);
             if (currentNode.gValue == getPreviousCost(gValueMap, currentNode.s)) {
                 nodesExpanded++;
                 long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);

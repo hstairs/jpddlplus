@@ -7,6 +7,7 @@ import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -26,11 +27,12 @@ public class PDDLPlanner {
     final private boolean saveSearchSpace;
     private final float boundG;
     private SearchEngine searchEngine;
+    private IExternalLogger extenalLogger;
 
     public PDDLPlanner(String search, String heuristic, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit) {
+                       boolean saveSearchSpace, float depthLimit, IExternalLogger extenalLogger) {
         this.search = search;
         this.heuristic = heuristic;
         this.redundantConstraints = redundantConstraints;
@@ -42,6 +44,14 @@ public class PDDLPlanner {
         this.t = t;
         this.saveSearchSpace = saveSearchSpace;
         this.boundG = depthLimit;
+        this.extenalLogger = extenalLogger;
+    }
+
+    public PDDLPlanner(String search, String heuristic, String redundantConstraints,
+                       boolean helpfulActionPruning, boolean helpfulTransitions,
+                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
+                       boolean saveSearchSpace, float depthLimit) {
+        this(search, heuristic, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t, saveSearchSpace, depthLimit, null);
     }
     public SearchNode searchSpaceHandle;
     public PDDLSolution plan(PDDLProblem p, SearchHeuristic h){
@@ -81,6 +91,7 @@ public class PDDLPlanner {
                 searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG);
                 break;
         }
+        searchEngine.setExtenalLogger(this.extenalLogger);
 
         final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);
         if (solutionHandle == null)

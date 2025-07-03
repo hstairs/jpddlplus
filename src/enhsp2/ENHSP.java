@@ -5,6 +5,8 @@ import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.enhsp2.SimpleExternalLogger;
+import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -505,6 +507,7 @@ public class ENHSP {
     }
 
     private LinkedList<ImmutablePair<BigDecimal, TransitionGround>> search() throws Exception {
+        IExternalLogger extenalLogger = new SimpleExternalLogger();
 
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
                 heuristic,
@@ -514,7 +517,8 @@ public class ENHSP {
                 wh != null ? Float.parseFloat(this.wh) : (float) 1.0,
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
-                tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit
+                tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
+                extenalLogger
                 );
 
         if (savingSearchSpaceJson) {

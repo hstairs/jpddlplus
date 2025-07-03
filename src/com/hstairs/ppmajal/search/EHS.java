@@ -80,6 +80,7 @@ public class EHS extends SearchEngine {
         float current_gn = 0;
         while (!frontier.isEmpty()) {
             SearchNode node = frontier.poll();
+            if(this.extenalLogger != null) this.extenalLogger.log(node);
             nodesExpanded++;
             if (node.gValue > current_gn) {
                 out.println(" " + node.gValue);

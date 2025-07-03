@@ -99,6 +99,7 @@ public class IDAStar extends SearchEngine {
         IdaStarSearchNode bestSol = null;
         while (!frontier.isEmpty()) {
             final IdaStarSearchNode node = frontier.pop();
+            if(this.extenalLogger != null) this.extenalLogger.log(node);
             long now = System.currentTimeMillis();
             if (now - this.startTime > timeout) {
                 throw new TimeoutException("");
