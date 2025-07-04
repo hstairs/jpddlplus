@@ -39,6 +39,10 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         }*/
     }
 
+    private void calcNovelty(int k, float[] upperBounds, float[] lowerBounds, NoveltyIndexer[] indexers){
+
+    }
+
 
     @Override
     public float computeEstimate(State stateInput) {
@@ -49,9 +53,9 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         }
 
         for (int end = 0; end < k; end++) {
-
-            if(end == k-1){
-                return 0;
+            calcNovelty(k, upperBounds, lowerBounds, indexers);
+            if(lowerBounds[end]< indexers[end].size()){
+                return lowerBounds[end] + totalNumberOfTuples(end, indexers);
             }
         }
 /*
@@ -66,6 +70,16 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         }
         return qbl1 < nSubgoals ? qbl1 : qbu1; */
         return 0;
+    }
+
+    private int totalNumberOfTuples(int k, NoveltyIndexer[] indexers) {
+        int total=0;
+        if(k==1)
+            return total;
+        for(int i = 0; i<k; i++){
+            total = total + (int)indexers[i].size();
+        }
+        return total;
     }
 
     @Override
