@@ -9,6 +9,7 @@ import com.hstairs.ppmajal.pddl.heuristics.novelty.objects.NoveltyIndexer;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
 
@@ -39,9 +40,23 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         }*/
     }
 
-    private void calcNovelty(int k, float[] upperBounds, float[] lowerBounds, NoveltyIndexer[] indexers){
+    private void calcNovelty(int k, State s) {
+        int n = subgoalConditions.length;
 
+        iterateCombinations(k, n, combination -> {
+            for (int index : combination) {
+                if (subgoalConditions[index].isSatisfied(s)) {
+                    if (h < indexers[k-1].get(combination)) {
+                        indexers[k-1].set(combination, h);
+                        lowerBounds[k-1]--;
+                    }
+                } else {
+                    upperBounds[k-1]++;
+                }
+            }
+        });
     }
+
 
 
     @Override
@@ -53,9 +68,12 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         }
 
         for (int end = 0; end < k; end++) {
-            calcNovelty(k, upperBounds, lowerBounds, indexers);
-            if(lowerBounds[end]< indexers[end].size()){
-                return lowerBounds[end] + totalNumberOfTuples(end, indexers);
+            calcNovelty(end+1, stateInput);
+        }
+
+        for(int i = 0; i<k; i++){
+            if(lowerBounds[i]< indexers[i].size()){
+                return lowerBounds[i] + totalNumberOfTuples(i+1, indexers);
             }
         }
 /*
@@ -69,11 +87,10 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
             else qbu1++;
         }
         return qbl1 < nSubgoals ? qbl1 : qbu1; */
-        return 0;
+        return upperBounds[k-1];
     }
 
-    private int totalNumberOfTuples(int k, NoveltyIndexer[] indexers) {
-        int total=0;
+    private int totalNumberOfTuples(int k, NoveltyIndexer[] indexers) {        int total=0;
         if(k==1)
             return total;
         for(int i = 0; i<k; i++){
@@ -81,6 +98,23 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         }
         return total;
     }
+
+    private void iterateCombinations(int k, int n, Consumer<int[]> callback) {
+        int[] indices = new int[k];
+        generateCombinations(indices, 0, 0, k, n, callback);
+    }
+
+    private void generateCombinations(int[] indices, int depth, int start, int k, int n, Consumer<int[]> callback) {
+        if (depth == k) {
+            callback.accept(indices.clone());
+            return;
+        }
+        for (int i = start; i < n; i++) {
+            indices[depth] = i;
+            generateCombinations(indices, depth + 1, i + 1, k, n, callback);
+        }
+    }
+
 
     @Override
     public Object[] getTransitions(boolean helpful) {
