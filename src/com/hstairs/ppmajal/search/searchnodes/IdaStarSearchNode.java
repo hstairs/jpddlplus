@@ -10,7 +10,7 @@ public class IdaStarSearchNode extends SimpleSearchNode {
 
     public int numberOfSons;
     public float minSoFar;
-    private static int nextId = 0; //only way tohav a global ID for all nodes
+    private static int nextId = 0; //only way to have a global ID for all nodes
     private final int id;
     private final Integer parentId;
 

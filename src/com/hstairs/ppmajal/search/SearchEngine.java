@@ -27,7 +27,7 @@ public abstract class SearchEngine {
     }
 
     public void setEventLogger(SearchEventLogger logger) {
-        this.eventLogger = logger;
+        this.eventLogger = logger; 
     }
 
     public abstract SearchStats getStats();
@@ -41,7 +41,7 @@ public abstract class SearchEngine {
     }
 
     public void initHandle(SearchNode init){
-        searchSpaceHandle = init;
+        searchSpaceHandle = init; //this needs to have an handle on the initial state for saving it into a json file
     }
 
     public SearchNode getSearchSpaceHandle() {
@@ -54,7 +54,7 @@ public abstract class SearchEngine {
         LinkedList plan = new LinkedList<>();
         lastState = c.s;
         while (c.transition != null) {
-            if (c.transition != null) {
+            if (c.transition != null) { //this is an action
                 plan.addFirst(c.transition);
             }
             c = c.father;
