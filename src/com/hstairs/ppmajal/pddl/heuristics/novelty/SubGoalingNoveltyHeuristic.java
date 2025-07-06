@@ -44,16 +44,23 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
         int n = subgoalConditions.length;
 
         iterateCombinations(k, n, combination -> {
+            boolean allSatisfied = true;
             for (int index : combination) {
-                if (subgoalConditions[index].isSatisfied(s)) {
-                    if (h < indexers[k-1].get(combination)) {
-                        indexers[k-1].set(combination, h);
-                        lowerBounds[k-1]--;
-                    }
-                } else {
-                    upperBounds[k-1]++;
+                if (!subgoalConditions[index].isSatisfied(s)) {
+                    allSatisfied = false;
+                    break;
                 }
             }
+
+            if (allSatisfied) {
+                if (h < indexers[k-1].get(combination)) {
+                    indexers[k-1].set(combination, h);
+                    lowerBounds[k-1]--;
+                }
+            } else {
+                upperBounds[k-1]++;
+            }
+
         });
     }
 
