@@ -56,9 +56,9 @@ public class SubGoalingNoveltyHeuristic extends NoveltyHeuristic{
                 if (h < indexers[k-1].get(combination)) {
                     indexers[k-1].set(combination, h);
                     lowerBounds[k-1]--;
+                } else if (h > indexers[k-1].get(combination)) {
+                    upperBounds[k-1]++;
                 }
-            } else {
-                upperBounds[k-1]++;
             }
 
         });
