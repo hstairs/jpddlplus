@@ -46,6 +46,9 @@ public class PDDLNovelyHeuristic {
             case "subG": {
                 return new SubGoalingNoveltyHeuristic(heuristicProblem, k, h);
             }
+            case "isubg":{
+                return new IntervalSubGoalingQBHeurisitc(heuristicProblem, 1, h);
+            }
             default:
                 System.out.println("Input heuristic is not supported. Interval quantified both novelty is used.");
                 return new IntervalQuantifiedBothHeuristic(heuristicProblem, 1, h);
