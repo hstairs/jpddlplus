@@ -1,0 +1,8 @@
+*.class
+/build/
+/out/
+/target/
+/output/
+*.log
+*.tmp
+.DS_Store
