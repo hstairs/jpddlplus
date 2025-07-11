@@ -334,7 +334,7 @@ public class PDDLProblem implements SearchProblem {
         }
         if (!this.simplifyAndSetupInit(aibrPreprocessing))
             return false;
-        groundGoals = generate_inequalities(getGoals());
+        //groundGoals = generate_inequalities(getGoals());
         readyForSearch = true;
         return true;
     }
