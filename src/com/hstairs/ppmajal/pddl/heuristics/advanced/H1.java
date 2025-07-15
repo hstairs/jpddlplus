@@ -858,6 +858,9 @@ public class H1 implements SearchHeuristic {
         if (Double.isNaN(eval)){
             return 1.0f;
         }
+        if (((Comparison) t).isStrict && this.isAdditive()){
+            return (float) (-1f * eval / v)+Float.MIN_VALUE;
+        }
         return (float) (-1f * eval / v);
     }
 
