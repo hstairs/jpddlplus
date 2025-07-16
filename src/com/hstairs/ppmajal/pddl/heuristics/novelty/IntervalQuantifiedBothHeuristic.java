@@ -129,7 +129,6 @@ public class IntervalQuantifiedBothHeuristic extends NoveltyHeuristic {
       NumericIntervalAssignment iVarVal = tempNumIntAssignments.get(iVar);
       for (Integer jVal : stateBoolFluents) {
         Pair<Integer, NumericIntervalAssignment> a2 = new Pair<>(jVal, iVarVal);
-
         if (!bnNoveltyMap.containsKey(a2) || h < bnNoveltyMap.get(a2)) {
           qbl2--;
           bnNoveltyMap.put(a2, h);

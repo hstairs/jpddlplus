@@ -23,14 +23,16 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
 
     Map<Integer, Float> b1NoveltyMap;
     Map<NumericIntervalAssignment, Float> n1NoveltyMap;
-    //Map<Pair<Integer, Integer>, Float> b2NoveltyMap;
+    Map<Pair<Integer, Integer>, Float> b2NoveltyMap;
     Map<Pair<NumericIntervalAssignment, NumericIntervalAssignment>, Float> n2NoveltyMap;
-    //Map<Pair<Integer, NumericIntervalAssignment>, Float> bnNoveltyMap;
+    Map<Pair<Integer, NumericIntervalAssignment>, Float> bnNoveltyMap;
 
     // temporary interval assignment from a state
-    //private final List<NumericIntervalAssignment> tempNumIntAssignments;
+    private final List<NumericIntervalAssignment> tempNumIntAssignments;
 
     // variables to help compute heuristic
+    float C1;
+    float C2;
     float qbl1, qbu1;
     float qbl2, qbu2;
     List<Integer> stateBoolFluents;
@@ -51,22 +53,25 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
         List<Float> s0Distances = new ArrayList<>();
         intervals = new ArrayList<>();
         for(int i=0;i<subgoalConditions.length;i++) {
-            s0Distances.add(evalGoalDistance(subgoalConditions[i], s0));
+            s0Distances.add(Float.POSITIVE_INFINITY);
             intervals.add(new Interval(s0Distances.get(i)));
         }
         b1NoveltyMap = new HashMap<>();
         n1NoveltyMap = new HashMap<>();
-        //b2NoveltyMap = new HashMap<>();
-        //n2NoveltyMap = new HashMap<>();
-        //bnNoveltyMap = new HashMap<>();
+        b2NoveltyMap = new HashMap<>();
+        n2NoveltyMap = new HashMap<>();
+        bnNoveltyMap = new HashMap<>();
 
-        //tempNumIntAssignments = new ArrayList<>(Collections.nCopies(nNumFluents, null));
+        tempNumIntAssignments = new ArrayList<>(Collections.nCopies(subgoalConditions.length, null));
+
+        C1 = subgoalConditions.length+nBoolFluents;
+        C2 = (C1 * (C1-1))/2;
     }
 
 
     private void hqb1(State state) {
-        qbl1 = subgoalConditions.length+nBoolFluents;
-        qbu1 = subgoalConditions.length+nBoolFluents;
+        qbl1 = C1;
+        qbu1 = C1;
 
         for (Integer a1 : stateBoolFluents) {
             Float h1 = b1NoveltyMap.get(a1);
@@ -82,38 +87,24 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
             int iInterval = intervals.get(i).getInterval(distance);
             NumericIntervalAssignment a1 = new NumericIntervalAssignment(i, iInterval);
             Float h1 = n1NoveltyMap.get(a1);
-            if (h1 == null || h < h1 || h==0.0f) {
+            if (h1 == null || h < h1) {
                 qbl1--;
                 n1NoveltyMap.put(a1, h);
             } else if (h > h1) {
                 qbu1++;
             }
         }
-        /*for (int var = 0; var < nNumFluents; var++) {
-            int iInterval = intervals.get(var).getInterval(stateNumFluents.get(var));
-            NumericIntervalAssignment a1 = new NumericIntervalAssignment(var, iInterval);
-            //tempNumIntAssignments.set(var, a1);
-            if (!n1NoveltyMap.containsKey(a1) || h < n1NoveltyMap.get(a1)) {
-                qbl1--;
-                n1NoveltyMap.put(a1, h);
-            } else if (h > n1NoveltyMap.get(a1)) {
-                qbu1++;
-            }
-        }*/
     }
-/*
-    private void hqb2() {
+
+    private void hqb2(State state) {
         qbl2 = C2;
         qbu2 = C2;
 
-        // 2-subsets
         for (int i = 0; i < stateBoolFluents.size(); i++) {
             Integer iVal = stateBoolFluents.get(i);
             for (int j = i + 1; j < stateBoolFluents.size(); j++) {
                 Integer jVal = stateBoolFluents.get(j);
-                // iVal < jVal because collected from bitset
                 Pair<Integer, Integer> a2 = new Pair<>(iVal, jVal);
-
                 if (!b2NoveltyMap.containsKey(a2) || h < b2NoveltyMap.get(a2)) {
                     qbl2--;
                     b2NoveltyMap.put(a2, h);
@@ -123,36 +114,42 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
             }
         }
 
-        for (int iVar = 0; iVar < stateNumFluents.\size(); iVar++) {
-            NumericIntervalAssignment iVarVal = tempNumIntAssignments.get(iVar);
-            for (int jVar = iVar + 1; jVar < stateNumFluents.size(); jVar++) {
-                NumericIntervalAssignment jVarVal = tempNumIntAssignments.get(jVar);
+        for (int i= 0; i< subgoalConditions.length; i++) {
+            float idistance = evalGoalDistance(subgoalConditions[i], state);
+            int iInterval = intervals.get(i).getInterval(idistance);
+            NumericIntervalAssignment i1 = new NumericIntervalAssignment(i, iInterval);
+            for (int j = i + 1; j < subgoalConditions.length;  j++) {
+                float jdistance = evalGoalDistance(subgoalConditions[i], state);
+                int jInterval = intervals.get(i).getInterval(jdistance);
+                NumericIntervalAssignment j1 = new NumericIntervalAssignment(j, jInterval);
                 Pair<NumericIntervalAssignment, NumericIntervalAssignment> a2 = new Pair<>(
-                        iVarVal, jVarVal);
-
-                if (!n2NoveltyMap.containsKey(a2) || h < n2NoveltyMap.get(a2)) {
+                        i1, j1);
+                Float h2=n2NoveltyMap.get(a2);
+                if (h2 == null || h < h2) {
                     qbl2--;
                     n2NoveltyMap.put(a2, h);
-                } else if (h > n2NoveltyMap.get(a2)) {
+                } else if (h > h2) {
                     qbu2++;
                 }
             }
         }
 
-        for (int iVar = 0; iVar < stateNumFluents.size(); iVar++) {
-            NumericIntervalAssignment iVarVal = tempNumIntAssignments.get(iVar);
+        for (int i= 0; i< subgoalConditions.length; i++) {
+            float idistance = evalGoalDistance(subgoalConditions[i], state);
+            int iInterval = intervals.get(i).getInterval(idistance);
+            NumericIntervalAssignment i1 = new NumericIntervalAssignment(i, iInterval);
             for (Integer jVal : stateBoolFluents) {
-                Pair<Integer, NumericIntervalAssignment> a2 = new Pair<>(jVal, iVarVal);
-
-                if (!bnNoveltyMap.containsKey(a2) || h < bnNoveltyMap.get(a2)) {
+                Pair<Integer, NumericIntervalAssignment> a2 = new Pair<>(jVal, i1);
+                Float h2 = bnNoveltyMap.get(a2);
+                if (h2 == null || h < h2) {
                     qbl2--;
                     bnNoveltyMap.put(a2, h);
-                } else if (h > bnNoveltyMap.get(a2)) {
+                } else if (h > h2) {
                     qbu2++;
                 }
             }
         }
-    }*/
+    }
 
     @Override
     public float computeEstimate(State stateInput) {
@@ -161,7 +158,18 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
         h = computeHeuristic(heuristic, stateInput);
         hqb1(stateInput);
 
-        return qbl1 < subgoalConditions.length+nBoolFluents ? qbl1 : qbu1;
+        if (k == 1) {
+            return qbl1 < C1 ? qbl1 : qbu1;
+        }
+
+        hqb2(stateInput);
+        if (qbl1 < C1) {
+            return qbl1;
+        } else if (qbl2 < C2) {
+            return C1 + qbl2;
+        } else {
+            return C1 + qbu2;
+        }
 
     }
 
