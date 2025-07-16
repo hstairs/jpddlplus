@@ -37,7 +37,7 @@ public class Comparison extends Terminal {
     private String comparator;
     private Expression left;
     private Expression right;
-
+    public final boolean isStrict;
     boolean normalized;
     //This needs to go away at some point
     public Comparison fatherFromRegression = null;
@@ -74,6 +74,10 @@ public class Comparison extends Terminal {
         this.left = left;
         this.right = right;
         this.normalized = normalized;
+        if (comparator.equals(">") || comparator.equals("<"))
+            this.isStrict = true;
+        else
+            this.isStrict = false;
 
     }
 
