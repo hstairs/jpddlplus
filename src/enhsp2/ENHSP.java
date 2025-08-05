@@ -50,24 +50,24 @@ import java.util.logging.Logger;
  */
 public class ENHSP {
 
-    private String domainFile;
-    private String problemFile;
-    private String searchEngineString;
-    private String wh;
-    private String heuristic = "aibr";
-    private String gw;
-    private boolean savingSearchSpaceJson = false;
-    private String deltaExecution;
-    private float depthLimit;
-    private String savePlan;
-    private boolean printTrace;
-    private String tieBreaking;
-    private String planner;
-    private String deltaHeuristic;
-    private String deltaPlanning;
-    private String deltaValidation;
-    private boolean helpfulActions;
-    private Integer numSubdomains;
+    String domainFile;
+    String problemFile;
+    String searchEngineString;
+    String wh;
+    String heuristic = "aibr";
+    String gw;
+    boolean savingSearchSpaceJson = false;
+    String deltaExecution;
+    float depthLimit;
+    String savePlan;
+    boolean printTrace;
+    String tieBreaking;
+    String planner;
+    String deltaHeuristic;
+    String deltaPlanning;
+    String deltaValidation;
+    boolean helpfulActions;
+    Integer numSubdomains;
     private PDDLProblem problem;
     private boolean pddlPlus;
     private PDDLDomain domain;
@@ -75,29 +75,29 @@ public class ENHSP {
     private PDDLProblem heuristicProblem;
     private long overallStart;
     private boolean copyOfTheProblem;
-    private boolean anyTime;
-    private long timeOut;
-    private boolean aibrPreprocessing;
+    boolean anyTime;
+    long timeOut;
+    boolean aibrPreprocessing;
     private SearchHeuristic h;
     private long overallPlanningTime;
     private float endGValue;
-    private boolean helpfulTransitions;
-    private boolean internalValidation = false;
+    boolean helpfulTransitions;
+    boolean internalValidation = false;
     private int planLength;
-    private String redundantConstraints;
-    private String groundingType;
+    String redundantConstraints;
+    String groundingType;
     private boolean naiveGrounding;
-    private boolean stopAfterGrounding;
-    private boolean printEvents;
+    boolean stopAfterGrounding;
+    boolean printEvents;
 
-    private boolean sdac;
-    private boolean onlyPlan;
-    private boolean ignoreMetric;
-    private boolean printActions;
-    private String inputPlan;
+    boolean sdac;
+    boolean onlyPlan;
+    boolean ignoreMetric;
+    boolean printActions;
+    String inputPlan;
     private PrintStream out;
-    private boolean autoAnytime;
-    private boolean unitCostHeuristic;
+    boolean autoAnytime;
+    boolean unitCostHeuristic;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
@@ -170,8 +170,7 @@ public class ENHSP {
     public record AnytimeConfigurations (String search, String heuristic, Boolean ha, String wh) {}
     LinkedList<AnytimeConfigurations> conf = new LinkedList();
 
-    public void planning() {
-
+    public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> planAndGetSolution() {
         try {
             printStats();
             setHeuristic();
@@ -185,6 +184,7 @@ public class ENHSP {
 
             }
             int i = 0;
+            LinkedList lastSol;
             do {
                 if (autoAnytime){
                     if ( conf.size() > i ) {
@@ -196,13 +196,14 @@ public class ENHSP {
                     }
                 }
                 LinkedList sp = search();
+                lastSol = sp;
                 if (printTrace) {
                     String fileName = getProblem().getPddlFileReference() + "_search_" + searchEngineString + "_h_" + heuristic + "_break_ties_" + tieBreaking + ".npt";
                     problem.validateRefactored(sp,new BigDecimal(this.deltaExecution), new BigDecimal(deltaExecution), fileName);
                     System.out.println("Numeric Plan Trace saved to " + fileName);
                 }
                 if (sp == null) {
-                    return;
+                    return null;
                 }else {
                     depthLimit = endGValue;
                     if (anyTime) {
@@ -213,10 +214,17 @@ public class ENHSP {
                     i++;
                 }
             } while (anyTime);
+
+            return lastSol;
         } catch (Exception ex) {
             Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
         }
 
+        return null;
+    }
+
+    public void planning() {
+        planAndGetSolution();
     }
 
     public void parseInput(String[] args) {
