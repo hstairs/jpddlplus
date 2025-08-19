@@ -1,11 +1,13 @@
 package com.hstairs.ppmajal.pddl.heuristics.novelty;
 
+import com.hstairs.ppmajal.conditions.BoolPredicate;
 import com.hstairs.ppmajal.conditions.Terminal;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.objects.NumericIntervalAssignment;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 
+import java.util.HashSet;
 import java.util.List;
 
 public abstract class NoveltyHeuristic implements SearchHeuristic {

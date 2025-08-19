@@ -142,6 +142,8 @@ public class IntervalQuantifiedBothHeuristic extends NoveltyHeuristic {
   @Override
   public float computeEstimate(State stateInput) {
     h = computeHeuristic(heuristic, stateInput);
+    if (h==Float.MAX_VALUE)
+      return Float.MAX_VALUE;
     final PDDLState s = (PDDLState) stateInput;
     stateBoolFluents = s.getBoolIds();
     stateNumFluents = s.getNumericalFluents();

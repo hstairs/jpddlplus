@@ -1,20 +1,21 @@
 package com.hstairs.ppmajal.pddl.heuristics.novelty;
-import java.util.*;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
+import com.hstairs.ppmajal.PDDLProblem.PDDLState;
 import com.hstairs.ppmajal.conditions.*;
 import com.hstairs.ppmajal.extraUtils.Pair;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.ManhattanHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.objects.Interval;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.objects.NumericIntervalAssignment;
-import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
-import com.hstairs.ppmajal.PDDLProblem.PDDLState;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
-public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
+import java.util.*;
+
+public class ISubGNegativeDistances extends NoveltyHeuristic{
 
     final SearchHeuristic heuristic;
 
@@ -23,13 +24,12 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
     Set<Terminal> subgoalsList = new HashSet<>();
     Set<Terminal> allSubgoalsList;
 
-    Map<Integer, Float> b1NoveltyMap;
     Map<Integer,Float>[] n1NoveltyArray;
-    Map<Pair<Integer, Integer>, Float> b2NoveltyMap;
     HashMap<Pair<Integer, Integer>, Float>[][] n2NoveltyArray;
+    Map<Integer, Float> b1NoveltyMap;
+    Map<Pair<Integer, Integer>, Float> b2NoveltyMap;
     Map<Pair<Integer, NumericIntervalAssignment>, Float> bnNoveltyMap;
 
-    // temporary interval assignment from a state
     private final List<NumericIntervalAssignment> tempNumIntAssignments;
 
     // variables to help compute heuristic
@@ -40,7 +40,7 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
     List<Integer> stateBoolFluents;
     float h;
 
-    public IntervalSubGoalingQBHeurisitc(PDDLProblem problem, int k, SearchHeuristic heuristic) {
+    public ISubGNegativeDistances(PDDLProblem problem, int k, SearchHeuristic heuristic) {
         super(problem, k, NoveltyValue.QUANTIFIED_BOTH, NoveltyType.INTERVAL);
         this.heuristic = heuristic;
         allSubgoalsList = problem.createSubgoals();
@@ -56,17 +56,16 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
         n1NoveltyArray = new Int2FloatOpenHashMap[nsubgoals];
         n2NoveltyArray = new HashMap[nsubgoals][nsubgoals];
         for(int i=0;i<nsubgoals;i++) {
-            s0Distances.add(Float.POSITIVE_INFINITY);
+            s0Distances.add(evalGoalDistance(subgoalConditions[i], s0));
             intervals.add(new Interval(s0Distances.get(i)));
             n1NoveltyArray[i] = new Int2FloatOpenHashMap();
             for(int j=i+1;j<nsubgoals;j++) {
                 n2NoveltyArray[i][j] = new HashMap<>();
             }
         }
-        b1NoveltyMap = new HashMap<>();
+        b1NoveltyMap = new Int2FloatOpenHashMap();
         b2NoveltyMap = new HashMap<>();
         bnNoveltyMap = new HashMap<>();
-
         tempNumIntAssignments = new ArrayList<>(Collections.nCopies(subgoalConditions.length, null));
 
         C1 = subgoalConditions.length+nBoolFluents;
@@ -75,8 +74,8 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
 
 
     private void hqb1(State state) {
-        qbl1=C1;
-        qbu1=C1;
+        qbl1 = C1;
+        qbu1 = C1;
 
         for (Integer a1 : stateBoolFluents) {
             Float h1 = b1NoveltyMap.get(a1);
@@ -87,19 +86,17 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
                 qbu1++;
             }
         }
-
         for(int i=0;i<subgoalConditions.length;i++) {
             float distance = evalGoalDistance(subgoalConditions[i], state);
             int iInterval = intervals.get(i).getInterval(distance);
-            Float h1=n1NoveltyArray[i].get(iInterval);
-            if(h1 == null || h < h1) {
+            Float h1 = n1NoveltyArray[i].get(iInterval);
+            if (h1 == null || h < h1) {
                 qbl1--;
                 n1NoveltyArray[i].put(iInterval, h);
-            } else if (h > h1 && distance==0f) {
+            } else if (h > h1 && distance<=0f) {
                 qbu1++;
             }
         }
-
     }
 
     private void hqb2(State state) {
@@ -131,7 +128,7 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
                 if (h1 == null || h < h1) {
                     qbl2--;
                     n2NoveltyArray[i][j].put(index, h);
-                } else if (h > h1 && (jdistance==0f || idistance==0f)) {
+                } else if (h > h1 && (jdistance<=0f || idistance<=0f)) {
                     qbu2++;
                 }
             }
@@ -189,9 +186,9 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
     }
 
     private float evalGoalDistance(Condition goals, State s) {
-        if (s.satisfy(goals)) {
+        /*if(s.satisfy(goals)) {
             return 0f;
-        }
+        }*/
         if (goals instanceof AndCond ac) {
             float res = 0f;
             for (var son : ac.sons) {
@@ -214,9 +211,11 @@ public class IntervalSubGoalingQBHeurisitc extends NoveltyHeuristic{
             }
             return min;
         } else if (goals instanceof Comparison g) {
-            if (g.getComparator().equals(">"))
-                return (float) Math.abs(g.getLeft().eval(s)) + 0.01f;
-            return (float) Math.abs(g.getLeft().eval(s));
+            /*if (g.getComparator().equals(">"))
+                return (float) (g.getLeft().eval(s)) + 0.01f;*/
+            if(g.getComparator().equals("="))
+                return (float) Math.abs(g.getLeft().eval(s));
+            return (float) -(g.getLeft().eval(s));
         } else if (goals instanceof BoolPredicate g) {
             return 1;
         }

@@ -8,7 +8,10 @@ import com.hstairs.ppmajal.PDDLProblem.PDDLState;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
+import java.lang.reflect.Array;
 import java.util.*;
 
 /**
@@ -28,7 +31,7 @@ public class AtomQuantifiedBothHeuristic extends NoveltyHeuristic {
   private final List<NumericAtomAssignment> tempNumAtomAssignments;
 
   // variables to help compute heuristic
-  float qbl1, qbu1;
+  float qbl1, qbu1, qbl01, qbu01;
   float qbl2, qbu2;
   List<Integer> stateBoolFluents;
   List<Double> stateNumFluents;
@@ -37,7 +40,6 @@ public class AtomQuantifiedBothHeuristic extends NoveltyHeuristic {
   public AtomQuantifiedBothHeuristic(PDDLProblem problem, int k, SearchHeuristic heuristic) {
     super(problem, k, NoveltyValue.QUANTIFIED_BOTH, NoveltyType.ATOM);
     this.heuristic = heuristic;
-
     b1NoveltyMap = new HashMap<>();
     n1NoveltyMap = new HashMap<>();
     b2NoveltyMap = new HashMap<>();
@@ -48,16 +50,19 @@ public class AtomQuantifiedBothHeuristic extends NoveltyHeuristic {
   }
 
   private void hqb1() {
-    qbl1 = C1;  // = h_qn
-    qbu1 = C1;  // = second case in Eqn. (3) in [Katz et al., ICAPS-17]
+    qbl1 = qbl01 = C1;
+    qbu1 = qbu01 = C1;
+
 
     // 1-subsets
     for (Integer a1 : stateBoolFluents) {
       if (!b1NoveltyMap.containsKey(a1) || h < b1NoveltyMap.get(a1)) {
         qbl1--;
+        qbl01--;
         b1NoveltyMap.put(a1, h);
       } else if (h > b1NoveltyMap.get(a1)) {
         qbu1++;
+        qbu01++;
       }
     }
 
@@ -71,6 +76,8 @@ public class AtomQuantifiedBothHeuristic extends NoveltyHeuristic {
         qbu1++;
       }
     }
+
+
   }
 
   private void hqb2() {
@@ -127,6 +134,8 @@ public class AtomQuantifiedBothHeuristic extends NoveltyHeuristic {
   @Override
   public float computeEstimate(State stateInput) {
     h = computeHeuristic(heuristic, stateInput);
+    if (h==Float.MAX_VALUE)
+      return Float.MAX_VALUE;
     final PDDLState s = (PDDLState) stateInput;
     stateBoolFluents = s.getBoolIds();
     stateNumFluents = s.getNumericalFluents();
