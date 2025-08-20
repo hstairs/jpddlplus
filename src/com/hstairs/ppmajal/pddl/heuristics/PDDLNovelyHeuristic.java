@@ -43,22 +43,30 @@ public class PDDLNovelyHeuristic {
                     case 2: return new IntervalWidthHeuristic(heuristicProblem, 2, new SearchHeuristic[]{h});
                 }
             }
-            case "subG": {
-                return new SubGoalingNoveltyHeuristic(heuristicProblem, k, h);
+            case "sqb": {
+                switch (k){
+                    case 1: return new SubGoalingNoveltyHeuristic(heuristicProblem, 1, h);
+                    case 2: return new SubGoalingNoveltyHeuristic(heuristicProblem, 2, h);
+                }
             }
-            case "isubg":{
+            case "dsqb":{
                 switch (k){
                     case 1: return new IntervalSubGoalingQBHeurisitc(heuristicProblem, 1, h);
                     case 2: return new IntervalSubGoalingQBHeurisitc(heuristicProblem, 2, h);
                 }
             }
 
-            case "neg_isubg": {
+            case "ndsqb1": {
                 switch (k) {
-                    case 1:
-                        return new ISubGNegativeDistances(heuristicProblem, 1, h);
-                    case 2:
-                        return new ISubGNegativeDistances(heuristicProblem, 2, h);
+                    case 1: return new ISubGNegativeDistances(heuristicProblem, 1, h, 1);
+                    case 2: return new ISubGNegativeDistances(heuristicProblem, 2, h, 1);
+                }
+            }
+
+            case "ndsqb2": {
+                switch (k) {
+                    case 1: return new ISubGNegativeDistances(heuristicProblem, 1, h, 2);
+                    case 2: return new ISubGNegativeDistances(heuristicProblem, 2, h, 2);
                 }
             }
             default:

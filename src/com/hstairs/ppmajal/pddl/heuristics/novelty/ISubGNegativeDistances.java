@@ -40,7 +40,7 @@ public class ISubGNegativeDistances extends NoveltyHeuristic{
     List<Integer> stateBoolFluents;
     float h;
 
-    public ISubGNegativeDistances(PDDLProblem problem, int k, SearchHeuristic heuristic) {
+    public ISubGNegativeDistances(PDDLProblem problem, int k, SearchHeuristic heuristic, int variant) {
         super(problem, k, NoveltyValue.QUANTIFIED_BOTH, NoveltyType.INTERVAL);
         this.heuristic = heuristic;
         allSubgoalsList = problem.createSubgoals();
@@ -56,8 +56,14 @@ public class ISubGNegativeDistances extends NoveltyHeuristic{
         n1NoveltyArray = new Int2FloatOpenHashMap[nsubgoals];
         n2NoveltyArray = new HashMap[nsubgoals][nsubgoals];
         for(int i=0;i<nsubgoals;i++) {
-            s0Distances.add(evalGoalDistance(subgoalConditions[i], s0));
-            intervals.add(new Interval(s0Distances.get(i)));
+            if(variant == 1) {
+                s0Distances.add(Float.POSITIVE_INFINITY);
+                intervals.add(new Interval(s0Distances.get(i)));
+            } else if(variant == 2) {
+                s0Distances.add(evalGoalDistance(subgoalConditions[i], s0));
+                intervals.add(new Interval(s0Distances.get(i)));
+            }
+
             n1NoveltyArray[i] = new Int2FloatOpenHashMap();
             for(int j=i+1;j<nsubgoals;j++) {
                 n2NoveltyArray[i][j] = new HashMap<>();
