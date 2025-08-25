@@ -93,7 +93,9 @@ public class PDDLPlanner {
         }
         searchEngine.setExtenalLogger(this.extenalLogger);
 
+        searchEngine.beforeExecution();
         final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);
+        searchEngine.afterExecution();
         if (solutionHandle == null)
             return new PDDLSolution(null,null,searchEngine.getStats(), -1);
         return new PDDLSolution(this.extractPlan(solutionHandle,p),

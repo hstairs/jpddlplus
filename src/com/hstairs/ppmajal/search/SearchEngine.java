@@ -73,6 +73,16 @@ public abstract class SearchEngine {
     public record SearchStats(int nodesExpanded, int nodesEvaluated, int deadEnds, int duplicates, long searchTime, long heuristicTime) {
     }
 
+    public void beforeExecution() {
+        if(this.extenalLogger == null) return;
+        this.extenalLogger.beforeExecution();
+    }
+
+    public void afterExecution() {
+        if(this.extenalLogger == null) return;
+        this.extenalLogger.afterExecution();
+    }
+
     public void setExtenalLogger(IExternalLogger extenalLogger) {
         this.extenalLogger = extenalLogger;
     }

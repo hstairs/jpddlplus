@@ -3,5 +3,10 @@ package com.hstairs.ppmajal.extraUtils;
 public enum ExternalLoggerLogType {
     Generating,
     Expanding,
-    Closing,
+    Closing;
+
+    @Override
+    public String toString() {
+        return name().toLowerCase();
+    } 
 }

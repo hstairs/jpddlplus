@@ -61,6 +61,7 @@ public class EHS extends SearchEngine {
             }
         }
         totalTime = System.currentTimeMillis()-startTime;
+        this.extenalLogger.afterExecution();
         return null;
     }    
 

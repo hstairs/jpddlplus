@@ -20,7 +20,5 @@ public class SimpleExternalLogger implements IExternalLogger {
         }
         
         System.out.println("node");
-
-        // System.out.println(node.);
     }
 }

@@ -33,7 +33,6 @@ import org.json.simple.parser.ParseException;
  * @author enrico
  */
 public class SearchNode extends SimpleSearchNode {
-
     public final JSONObject jsonRepresentation;
     public float f;
     public int waitingPoints;
