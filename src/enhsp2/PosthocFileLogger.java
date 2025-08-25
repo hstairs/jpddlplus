@@ -16,6 +16,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 public class PosthocFileLogger implements IExternalLogger {
     private String filePath;
@@ -44,10 +47,10 @@ public class PosthocFileLogger implements IExternalLogger {
 
             // Merge the saved jsonRepresentation with the one created
             JSONObject savedData = searchNode.jsonRepresentation;
-            Iterator savedDataKeys = savedData.keys();
-            while(savedDataKeys.hasNext()) {
-                String key = (String)savedDataKeys.next();
-                event.put(key, savedData.get(key));
+            if(savedData != null) {
+                for(Object key : savedData.keySet()) {
+                    event.put(key, savedData.get(key));
+                }
             }
             event.put("f", searchNode.f);
 
@@ -63,7 +66,7 @@ public class PosthocFileLogger implements IExternalLogger {
             file.delete();
         }
     }
-
+    
     @Override
     public void afterExecution() {
         writeSavedEvents();
@@ -77,8 +80,10 @@ public class PosthocFileLogger implements IExternalLogger {
         try {
             if(file.exists()) {
                 String content = new String(Files.readAllBytes(Paths.get(filePath)));
-                root = new JSONObject(content);
-                existingEvents = root.optJSONArray("events");
+                JSONParser parser = new JSONParser();
+                root = (JSONObject) parser.parse(content);
+                
+                existingEvents = (JSONArray) root.get("events");
                 if(existingEvents == null) {
                     existingEvents = new JSONArray();
                 }
@@ -89,17 +94,15 @@ public class PosthocFileLogger implements IExternalLogger {
                 existingEvents = new JSONArray();
             }
 
-            for(JSONObject event : this.events) {
-                existingEvents.put(event);
-            }
+            existingEvents.addAll(this.events);
             root.put("events", existingEvents);
 
             try (FileWriter writer = new FileWriter(filePath)) {
-                writer.write(root.toString(2));
+                writer.write(root.toJSONString());
             }
 
             this.events = new ArrayList<>();
-        } catch(IOException e) {
+        } catch(IOException | ParseException e) {
             e.printStackTrace();
         }
     }

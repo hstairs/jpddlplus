@@ -98,6 +98,7 @@ public class ENHSP {
     private PrintStream out;
     boolean autoAnytime;
     boolean unitCostHeuristic;
+    IExternalLogger externalLogger;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
@@ -282,6 +283,8 @@ public class ENHSP {
         options.addOption("autoanytime",false,"Activate auto anytime modality. ");
         options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
 
+        options.addOption("with_posthoc_logger", true, "Activate the posthoc file logger. A filename must be provided as argument");
+
         CommandLineParser parser = new DefaultParser();
         try {
             CommandLine cmd = parser.parse(options, args);
@@ -395,6 +398,12 @@ public class ENHSP {
             helpfulTransitions = cmd.getOptionValue("ht") != null && "true".equals(cmd.getOptionValue("ht"));
             ignoreMetric = cmd.hasOption("im");
             printActions = cmd.hasOption("print_actions");
+
+            String filePath = cmd.getOptionValue("with_posthoc_logger");
+            if(filePath != null) {
+                externalLogger = new PosthocFileLogger(filePath);
+            }
+
         } catch (ParseException exp) {
 //            Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
             System.err.println("Parsing failed.  Reason: " + exp.getMessage());
@@ -515,8 +524,6 @@ public class ENHSP {
     }
 
     private PDDLSolution search() throws Exception {
-        IExternalLogger extenalLogger = new SimpleExternalLogger();
-
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
                 heuristic,
                 redundantConstraints,
@@ -526,7 +533,7 @@ public class ENHSP {
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
                 tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
-                extenalLogger
+                this.externalLogger
                 );
 
         if (savingSearchSpaceJson) {

@@ -1,5 +1,7 @@
 package enhsp2;
 
+import com.hstairs.ppmajal.extraUtils.IExternalLogger;
+
 public class ENHSPBuilder {
     private final ENHSP enhsp;
 
@@ -79,6 +81,11 @@ public class ENHSPBuilder {
 
     public ENHSPBuilder setRedundantConstraints(String mode) {
         enhsp.redundantConstraints = mode;
+        return this;
+    }
+
+    public ENHSPBuilder setExternalLogger(IExternalLogger externalLogger) {
+        enhsp.externalLogger = externalLogger;
         return this;
     }
 
@@ -220,7 +227,8 @@ public class ENHSPBuilder {
             .enableStopAfterGrounding(false)
             .enableHelpfulTransitions(false)
             .enableIgnoreMetric(false)
-            .enablePrintActions(false);
+            .enablePrintActions(false)
+            .setExternalLogger(null);
 
         return this;   
     }
