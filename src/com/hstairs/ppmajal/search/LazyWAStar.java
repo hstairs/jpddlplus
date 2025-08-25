@@ -1,5 +1,6 @@
 package com.hstairs.ppmajal.search;
 
+import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
@@ -59,13 +60,15 @@ public class LazyWAStar extends WAStar {
         }
         super.initHandle(init); //This is to inspect the search space if needed
         frontier.enqueue(init);
+        this.tryLog(init, ExternalLoggerLogType.Generating);
+
         Object2FloatMap<State> gValueMap = new Object2FloatOpenHashMap<>();
         gValueMap.put(initState, 0f);//The initial state is at 0 distance, of course.
         float bestf = 0;
         previous = 0;
         while (!frontier.isEmpty()) {
             final SearchNode currentNode = frontier.dequeue();
-            if(this.extenalLogger != null) this.extenalLogger.log(currentNode);
+            this.tryLog(currentNode, ExternalLoggerLogType.Expanding);
             if (currentNode.gValue == getPreviousCost(gValueMap, currentNode.s)) {
                 nodesExpanded++;
                 long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);
@@ -133,6 +136,7 @@ public class LazyWAStar extends WAStar {
                     deadEndsDetected++;
                 }
             }
+            this.tryLog(currentNode, ExternalLoggerLogType.Closing);
         }
 
         return null;

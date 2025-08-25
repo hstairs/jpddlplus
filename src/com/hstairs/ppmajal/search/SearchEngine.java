@@ -3,6 +3,7 @@ package com.hstairs.ppmajal.search;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
+import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.io.PrintStream;
@@ -74,5 +75,10 @@ public abstract class SearchEngine {
 
     public void setExtenalLogger(IExternalLogger extenalLogger) {
         this.extenalLogger = extenalLogger;
+    }
+
+    public void tryLog(SimpleSearchNode node, ExternalLoggerLogType logType) {
+        if(this.extenalLogger == null) return;
+        this.extenalLogger.log(node, logType);
     }
 }
