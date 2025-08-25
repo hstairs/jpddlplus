@@ -170,7 +170,7 @@ public class ENHSP {
     public record AnytimeConfigurations (String search, String heuristic, Boolean ha, String wh) {}
     LinkedList<AnytimeConfigurations> conf = new LinkedList();
 
-    public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> planAndGetSolution() {
+    public PDDLSolution planAndGetSolution() {
         try {
             printStats();
             setHeuristic();
@@ -184,7 +184,7 @@ public class ENHSP {
 
             }
             int i = 0;
-            LinkedList lastSol;
+            PDDLSolution lastSol;
             do {
                 if (autoAnytime){
                     if ( conf.size() > i ) {
@@ -195,8 +195,8 @@ public class ENHSP {
                         wh = anytimeConfigurations.wh;
                     }
                 }
-                LinkedList sp = search();
-                lastSol = sp;
+                lastSol = search();
+                LinkedList sp = lastSol.rawPlan();
                 if (printTrace) {
                     String fileName = getProblem().getPddlFileReference() + "_search_" + searchEngineString + "_h_" + heuristic + "_break_ties_" + tieBreaking + ".npt";
                     problem.validateRefactored(sp,new BigDecimal(this.deltaExecution), new BigDecimal(deltaExecution), fileName);
@@ -514,7 +514,7 @@ public class ENHSP {
                 unitCostHeuristic);
     }
 
-    private LinkedList<ImmutablePair<BigDecimal, TransitionGround>> search() throws Exception {
+    private PDDLSolution search() throws Exception {
         IExternalLogger extenalLogger = new SimpleExternalLogger();
 
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
@@ -546,7 +546,7 @@ public class ENHSP {
         if (savingSearchSpaceJson) {
             planner.getSearchSpaceHandle().printJson(getProblem().getPddlFileReference() + ".sp_log");
         }
-        return plan.rawPlan();
+        return plan;
     }
 
     private void printInfo(PDDLSolution plan, boolean pddlPlus, String savePlan, PDDLState s) {
