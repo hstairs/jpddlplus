@@ -1,5 +1,7 @@
 package enhsp2;
 
+import java.util.ArrayList;
+
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 public class ENHSPBuilder {
@@ -231,5 +233,17 @@ public class ENHSPBuilder {
             .setExternalLogger(null);
 
         return this;   
+    }
+
+    public ArrayList<String> getAvailableHeuristics() {
+        return enhsp.getAvailableHeuristics();
+    }
+
+    public ArrayList<String> getAvailableSearchEngines() {
+        return enhsp.getAvailableSearchEngines();
+    }
+
+    public ArrayList<String> getAvailableTieBreakers() {
+        return enhsp.getAvailableTieBreakers();
     }
 }

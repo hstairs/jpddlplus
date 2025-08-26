@@ -12,6 +12,8 @@ import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.function.BiFunction;
 
 public class PDDLPlanner {
     final String search;
@@ -29,10 +31,26 @@ public class PDDLPlanner {
     private SearchEngine searchEngine;
     private IExternalLogger extenalLogger;
 
+    // ---------------- Static Maps ---------------- //
+    private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
+            "smaller_g", SearchEngine.TieBreaking.LOWERG,
+            "larger_g", SearchEngine.TieBreaking.HIGHERG,
+            "arbitrary", SearchEngine.TieBreaking.ARBITRARY
+    );
+
+    private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
+            Map.entry("wastar", (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
+            Map.entry("gbfs", (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
+            Map.entry("ehs", (planner, tb) -> new EHS(planner.helpfulActions)),
+            Map.entry("ida", (planner, tb) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
+            Map.entry("lazygbfs", (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+            Map.entry("lazywastar", (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+    );
+
     public PDDLPlanner(String search, String heuristic, String redundantConstraints,
-                       boolean helpfulActionPruning, boolean helpfulTransitions,
-                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit, IExternalLogger extenalLogger) {
+                    boolean helpfulActionPruning, boolean helpfulTransitions,
+                    float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
+                    boolean saveSearchSpace, float depthLimit, IExternalLogger extenalLogger) {
         this.search = search;
         this.heuristic = heuristic;
         this.redundantConstraints = redundantConstraints;
@@ -55,42 +73,14 @@ public class PDDLPlanner {
     }
     public SearchNode searchSpaceHandle;
     public PDDLSolution plan(PDDLProblem p, SearchHeuristic h){
-        TieBreaker tb;
-        switch (t){
-            case "smaller_g":
-                tb = new TieBreaker(SearchEngine.TieBreaking.LOWERG);
-                break;
-            case "larger_g":
-                tb = new TieBreaker(SearchEngine.TieBreaking.HIGHERG);
-                break;
-            default:
-                tb = new TieBreaker(SearchEngine.TieBreaking.ARBITRARY);
-                break;
-        }
-        switch (search.toLowerCase()){
-            case "wastar" :
-                searchEngine = new WAStar(hWeigth, true, helpfulActions, tb, saveSearchSpace, boundG);
-                break;
-            case "gbfs":
-                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG);
-                break;
-            case "ehs":
-                searchEngine = new EHS(helpfulActions);
-                break;
-            case "ida":
-                searchEngine = new IDAStar(helpfulActions, hWeigth,false,false,
-                        false,System.out);
-                break;
-            case "lazygbfs":
-                searchEngine = new LazyWAStar(hWeigth,false,helpfulActions,saveSearchSpace, tb, boundG);
-                break;
-            case "lazywastar":
-                searchEngine = new LazyWAStar(hWeigth,true,helpfulActions,saveSearchSpace, tb, boundG);
-                break;
-            default:
-                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG);
-                break;
-        }
+        TieBreaker tb = new TieBreaker(
+                TIE_BREAKERS.getOrDefault(t, SearchEngine.TieBreaking.ARBITRARY)
+        );
+
+        searchEngine = SEARCH_ENGINES
+                .getOrDefault(search.toLowerCase(), (pl, tie) -> new WAStar(pl.hWeigth, false, pl.helpfulActions, tie, pl.saveSearchSpace, pl.boundG))
+                .apply(this, tb);
+
         searchEngine.setExtenalLogger(this.extenalLogger);
 
         searchEngine.beforeExecution();
@@ -100,10 +90,6 @@ public class PDDLPlanner {
             return new PDDLSolution(null,null,searchEngine.getStats(), -1);
         return new PDDLSolution(this.extractPlan(solutionHandle,p),
                 solutionHandle, searchEngine.getStats(), solutionHandle.gValue);
-    }
-
-    public SearchNode getSearchSpaceHandle(){
-        return searchEngine.getSearchSpaceHandle();
     }
 
     public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan (SimpleSearchNode input, PDDLProblem p) {
@@ -195,5 +181,17 @@ public class PDDLPlanner {
             return finalPlan;
         }
         return plan;
+    }
+
+    public SearchNode getSearchSpaceHandle(){
+        return searchEngine.getSearchSpaceHandle();
+    }
+
+    public static ArrayList<String> getAvailableSearchEngines() {
+        return new ArrayList<>(SEARCH_ENGINES.keySet());
+    }
+
+    public static ArrayList<String> getAvailableTieBreakers() {
+        return new ArrayList<>(TIE_BREAKERS.keySet());
     }
 }

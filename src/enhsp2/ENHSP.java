@@ -108,6 +108,18 @@ public class ENHSP {
         return planLength;
     }
 
+    public ArrayList<String> getAvailableHeuristics(){
+        return new ArrayList<>(PDDLHeuristic.getAvailableHeuristics());
+    }
+
+    public ArrayList<String> getAvailableSearchEngines(){
+        return new ArrayList<>(PDDLPlanner.getAvailableSearchEngines());
+    }
+
+    public ArrayList<String> getAvailableTieBreakers(){
+        return new ArrayList<>(PDDLPlanner.getAvailableTieBreakers());
+    }
+
     public Pair<PDDLDomain, PDDLProblem> parseDomainProblem(String domainFile, String problemFile, String delta, PrintStream out) {
         try {
             final PDDLDomain localDomain = new PDDLDomain(domainFile);
@@ -435,86 +447,24 @@ public class ENHSP {
     }
 
     private void setPlanner() {
-        helpfulTransitions = false;
-        helpfulActions = false;
-        tieBreaking = "arbitrary";
-        switch (planner) {
-            case "sat-hmrp":
-                heuristic = "hmrp";
-                searchEngineString = "gbfs";
-                tieBreaking = "arbitrary";
-                break;
-            case "sat-hmrph":
-                heuristic = "hmrp";
-                helpfulActions = true;
-                searchEngineString = "gbfs";
-                tieBreaking = "arbitrary";
-                break;
-            case "sat-hmrphj":
-                heuristic = "hmrp";
-                helpfulActions = true;
-                helpfulTransitions = true;
-                searchEngineString = "gbfs";
-                tieBreaking = "arbitrary";
-                break;
-            case "sat-hmrpff":
-                heuristic = "hmrp";
-                helpfulActions = false;
-                redundantConstraints = "brute";
-                helpfulTransitions = false;
-                searchEngineString = "gbfs";
-                tieBreaking = "arbitrary";
-                break;
-            case "sat-hadd":
-                heuristic = "hadd";
-                searchEngineString = "gbfs";
-                tieBreaking = "smaller_g";
-                break;
-            case "sat-aibr":
-                heuristic = "aibr";
-                searchEngineString = "WAStar";
-                tieBreaking = "arbitrary";
-                break;
-            case "sat-hradd":
-                heuristic = "hradd";
-                searchEngineString = "gbfs";
-                tieBreaking = "smaller_g";
-                break;
-            case "opt-hmax":
-                heuristic = "hmax";
-                searchEngineString = "WAStar";
-                tieBreaking = "larger_g";
-                break;
-            case "opt-hlm":
-                heuristic = "hlm-lp";
-                searchEngineString = "WAStar";
-                tieBreaking = "larger_g";
-                break;
-            case "opt-hlmrd":
-                heuristic = "hlm-lp";
-                redundantConstraints = "brute";
-                searchEngineString = "WAStar";
-                tieBreaking = "larger_g";
-                break;
-            case "opt-hrmax":
-                heuristic = "hrmax";
-                searchEngineString = "WAStar";
-                tieBreaking = "larger_g";
-                break;
-            case "opt-blind":
-                heuristic = "blind";
-                searchEngineString = "WAStar";
-                tieBreaking = "larger_g";
-                aibrPreprocessing = false;
-                break;
-            default:
-                System.out.println("! ====== ! Warning: Unknown planner configuration. Going with default: gbfs with hadd ! ====== !");
-                heuristic = "hadd";
-                searchEngineString = "gbfs";
-                tieBreaking = "smaller_g";
-                break;
+        Planner chosen;
+        try {
+            chosen = Planner.valueOf(planner.toUpperCase().replace("-", "_"));
+        } catch (IllegalArgumentException e) {
+            System.out.println(
+                    "! ====== ! Warning: Unknown planner configuration. Going with default: gbfs with hadd ! ====== !");
+            chosen = Planner.SAT_HADD;
         }
 
+        PlannerConfig cfg = chosen.config;
+
+        heuristic = cfg.heuristic;
+        searchEngineString = cfg.searchEngineString;
+        tieBreaking = cfg.tieBreaking;
+        helpfulActions = cfg.helpfulActions;
+        helpfulTransitions = cfg.helpfulTransitions;
+        redundantConstraints = cfg.redundantConstraints;
+        aibrPreprocessing = cfg.aibrPreprocessing;
     }
 
     private void setHeuristic() {

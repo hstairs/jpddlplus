@@ -25,112 +25,111 @@ import java.util.Map;
  */
 public class PDDLHeuristic {
 
-    public static SearchHeuristic getHeuristic(String heuristic,
-                                               PDDLProblem heuristicProblem, String redundantConstraints,
-            boolean helpfulActionsPruning, boolean helpfulTransitions, boolean toOneTransformation) {
-        Map<AndCond, Collection<IntArraySet>> redConstraint = null;
-        if ("smart".equals(redundantConstraints)) {
-            final H1 h1 = new H1(heuristicProblem, true, true, false, "smart", false, true, false, false, false);
-            h1.computeEstimate(heuristicProblem.getInit());
+        @FunctionalInterface
+        interface HeuristicFactory {
+                SearchHeuristic create(PDDLProblem problem, String redundantConstraints,
+                                boolean helpfulActionsPruning, boolean helpfulTransitions,
+                                boolean toOneTransformation);
         }
-        switch (heuristic) {
-            case "gc": {
-                return new GoalCounting(heuristicProblem);
-            }
-            case "hadd": {
-                return new H1(heuristicProblem, true, false, false,
-                        redundantConstraints, helpfulActionsPruning, false, helpfulTransitions,
-                        false, redConstraint,toOneTransformation);
 
-            }
-            case "hradd": {
-                return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false,false);
+        private static final Map<String, HeuristicFactory> HEURISTICS = Map.ofEntries(
+                        Map.entry("gc", (p, rc, ha, ht, to1) -> new GoalCounting(p)),
 
-            }
+                        Map.entry("hadd",
+                                        (p, rc, ha, ht, to1) -> new H1(p, true, false, false, rc, ha, false, ht, false,
+                                                        null, to1)),
 
-            case "hrmax": {
-                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false,false);
+                        Map.entry("hradd",
+                                        (p, rc, ha, ht, to1) -> new H1(p, true, false, false, "brute", false, false,
+                                                        false, false, false)),
 
-            }
-            case "h1res": {
-                return new H1Res(heuristicProblem, redundantConstraints, false, false);
+                        Map.entry("hrmax",
+                                        (p, rc, ha, ht, to1) -> new H1(p, false, false, false, "brute", false, false,
+                                                        false, false, false)),
 
-            }
-            case "h1res2": {
-                return new H1Res(heuristicProblem, redundantConstraints, true, false);
+                        Map.entry("h1res", (p, rc, ha, ht, to1) -> new H1Res(p, rc, false, false)),
+                        Map.entry("h1res2", (p, rc, ha, ht, to1) -> new H1Res(p, rc, true, false)),
+                        Map.entry("h1res3", (p, rc, ha, ht, to1) -> new H1Res(p, rc, true, true)),
+                        Map.entry("h1res4", (p, rc, ha, ht, to1) -> new H1Res(p, rc, false, true)),
 
-            }
-            case "h1res3": {
-                return new H1Res(heuristicProblem, redundantConstraints, true, true);
+                        Map.entry("hmax",
+                                        (p, rc, ha, ht, to1) -> new H1(p, false, false, false, rc, false, false, false,
+                                                        false, null,
+                                                        false)),
 
-            }
-            case "h1res4": {
-                return new H1Res(heuristicProblem, redundantConstraints, false, true);
+                        Map.entry("hmrp",
+                                        (p, rc, ha, ht, to1) -> new H1(p, true, true, false, rc, ha, false, ht, true,
+                                                        null, to1)),
 
-            }
-            case "hmax": {
-                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint,false);
+                        Map.entry("hmrp_fix",
+                                        (p, rc, ha, ht, to1) -> new H1Fix(p, false, false, rc, ha, false, false, true,
+                                                        false)),
 
-            }
-            case "hmrp": {
-                return new H1(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint,toOneTransformation);
-            }
-            case "hmrp_fix": {
-                return new H1Fix(heuristicProblem, false, false, redundantConstraints, helpfulActionsPruning, false, false, true, false);
+                        Map.entry("hmrp_easy_fix",
+                                        (p, rc, ha, ht, to1) -> new H1Fix(p, true, true, rc, ha, false, false, false,
+                                                        false)),
 
-            }
-            case "hmrp_easy_fix": {
-                return new H1Fix(heuristicProblem, true, true, redundantConstraints, helpfulActionsPruning, false, false, false, false);
+                        Map.entry("hmrp_fix_tran",
+                                        (p, rc, ha, ht, to1) -> new H1Fix(p, false, false, rc, ha, false, false, false,
+                                                        true)),
 
-            }
-            case "hmrp_fix_tran": {
-                return new H1Fix(heuristicProblem, false, false, redundantConstraints, helpfulActionsPruning, false, false, false, true);
+                        Map.entry("blind", (p, rc, ha, ht, to1) -> new BlindHeuristic(p)),
+                        Map.entry("01blind", (p, rc, ha, ht, to1) -> new GoalSensitiveHeuristic(p)),
 
-            }
+                        Map.entry("aibr", (p, rc, ha, ht, to1) -> {
+                                System.out.println("AIBR selected");
+                                return new Aibr(p);
+                        }),
 
-            case "blind": {
-                return new BlindHeuristic(heuristicProblem);
+                        Map.entry("hlm-count", (p, rc, ha, ht, to1) -> {
+                                System.out.println("HLM selected");
+                                return new LM(p);
+                        }),
 
-            }
-            case "01blind": {
-                return new GoalSensitiveHeuristic(heuristicProblem);
+                        Map.entry("hlm-lp", (p, rc, ha, ht, to1) -> {
+                                System.out.println("HLM selected");
+                                System.out.println(rc);
+                                return new LM(p, "lp", rc, "cplex");
+                        }),
 
-            }
-            case "aibr": {
-                System.out.println("AIBR selected");
-                return new Aibr(heuristicProblem);
+                        Map.entry("hlm-lp-gurobi", (p, rc, ha, ht, to1) -> {
+                                System.out.println("HLM selected");
+                                System.out.println(rc);
+                                return new LM(p, "lp", rc, "gurobi");
+                        }),
 
-            }
-            case "hlm-count": {
-                System.out.println("HLM selected");
-                return new LM(heuristicProblem);
+                        Map.entry("hgen", (p, rc, ha, ht, to1) -> {
+                                System.out.println("HGEN selected");
+                                System.out.println(rc);
+                                return new HGen(p);
+                        }));
 
-            }
-            case "hlm-lp": {
-                System.out.println("HLM selected");
-                System.out.println(redundantConstraints);
-                return new LM(heuristicProblem, "lp", redundantConstraints, "cplex");
+        public static SearchHeuristic getHeuristic(String heuristic,
+                        PDDLProblem heuristicProblem,
+                        String redundantConstraints,
+                        boolean helpfulActionsPruning,
+                        boolean helpfulTransitions,
+                        boolean toOneTransformation) {
+                // Special case "smart"
+                if ("smart".equals(redundantConstraints)) {
+                        final H1 h1 = new H1(heuristicProblem, true, true, false,
+                                        "smart", false, true, false, false, false);
+                        h1.computeEstimate(heuristicProblem.getInit());
+                }
 
-            }
-            case "hlm-lp-gurobi": {
-                System.out.println("HLM selected");
-                System.out.println(redundantConstraints);
-                return new LM(heuristicProblem, "lp", redundantConstraints, "gurobi");
+                HeuristicFactory factory = HEURISTICS.get(heuristic);
+                if (factory != null) {
+                        return factory.create(heuristicProblem, redundantConstraints,
+                                        helpfulActionsPruning, helpfulTransitions, toOneTransformation);
+                }
 
-            }
-            case "hgen":{
-                System.out.println("HGEN selected");
-                System.out.println(redundantConstraints);
-                return new HGen(heuristicProblem);
-
-            }
-            default:
                 if (heuristic != null) {
-                    System.out.println("Folding back to 1-0 heuristic. Input heuristic is not supported");
+                        System.out.println("Folding back to 1-0 heuristic. Input heuristic is not supported");
                 }
                 return new GoalSensitiveHeuristic(heuristicProblem);
-
         }
-    }
 
+        public static Collection<String> getAvailableHeuristics() {
+                return HEURISTICS.keySet();
+        }
 }
