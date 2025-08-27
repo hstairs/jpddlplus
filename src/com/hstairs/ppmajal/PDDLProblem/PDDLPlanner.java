@@ -11,6 +11,7 @@ import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -33,18 +34,27 @@ public class PDDLPlanner {
 
     // ---------------- Static Maps ---------------- //
     private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
-            "smaller_g", SearchEngine.TieBreaking.LOWERG,
-            "larger_g", SearchEngine.TieBreaking.HIGHERG,
-            "arbitrary", SearchEngine.TieBreaking.ARBITRARY
+        "smaller_g", SearchEngine.TieBreaking.LOWERG,
+        "larger_g", SearchEngine.TieBreaking.HIGHERG,
+        "arbitrary", SearchEngine.TieBreaking.ARBITRARY
     );
 
+    private static final String[][] SE_INFOS = {
+        {"wastar", "WAStar", "Weighted A* Search"},
+        {"gbfs", "GBFS", "Greedy Best-First Search"},
+        {"ehs", "EHS", "Enhanced Heuristic Search"},
+        {"ida", "IDA", "Iterative Deepening A*"},
+        {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
+        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"}
+    };
+
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
-            Map.entry("wastar", (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
-            Map.entry("gbfs", (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
-            Map.entry("ehs", (planner, tb) -> new EHS(planner.helpfulActions)),
-            Map.entry("ida", (planner, tb) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
-            Map.entry("lazygbfs", (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
-            Map.entry("lazywastar", (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+        Map.entry(SE_INFOS[0][0], (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
+        Map.entry(SE_INFOS[1][0], (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
+        Map.entry(SE_INFOS[2][0], (planner, _) -> new EHS(planner.helpfulActions)),
+        Map.entry(SE_INFOS[3][0], (planner, _) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
+        Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
     );
 
     public PDDLPlanner(String search, String heuristic, String redundantConstraints,
@@ -187,11 +197,20 @@ public class PDDLPlanner {
         return searchEngine.getSearchSpaceHandle();
     }
 
-    public static ArrayList<String> getAvailableSearchEngines() {
-        return new ArrayList<>(SEARCH_ENGINES.keySet());
+    public static String[][] getAvailableSearchEngines() {
+        return SE_INFOS;
     }
 
-    public static ArrayList<String> getAvailableTieBreakers() {
-        return new ArrayList<>(TIE_BREAKERS.keySet());
+    public static Collection<String> getAvailableTieBreakers() {
+        return TIE_BREAKERS.keySet();
+    }
+
+    public static String getHelpString(){
+        StringBuilder sb = new StringBuilder();
+        sb.append("Available Search Engines:\n");
+        for (String[] seInfo : SE_INFOS) {
+            sb.append(" - ").append(seInfo[0]).append(": ").append(seInfo[1]).append("\n");
+        }
+        return sb.toString();
     }
 }

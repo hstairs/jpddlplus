@@ -21,9 +21,6 @@
 import enhsp2.ENHSP;
 
 public class main {
-
-
-
     public static void main(String[] args) throws Exception {
         ENHSP p = new ENHSP(false);
         p.parseInput(args);

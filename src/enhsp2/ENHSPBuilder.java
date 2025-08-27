@@ -235,11 +235,11 @@ public class ENHSPBuilder {
         return this;   
     }
 
-    public ArrayList<String> getAvailableHeuristics() {
+    public String[][] getAvailableHeuristics() {
         return enhsp.getAvailableHeuristics();
     }
 
-    public ArrayList<String> getAvailableSearchEngines() {
+    public String[][] getAvailableSearchEngines() {
         return enhsp.getAvailableSearchEngines();
     }
 

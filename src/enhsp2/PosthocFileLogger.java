@@ -38,7 +38,10 @@ public class PosthocFileLogger implements IExternalLogger {
         event.put("id", node.id.toString());
         event.put("g", node.gValue);
         if(node.father != null) {
-            event.put("parentId", node.father.id.toString());
+            event.put("pId", node.father.id.toString());
+        }
+        else{
+            event.put("pId", null);
         }
         event.put("type", eventType);
 
@@ -90,7 +93,7 @@ public class PosthocFileLogger implements IExternalLogger {
 
             } else {
                 root = new JSONObject();
-                root.put("version", "1.0.5");
+                root.put("version", "1.4.0");
                 existingEvents = new JSONArray();
             }
 

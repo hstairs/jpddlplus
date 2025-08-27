@@ -108,12 +108,12 @@ public class ENHSP {
         return planLength;
     }
 
-    public ArrayList<String> getAvailableHeuristics(){
-        return new ArrayList<>(PDDLHeuristic.getAvailableHeuristics());
+    public String[][] getAvailableHeuristics(){
+        return PDDLHeuristic.getAvailableHeuristics();
     }
 
-    public ArrayList<String> getAvailableSearchEngines(){
-        return new ArrayList<>(PDDLPlanner.getAvailableSearchEngines());
+    public String[][] getAvailableSearchEngines(){
+        return (PDDLPlanner.getAvailableSearchEngines());
     }
 
     public ArrayList<String> getAvailableTieBreakers(){
@@ -240,25 +240,13 @@ public class ENHSP {
         planAndGetSolution();
     }
 
-    public void parseInput(String[] args) {
+    private Options buildOptions(){
         Options options = new Options();
         options.addRequiredOption("o", "domain", true, "PDDL domain file");
         options.addRequiredOption("f", "problem", true, "PDDL problem file");
         options.addOption("planner", true, "Fast Preconfgured Planner. For available options look into the code. This overrides all other parameters but domain and problem specs. Commonly used settings are: sat-hmrp (satisficing planning) or opt-hrmax (optimal planning).");
-        options.addOption("h", true, "heuristic: options (default is hadd):\n"
-                + "aibr, Additive Interval Based relaxation heuristic\n"
-                + "hadd, Additive version of subgoaling heuristic\n"
-                + "hradd, Additive version of subgoaling heuristic plus redundant constraints\n"
-                + "hmax, Hmax for Numeric Planning\n"
-                + "hrmax, Hmax for Numeric Planning with redundant constraints\n"
-                + "hmrp, heuristic based on MRP extraction\n"
-                + "blcost, goal sensitive heuristic (1 to non goal-states, 0 to goal-states)\n"
-                + "blind, full blind heuristic (0 to all states)");
-        options.addOption("s", true, "allows to select search strategy (default is WAStar):\n"
-                + "gbfs, Greedy Best First Search (f(n) = h(n))\n"
-                + "lazygbfs, Greedy Best First Search (f(n) = h(n)) with lazy evaluation\n"
-                + "WAStar, WA* (f(n) = g(n) + h_w*h(n))\n"
-                + "wa_star_4, WA* (f(n) = g(n) + 4*h(n))\n");
+        options.addOption("h", true, "allows to select heuristic (default is hadd). " + PDDLHeuristic.getHelpString() + "\n");
+        options.addOption("s", true, "allows to select search strategy (default is WAStar):\n" + PDDLPlanner.getHelpString() + "\n");
         options.addOption("ties", true, "tie-breaking (default is arbitrary): larger_g, smaller_g, arbitrary");
         options.addOption("dp", "delta_planning", true, "planning decision executionDelta: float");
         options.addOption("de", "delta_execution", true, "planning execution executionDelta: float");
@@ -270,7 +258,6 @@ public class ENHSP {
         options.addOption("sjr", false, "save state space explored in json file");
         options.addOption("ha", "helpful-actions", true, "activate helpful actions in the search");
         options.addOption("pe", "print-events-plan", false, "activate printing of events");
-
         options.addOption("ht", "helpful-transitions", true, "activate up-to-macro actions");
         options.addOption("sp", true, "Save plan. Argument is filename");
         options.addOption("pt", false, "print state trajectory (Experimental)");
@@ -279,7 +266,6 @@ public class ENHSP {
         options.addOption("red", "redundant_constraints", true, "Choose mechanism for redundant constraints generation among, "
                 + "no, brute and smart. No redundant constraints generation is the default");
         options.addOption("gro", "grounding", true, "Activate grounding via internal mechanism, fd or metricff or internal or naive (default is internal)");
-
         options.addOption("dl", true, "bound on plan-cost: float (Experimental)");
         options.addOption("k", true, "maximal number of subdomains. This works in combination with haddabs: integer");
         options.addOption("anytime", false, "Run in anytime modality. Incrementally tries to find a lower bound. Does not stop until the user decides so");
@@ -294,9 +280,13 @@ public class ENHSP {
         options.addOption("silent",false,"Activate silent modality");
         options.addOption("autoanytime",false,"Activate auto anytime modality. ");
         options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
-
         options.addOption("with_posthoc_logger", true, "Activate the posthoc file logger. A filename must be provided as argument");
 
+        return options;
+    }
+
+    public void parseInput(String[] args) {
+        Options options = buildOptions();
         CommandLineParser parser = new DefaultParser();
         try {
             CommandLine cmd = parser.parse(options, args);
@@ -373,7 +363,6 @@ public class ENHSP {
             }
             
             inputPlan = cmd.getOptionValue("inputplan");
-            inputPlan = cmd.getOptionValue("inputplan");
 
             String k = cmd.getOptionValue("k");
             if (k != null) {
@@ -420,10 +409,10 @@ public class ENHSP {
 //            Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
             System.err.println("Parsing failed.  Reason: " + exp.getMessage());
             HelpFormatter formatter = new HelpFormatter();
+            formatter.setWidth(120);
             formatter.printHelp("enhsp", options);
             System.exit(-1);
         }
-
     }
 
     /**

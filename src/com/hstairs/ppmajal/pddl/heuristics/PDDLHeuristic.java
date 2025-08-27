@@ -25,111 +25,143 @@ import java.util.Map;
  */
 public class PDDLHeuristic {
 
-        @FunctionalInterface
-        interface HeuristicFactory {
-                SearchHeuristic create(PDDLProblem problem, String redundantConstraints,
-                                boolean helpfulActionsPruning, boolean helpfulTransitions,
-                                boolean toOneTransformation);
+    @FunctionalInterface
+    interface HeuristicFactory {
+        SearchHeuristic create(PDDLProblem problem, String redundantConstraints,
+                boolean helpfulActionsPruning, boolean helpfulTransitions,
+                boolean toOneTransformation);
+    }
+
+    private static final String[][] HEURISTIC_INFOS = {
+        // CHECK if description is correct
+        { "gc", "Goal Counting", "Counts the number of unsatisfied goals as heuristic value." },
+        { "hadd", "HAdd", "Additive version of subgoaling heuristic." },
+        { "hradd", "HRAdd", "Additive version of subgoaling heuristic plus redundant constraints." },
+        { "hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints." },
+        { "h1res", "H1Res", "Resolution-based heuristic without optimizations." },
+        { "h1res2", "H1Res2", "Resolution-based heuristic with relaxed operator relevance pruning." },
+        { "h1res3", "H1Res3", "Resolution-based heuristic with both relevance and transition pruning." },
+        { "h1res4", "H1Res4", "Resolution-based heuristic with transition pruning only." },
+        { "hmax", "HMax", "Hmax for Numeric Planning." },
+        { "hmrp", "HMRP", "Heuristic based on MRP extraction." },
+        { "hmrp_fix", "HMRPFix", "Fixed variant of HMRP with adjusted mutex handling." },
+        { "hmrp_easy_fix", "HMRPEasyFix", "Simplified fixed variant of HMRP for efficiency." },
+        { "hmrp_fix_tran", "HMRPFixTran", "Fixed variant of HMRP including transition-based handling." },
+        { "blind", "Blind", "Blind heuristic always returning 0 (uninformed)." },
+        { "01blind", "01Blind", "Goal-sensitive blind heuristic returning 0 or 1 depending on state." },
+        { "aibr", "AIBR", "Additive Interval Based relaxation heuristic." },
+        { "hlm-count", "HLMCount", "Landmark-count heuristic estimating distance by number of unsatisfied landmarks." },
+        { "hlm-lp", "HLM-LP", "Landmark heuristic using linear programming (LP) with CPLEX." },
+        { "hlm-lp-gurobi", "HLM-FF", "Landmark heuristic using LP solved with Gurobi." },
+        { "hgen", "HGen", "Generic heuristic generator (experimental baseline heuristic)." },
+    };
+
+    private static final Map<String, HeuristicFactory> HEURISTICS = Map.ofEntries(
+            Map.entry(HEURISTIC_INFOS[0][0], (p, rc, ha, ht, to1) -> new GoalCounting(p)),
+
+            Map.entry(HEURISTIC_INFOS[1][0],
+                    (p, rc, ha, ht, to1) -> new H1(p, true, false, false, rc, ha, false, ht, false,
+                            null, to1)),
+
+            Map.entry(HEURISTIC_INFOS[2][0],
+                    (p, rc, ha, ht, to1) -> new H1(p, true, false, false, "brute", false, false,
+                            false, false, false)),
+
+            Map.entry(HEURISTIC_INFOS[3][0],
+                    (p, rc, ha, ht, to1) -> new H1(p, false, false, false, "brute", false, false,
+                            false, false, false)),
+
+            Map.entry(HEURISTIC_INFOS[4][0], (p, rc, ha, ht, to1) -> new H1Res(p, rc, false, false)),
+            Map.entry(HEURISTIC_INFOS[5][0], (p, rc, ha, ht, to1) -> new H1Res(p, rc, true, false)),
+            Map.entry(HEURISTIC_INFOS[6][0], (p, rc, ha, ht, to1) -> new H1Res(p, rc, true, true)),
+            Map.entry(HEURISTIC_INFOS[7][0], (p, rc, ha, ht, to1) -> new H1Res(p, rc, false, true)),
+
+            Map.entry(HEURISTIC_INFOS[8][0],
+                    (p, rc, ha, ht, to1) -> new H1(p, false, false, false, rc, false, false, false,
+                            false, null,
+                            false)),
+
+            Map.entry(HEURISTIC_INFOS[9][0],
+                    (p, rc, ha, ht, to1) -> new H1(p, true, true, false, rc, ha, false, ht, true,
+                            null, to1)),
+
+            Map.entry(HEURISTIC_INFOS[10][0],
+                    (p, rc, ha, ht, to1) -> new H1Fix(p, false, false, rc, ha, false, false, true,
+                            false)),
+
+            Map.entry(HEURISTIC_INFOS[11][0],
+                    (p, rc, ha, ht, to1) -> new H1Fix(p, true, true, rc, ha, false, false, false,
+                            false)),
+
+            Map.entry(HEURISTIC_INFOS[12][0],
+                    (p, rc, ha, ht, to1) -> new H1Fix(p, false, false, rc, ha, false, false, false,
+                            true)),
+
+            Map.entry(HEURISTIC_INFOS[13][0], (p, rc, ha, ht, to1) -> new BlindHeuristic(p)),
+            Map.entry(HEURISTIC_INFOS[14][0], (p, rc, ha, ht, to1) -> new GoalSensitiveHeuristic(p)),
+
+            Map.entry(HEURISTIC_INFOS[15][0], (p, rc, ha, ht, to1) -> {
+                System.out.println("AIBR selected");
+                return new Aibr(p);
+            }),
+
+            Map.entry(HEURISTIC_INFOS[16][0], (p, rc, ha, ht, to1) -> {
+                System.out.println("HLM selected");
+                return new LM(p);
+            }),
+
+            Map.entry(HEURISTIC_INFOS[17][0], (p, rc, ha, ht, to1) -> {
+                System.out.println("HLM-LP selected");
+                return new LM(p, "lp", rc, "cplex");
+            }),
+
+            Map.entry(HEURISTIC_INFOS[18][0], (p, rc, ha, ht, to1) -> {
+                System.out.println("HLM selected");
+                System.out.println(rc);
+                return new LM(p, "lp", rc, "gurobi");
+            }),
+
+            Map.entry(HEURISTIC_INFOS[19][0], (p, rc, ha, ht, to1) -> {
+                System.out.println("HGEN selected");
+                System.out.println(rc);
+                return new HGen(p);
+            }));
+
+    public static SearchHeuristic getHeuristic(String heuristic,
+            PDDLProblem heuristicProblem,
+            String redundantConstraints,
+            boolean helpfulActionsPruning,
+            boolean helpfulTransitions,
+            boolean toOneTransformation) {
+        // Special case "smart"
+        if ("smart".equals(redundantConstraints)) {
+            final H1 h1 = new H1(heuristicProblem, true, true, false,
+                    "smart", false, true, false, false, false);
+            h1.computeEstimate(heuristicProblem.getInit());
         }
 
-        private static final Map<String, HeuristicFactory> HEURISTICS = Map.ofEntries(
-                        Map.entry("gc", (p, rc, ha, ht, to1) -> new GoalCounting(p)),
-
-                        Map.entry("hadd",
-                                        (p, rc, ha, ht, to1) -> new H1(p, true, false, false, rc, ha, false, ht, false,
-                                                        null, to1)),
-
-                        Map.entry("hradd",
-                                        (p, rc, ha, ht, to1) -> new H1(p, true, false, false, "brute", false, false,
-                                                        false, false, false)),
-
-                        Map.entry("hrmax",
-                                        (p, rc, ha, ht, to1) -> new H1(p, false, false, false, "brute", false, false,
-                                                        false, false, false)),
-
-                        Map.entry("h1res", (p, rc, ha, ht, to1) -> new H1Res(p, rc, false, false)),
-                        Map.entry("h1res2", (p, rc, ha, ht, to1) -> new H1Res(p, rc, true, false)),
-                        Map.entry("h1res3", (p, rc, ha, ht, to1) -> new H1Res(p, rc, true, true)),
-                        Map.entry("h1res4", (p, rc, ha, ht, to1) -> new H1Res(p, rc, false, true)),
-
-                        Map.entry("hmax",
-                                        (p, rc, ha, ht, to1) -> new H1(p, false, false, false, rc, false, false, false,
-                                                        false, null,
-                                                        false)),
-
-                        Map.entry("hmrp",
-                                        (p, rc, ha, ht, to1) -> new H1(p, true, true, false, rc, ha, false, ht, true,
-                                                        null, to1)),
-
-                        Map.entry("hmrp_fix",
-                                        (p, rc, ha, ht, to1) -> new H1Fix(p, false, false, rc, ha, false, false, true,
-                                                        false)),
-
-                        Map.entry("hmrp_easy_fix",
-                                        (p, rc, ha, ht, to1) -> new H1Fix(p, true, true, rc, ha, false, false, false,
-                                                        false)),
-
-                        Map.entry("hmrp_fix_tran",
-                                        (p, rc, ha, ht, to1) -> new H1Fix(p, false, false, rc, ha, false, false, false,
-                                                        true)),
-
-                        Map.entry("blind", (p, rc, ha, ht, to1) -> new BlindHeuristic(p)),
-                        Map.entry("01blind", (p, rc, ha, ht, to1) -> new GoalSensitiveHeuristic(p)),
-
-                        Map.entry("aibr", (p, rc, ha, ht, to1) -> {
-                                System.out.println("AIBR selected");
-                                return new Aibr(p);
-                        }),
-
-                        Map.entry("hlm-count", (p, rc, ha, ht, to1) -> {
-                                System.out.println("HLM selected");
-                                return new LM(p);
-                        }),
-
-                        Map.entry("hlm-lp", (p, rc, ha, ht, to1) -> {
-                                System.out.println("HLM selected");
-                                System.out.println(rc);
-                                return new LM(p, "lp", rc, "cplex");
-                        }),
-
-                        Map.entry("hlm-lp-gurobi", (p, rc, ha, ht, to1) -> {
-                                System.out.println("HLM selected");
-                                System.out.println(rc);
-                                return new LM(p, "lp", rc, "gurobi");
-                        }),
-
-                        Map.entry("hgen", (p, rc, ha, ht, to1) -> {
-                                System.out.println("HGEN selected");
-                                System.out.println(rc);
-                                return new HGen(p);
-                        }));
-
-        public static SearchHeuristic getHeuristic(String heuristic,
-                        PDDLProblem heuristicProblem,
-                        String redundantConstraints,
-                        boolean helpfulActionsPruning,
-                        boolean helpfulTransitions,
-                        boolean toOneTransformation) {
-                // Special case "smart"
-                if ("smart".equals(redundantConstraints)) {
-                        final H1 h1 = new H1(heuristicProblem, true, true, false,
-                                        "smart", false, true, false, false, false);
-                        h1.computeEstimate(heuristicProblem.getInit());
-                }
-
-                HeuristicFactory factory = HEURISTICS.get(heuristic);
-                if (factory != null) {
-                        return factory.create(heuristicProblem, redundantConstraints,
-                                        helpfulActionsPruning, helpfulTransitions, toOneTransformation);
-                }
-
-                if (heuristic != null) {
-                        System.out.println("Folding back to 1-0 heuristic. Input heuristic is not supported");
-                }
-                return new GoalSensitiveHeuristic(heuristicProblem);
+        HeuristicFactory factory = HEURISTICS.get(heuristic);
+        if (factory != null) {
+            return factory.create(heuristicProblem, redundantConstraints,
+                    helpfulActionsPruning, helpfulTransitions, toOneTransformation);
         }
 
-        public static Collection<String> getAvailableHeuristics() {
-                return HEURISTICS.keySet();
+        if (heuristic != null) {
+            System.out.println("Folding back to 1-0 heuristic. Input heuristic is not supported");
         }
+        return new GoalSensitiveHeuristic(heuristicProblem);
+    }
+
+    public static String[][] getAvailableHeuristics() {
+        return HEURISTIC_INFOS;
+    }
+
+    public static String getHelpString(){
+        StringBuilder sb = new StringBuilder();
+        sb.append("Available Heuristics:\n");
+        for (String[] info: HEURISTIC_INFOS) {
+            sb.append(" - ").append(info[0]).append(": ").append(info[2]).append("\n");
+        }
+        return sb.toString();
+    }
 }
