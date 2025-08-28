@@ -26,18 +26,19 @@ public class PDDLPlanner {
     private final float boundG;
     private SearchEngine searchEngine;
 
+    final private boolean bucketBasedQueueSearch;
 
     public PDDLPlanner() {
         this("wastar", "no", false,
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
-                "", false, Float.POSITIVE_INFINITY);
+                "", false, Float.POSITIVE_INFINITY,false);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit) {
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch) {
         this.search = search;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
@@ -48,6 +49,7 @@ public class PDDLPlanner {
         this.t = t;
         this.saveSearchSpace = saveSearchSpace;
         this.boundG = depthLimit;
+        this.bucketBasedQueueSearch = bucketBasedQueueSearch;
     }
 
     public SearchNode searchSpaceHandle;
@@ -67,10 +69,10 @@ public class PDDLPlanner {
         }
         switch (search.toLowerCase()) {
             case "wastar":
-                searchEngine = new WAStar(hWeigth, true, helpfulActions, tb, saveSearchSpace, boundG);
+                searchEngine = new WAStar(hWeigth, true, helpfulActions, tb, saveSearchSpace, boundG,bucketBasedQueueSearch);
                 break;
             case "gbfs":
-                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG);
+                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG,bucketBasedQueueSearch);
                 break;
             case "ehs":
                 searchEngine = new EHS(helpfulActions);
@@ -80,13 +82,14 @@ public class PDDLPlanner {
                         false, System.out);
                 break;
             case "lazygbfs":
-                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG);
+                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG,false,bucketBasedQueueSearch);
                 break;
             case "lazywastar":
                 searchEngine = new LazyWAStar(hWeigth, true, helpfulActions, saveSearchSpace, tb, boundG);
                 break;
+
             default:
-                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG);
+                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG,bucketBasedQueueSearch);
                 break;
         }
 

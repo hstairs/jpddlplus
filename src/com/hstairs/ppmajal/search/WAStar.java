@@ -3,6 +3,7 @@ package com.hstairs.ppmajal.search;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
+import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
@@ -22,13 +23,22 @@ public class WAStar extends SearchEngine {
     final protected boolean saveSearchSpace;
     final protected float gBound;
 
-    public WAStar(float hw, boolean optimality, boolean helpfulActionsPruning, TieBreaker tieBreaker, boolean saveSearchSpace, float gBound){
+    final protected boolean bucketPriorityQueue;
+
+
+    public  WAStar(float hw, boolean optimality, boolean helpfulActionsPruning,
+                         TieBreaker tieBreaker, boolean saveSearchSpace, float gBound){
+        this(hw,optimality,helpfulActionsPruning,tieBreaker,saveSearchSpace,gBound,false);
+    }
+    public WAStar(float hw, boolean optimality, boolean helpfulActionsPruning,
+                  TieBreaker tieBreaker, boolean saveSearchSpace, float gBound, boolean bucketPriorityQueue){
         super(helpfulActionsPruning);
         this.optimality = optimality;
         this.hw = hw;
         this.tieBreaker = tieBreaker;
         this.saveSearchSpace = saveSearchSpace;
         this.gBound = gBound;
+        this.bucketPriorityQueue = bucketPriorityQueue;
     }
     public SearchStats getStats(){
         return new SearchStats(nodesExpanded,nodesEvaluated,deadEndsDetected,duplicatedDetected,totalTime,heuristicTime);
@@ -71,6 +81,8 @@ public class WAStar extends SearchEngine {
             ((Queue) frontier).add(newNode);
         } else if (frontier instanceof ObjectHeapPriorityQueue) {
             ((ObjectHeapPriorityQueue) frontier).enqueue(newNode);
+        } else if (frontier instanceof BucketPriorityQueue){
+            ((BucketPriorityQueue) frontier).enqueue(newNode);
         }
 
     }
@@ -79,14 +91,14 @@ public class WAStar extends SearchEngine {
         zeroCounters();
         final State initState = problem.getInit();
 
-        final ObjectHeapPriorityQueue<SearchNode> frontier =
-                new ObjectHeapPriorityQueue<>(tieBreaker);
         if (!problem.satisfyGlobalConstraints(initState)) {
             out.println("Initial State is not valid");
             return null;
         }
                 long timeAtStart = System.currentTimeMillis();
         hAtInit = h.computeEstimate(initState);
+        final PriorityQueue<SearchNode> frontier = getPriorityQueue((int)hAtInit*10);
+
         out.println("h(I):"+hAtInit);
 
         heuristicTime += System.currentTimeMillis() - timeAtStart;
@@ -149,11 +161,18 @@ public class WAStar extends SearchEngine {
         return null;
     }
 
+    protected PriorityQueue getPriorityQueue(int size) {
+        if (bucketPriorityQueue){
+            return new BucketPriorityQueue(size,tieBreaker);
+        }else{
+            return new ObjectHeapPriorityQueue<>(tieBreaker);
+        }
+    }
 
 
     protected float printInfoDuringSearch(long timeAtStart, PrintStream out, float bestf, long fromTheBeginning,
                                         int nodesExpanded,
-                                        int nodesEvaluated, ObjectHeapPriorityQueue<SearchNode> frontier,
+                                        int nodesEvaluated, Object frontier,
                                         SearchNode currentNode) {
         if (fromTheBeginning >= previous + 10000) {
             final float speed = nodesExpanded / (fromTheBeginning / 1000);
@@ -168,11 +187,22 @@ public class WAStar extends SearchEngine {
             out.println("f(n) = " + currentNode.f + " (Expanded Nodes: " + nodesExpanded
                     + ", Evaluated States: " + nodesEvaluated + ", Time: " +
                     (float) ((System.currentTimeMillis() - timeAtStart)) / 1000.0 + ")"+
-                    " Frontier Size: "+frontier.size());
+                    " Frontier Size: "+size(frontier));
         }else if (!optimality && hAtInit > (hValueInCurrentNode)) {
             out.println(" g(n)= " + currentNode.gValue + " h(n)=" + (hValueInCurrentNode));
             hAtInit = hValueInCurrentNode;
         }
         return bestf;
+    }
+
+    private int size(Object frontier) {
+        if (frontier instanceof Queue) {
+            return ((Queue) frontier).size();
+        } else if (frontier instanceof ObjectHeapPriorityQueue) {
+            return ((ObjectHeapPriorityQueue) frontier).size();
+        } else if (frontier instanceof BucketPriorityQueue){
+            return ((BucketPriorityQueue) frontier).size();
+        }
+        return -1;
     }
 }

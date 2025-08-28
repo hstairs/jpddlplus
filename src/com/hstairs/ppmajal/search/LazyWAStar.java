@@ -4,6 +4,7 @@ import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
@@ -11,7 +12,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.jgrapht.alg.util.Pair;
 
 import java.io.PrintStream;
-import java.sql.Array;
 import java.util.*;
 
 public class LazyWAStar extends WAStar {
@@ -19,12 +19,14 @@ public class LazyWAStar extends WAStar {
 
     final private boolean helpfulActionsWithPruning;
 
-    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace, TieBreaker tb, float boundG,boolean helpfulActionsWithPruning) {
-        super(hw, optimality, helpfulActions, tb, saveSearchSpace, boundG);
+    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace,
+                      TieBreaker tb, float boundG,boolean helpfulActionsWithPruning, boolean bucketPriorityQueue) {
+        super(hw, optimality, helpfulActions, tb, saveSearchSpace, boundG,bucketPriorityQueue);
         this.helpfulActionsWithPruning = helpfulActionsWithPruning;
     }
-    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace, TieBreaker tb, float boundG) {
-        this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false);
+    public LazyWAStar(float hw, boolean optimality, boolean helpfulActions, boolean saveSearchSpace,
+                      TieBreaker tb, float boundG) {
+        this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false, false);
     }
 
     Object[] getActionsToSearch(List helpful, SearchHeuristic h) {
@@ -44,17 +46,21 @@ public class LazyWAStar extends WAStar {
 
     @Override
     public SimpleSearchNode search(SearchProblem problem, SearchHeuristic h, PrintStream out) {
+
+
         zeroCounters();
         final State initState = problem.getInit();
 
-        final ObjectHeapPriorityQueue<SearchNode> frontier =
-                new ObjectHeapPriorityQueue<>(tieBreaker);
         if (!problem.satisfyGlobalConstraints(initState)) {
             out.println("Initial State is not valid");
             return null;
         }
         long timeAtStart = System.currentTimeMillis();
         hAtInit = h.computeEstimate(initState);
+        PriorityQueue frontier = getPriorityQueue((int)hAtInit*10);
+
+
+
         heuristicTime += System.currentTimeMillis() - timeAtStart;
         if (hAtInit == Float.MAX_VALUE) {
             deadEndsDetected++;
@@ -68,13 +74,14 @@ public class LazyWAStar extends WAStar {
             init.helpfulActions = h.getTransitions(helpfulActions);
         }
         super.initHandle(init); //This is to inspect the search space if needed
-        frontier.enqueue(init);
+        enqueue(frontier,init);
         Object2FloatMap<State> gValueMap = new Object2FloatOpenHashMap<>();
         gValueMap.put(initState, 0f);//The initial state is at 0 distance, of course.
         float bestf = 0;
         previous = 0;
-        while (!frontier.isEmpty()) {
-            final SearchNode currentNode = frontier.dequeue();
+        while (!isEmpty(frontier)) {
+            final SearchNode currentNode = (SearchNode) dequeue(frontier);
+            //System.out.println(currentNode.f);
             if (currentNode.gValue == getPreviousCost(gValueMap, currentNode.s)) {
                 nodesExpanded++;
                 long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);
@@ -93,7 +100,7 @@ public class LazyWAStar extends WAStar {
 
                     heuristicTime += System.currentTimeMillis() - start;
                     bestf = printInfoDuringSearch(timeAtStart, out, bestf, fromTheBeginning,
-                            nodesExpanded, nodesEvaluated, frontier, currentNode);
+                             nodesExpanded, nodesEvaluated, frontier, currentNode);
 
                     Object[] actionsToSearch = getActionsToSearch(helpful,h);
 
@@ -152,5 +159,29 @@ public class LazyWAStar extends WAStar {
         }
 
         return null;
+    }
+
+    private Object dequeue(Object frontier) {
+        if (frontier instanceof BucketPriorityQueue){
+            return ((BucketPriorityQueue) frontier).dequeue();
+        }else if (frontier instanceof ObjectHeapPriorityQueue<?>){
+            return ((ObjectHeapPriorityQueue<?>) frontier).dequeue();
+        }else{
+            throw  new RuntimeException("Unsupported priority queue");
+        }
+    }
+
+    private boolean isEmpty(Object frontier) {
+        if (frontier instanceof BucketPriorityQueue){
+            return ((BucketPriorityQueue) frontier).isEmpty();
+        }else if (frontier instanceof ObjectHeapPriorityQueue<?>){
+            return ((ObjectHeapPriorityQueue<?>) frontier).isEmpty();
+        }else{
+            throw  new RuntimeException("Unsupported priority queue");
+        }
+    }
+
+    private void enqueue(PriorityQueue frontier, SearchNode init) {
+        frontier.enqueue(init);
     }
 }

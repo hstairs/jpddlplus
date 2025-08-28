@@ -61,7 +61,8 @@ public class ProblemTransfomer {
     private static Int2IntOpenHashMap cptransition2transitionMap;
     private static Set<NumFluent> metricVars = new HashSet<>();
 
-    public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints, boolean unitaryCost, int linearEffectsAbstraction) {
+    public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints,
+                                                            boolean unitaryCost, int linearEffectsAbstraction) {
         int nTransitions = Transition.totNumberOfTransitions + 1;
         pseudoGoal = nTransitions - 1;
         p = problem;
