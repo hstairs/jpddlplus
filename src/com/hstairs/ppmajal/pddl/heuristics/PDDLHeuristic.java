@@ -134,6 +134,10 @@ public class PDDLHeuristic {
             boolean helpfulTransitions,
             boolean toOneTransformation) {
         // Special case "smart"
+        if (redundantConstraints == null) {
+            redundantConstraints = "";
+        }
+
         if ("smart".equals(redundantConstraints)) {
             final H1 h1 = new H1(heuristicProblem, true, true, false,
                     "smart", false, true, false, false, false);

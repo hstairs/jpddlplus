@@ -1,0 +1,29 @@
+@startuml schema
+hide footbox
+skinparam sequenceMessageSpacing 3
+skinparam ParticipantPadding 40
+
+actor Utente as U
+participant "posthoc-app" as App #lightgreen
+participant "posthoc-server" as Server #lightblue
+participant "jpddlplus" as Jpddl #orange
+
+U -> App: Configura collegamento al Server
+App -> Server: Inizializza connessione WebSocket
+
+U -> App: Imposta parametri
+App -> Server: Invia parametri
+Server -> Server: Crea file istanza
+Server -> Jpddl: Invoca builder
+Jpddl --> Server: Risultato
+Server -> Server: Parsing eventi
+Server --> App: Restituisce soluzione
+App -> U: Renderizza soluzione
+
+loop Modifica parametri
+  U -> App: Cambia parametri
+  note right of App
+    Ripete passi 4–8
+  end note
+end
+@enduml
