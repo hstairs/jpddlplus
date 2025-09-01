@@ -244,7 +244,7 @@ public class ENHSP {
         Options options = new Options();
         options.addRequiredOption("o", "domain", true, "PDDL domain file");
         options.addRequiredOption("f", "problem", true, "PDDL problem file");
-        options.addOption("planner", true, "Fast Preconfgured Planner. For available options look into the code. This overrides all other parameters but domain and problem specs. Commonly used settings are: sat-hmrp (satisficing planning) or opt-hrmax (optimal planning).");
+        options.addOption("planner", true, "Fast Preconfgured Planner. This overrides all other parameters but domain and problem specs.\n" + Planner.getHelp() + "\n");
         options.addOption("h", true, "allows to select heuristic (default is hadd). " + PDDLHeuristic.getHelpString() + "\n");
         options.addOption("s", true, "allows to select search strategy (default is WAStar):\n" + PDDLPlanner.getHelpString() + "\n");
         options.addOption("ties", true, "tie-breaking (default is arbitrary): larger_g, smaller_g, arbitrary");
@@ -441,8 +441,8 @@ public class ENHSP {
             chosen = Planner.valueOf(planner.toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
             System.out.println(
-                    "! ====== ! Warning: Unknown planner configuration. Going with default: gbfs with hadd ! ====== !");
-            chosen = Planner.SAT_HADD;
+                    "! ====== ! Warning: Unknown planner configuration. Going with default: sat-hmrp ! ====== !");
+            chosen = Planner.SAT_HMRP;
         }
 
         PlannerConfig cfg = chosen.config;
