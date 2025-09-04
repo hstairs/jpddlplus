@@ -76,6 +76,11 @@ public class ENHSPBuilder {
         return this;
     }
 
+    public ENHSPBuilder setLinearEffectsAbstraction(int linearEffectsAbstraction) {
+        enhsp.linearEffectsAbstraction = linearEffectsAbstraction;
+        return this;
+    }
+
     public ENHSPBuilder setGroundingType(String groundingType) {
         enhsp.groundingType = groundingType;
         return this;
@@ -176,6 +181,26 @@ public class ENHSPBuilder {
         return this;
     }
 
+    public ENHSPBuilder enablePrintAllInfo(boolean enabled) {
+        enhsp.printAllInfo = enabled;
+        return this;
+    }
+
+    public ENHSPBuilder enablePrintMakespan(boolean enabled) {
+        enhsp.printMakespan = enabled;
+        return this;
+    }
+
+    public ENHSPBuilder enablePls(boolean enabled) {
+        enhsp.pls = enabled;
+        return this;
+    }
+
+    public ENHSPBuilder enableBucketBasedQueueSearch(boolean enabled) {
+        enhsp.bucketBasedQueueSearch = enabled;
+        return this;
+    }
+
     public ENHSPBuilder setWeightH(String wh) {
         enhsp.wh = wh;
         return this;
@@ -230,7 +255,12 @@ public class ENHSPBuilder {
             .enableHelpfulTransitions(false)
             .enableIgnoreMetric(false)
             .enablePrintActions(false)
-            .setExternalLogger(null);
+            .setExternalLogger(null)
+            .setLinearEffectsAbstraction(-1)
+            .enablePrintAllInfo(false)
+            .enablePrintMakespan(true)
+            .enablePls(false)
+            .enableBucketBasedQueueSearch(false);
 
         return this;   
     }

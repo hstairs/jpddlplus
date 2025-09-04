@@ -70,7 +70,7 @@ public class ENHSP {
     String deltaValidation;
     boolean helpfulActions;
     Integer numSubdomains;
-    private int linearEffectsAbstraction = -1;
+    int linearEffectsAbstraction = -1;
 
     private PDDLProblem problem;
     private boolean pddlPlus;
@@ -102,11 +102,11 @@ public class ENHSP {
     boolean autoAnytime;
     boolean unitCostHeuristic;
     IExternalLogger externalLogger;
-    private boolean printAllInfo;
-    private boolean printMakespan;
-    public static boolean aibrDebug = false;
-    private boolean pls;
-    private boolean bucketBasedQueueSearch;
+    boolean printAllInfo;
+    boolean printMakespan;
+    private static boolean aibrDebug = false;
+    boolean pls;
+    boolean bucketBasedQueueSearch;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
