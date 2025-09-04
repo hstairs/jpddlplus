@@ -28,19 +28,25 @@ import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.parser.PddlLexer;
 import com.hstairs.ppmajal.parser.PddlParser;
+import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.problem.*;
 import com.hstairs.ppmajal.propositionalFactory.*;
+import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.SearchProblem;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import com.hstairs.ppmajal.transition.TransitionSchema;
+import it.unimi.dsi.fastutil.ints.IntArraySet;
+import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.logging.Level;
@@ -58,6 +64,12 @@ import org.jgrapht.alg.util.Pair;
  * @author enrico
  */
 public class PDDLProblem implements SearchProblem {
+
+    private boolean relevantUndefinedVariablesPresent;
+    private boolean[] subgoalRelevantFluents;
+    private boolean[] costRelevantFluents;
+    private boolean aibrDebugPreprocessing = false;
+    private DecActionRepresentation decActRep;
 
     /**
      * @return the name
@@ -322,7 +334,7 @@ public class PDDLProblem implements SearchProblem {
         }
         if (!this.simplifyAndSetupInit(aibrPreprocessing))
             return false;
-        groundGoals = generate_inequalities(getGoals());
+        //groundGoals = generate_inequalities(getGoals());
         readyForSearch = true;
         return true;
     }
@@ -338,11 +350,34 @@ public class PDDLProblem implements SearchProblem {
 
             for (TransitionGround gr : transitions) {
                 gr.updateInvariantFluents(actualFluents);
-
             }
         }
 //        System.out.println(actualFluents);
         return actualFluents;
+    }
+
+    public boolean isSubgoalsRelevant(NumFluent nf) {
+        return subgoalRelevantFluents != null && subgoalRelevantFluents[nf.getId()];
+    }
+
+    public boolean isCostRelevant(NumFluent nf) {
+        return costRelevantFluents != null && costRelevantFluents[nf.getId()];
+    }
+
+    public void setSubgoalRelevant(NumFluent nf) {
+        if (subgoalRelevantFluents == null) {
+            subgoalRelevantFluents = new boolean[NumFluent.numFluentsBank.size()];
+            Arrays.fill(subgoalRelevantFluents, false);
+        }
+        subgoalRelevantFluents[nf.getId()] = true;
+    }
+
+    public void setCostRelevant(NumFluent nf) {
+        if (costRelevantFluents == null) {
+            costRelevantFluents = new boolean[NumFluent.numFluentsBank.size()];
+            Arrays.fill(costRelevantFluents, false);
+        }
+        costRelevantFluents[nf.getId()] = true;
     }
 
     private void generateConstraints() throws Exception {
@@ -390,16 +425,18 @@ public class PDDLProblem implements SearchProblem {
         while (it.hasNext()) {
             TransitionGround act = (TransitionGround) it.next();
             boolean keep = true;
-            for (final NumEffect effect : act.getAllNumericEffects()) {
-                if (true) {
-                    if (effect.weakEval(this, this.getActualFluents()) != null) {
-                        effect.normalize();
-                    } else {
-                        keep = false;
+            for (var condEffect : act.getAllConditionalEffects().entrySet()) {
+                Condition key = condEffect.getKey().weakEval(this, this.getActualFluents());
+                if (!key.isUnsatisfiable()) {
+                    for (var _e : condEffect.getValue()) {
+                        if (_e instanceof NumEffect effect) {
+                            if (effect.weakEval(this, this.getActualFluents()) != null) {
+                                effect.normalize();
+                            } else {
+                                keep = false;
+                            }
+                        }
                     }
-                } else {
-                    effect.normalize();
-
                 }
             }
             if (isSimplifyActions() && keep) {
@@ -451,31 +488,33 @@ public class PDDLProblem implements SearchProblem {
 //        final Collection<TransitionGround> transitions = h1.getTransitions(false);
         if (aibrPreprocessing) {
             System.out.println("Aibr Preprocessing");
-            final Aibr heuristic = new Aibr(this, true);
+            final Aibr heuristic = new Aibr(this, true, aibrDebugPreprocessing);
             final float v = heuristic.computeEstimate(this.init);
-            if (v == Float.MAX_VALUE) {
-                out.println("Problem Detected as Unsolvable");
-                return false;
-            }
-            final Collection<TransitionGround> transitions = heuristic.getAllTransitions();
-            actions = new ArrayList<>();
-            processesSet = new ArrayList<>();
-            eventsSet = new ArrayList<>();
-            for (final TransitionGround t : transitions) {
-                switch (t.getSemantics()) {
-                    case ACTION:
-                        actions.add(t);
-                        break;
-                    case PROCESS:
-                        processesSet.add(t);
-                        break;
-                    case EVENT:
-                        eventsSet.add(t);
-                        break;
+            if (v != Float.MAX_VALUE) {
+                final Collection<TransitionGround> transitions = heuristic.getAllTransitions();
+                actions = new ArrayList<>();
+                processesSet = new ArrayList<>();
+                eventsSet = new ArrayList<>();
+                for (final TransitionGround t : transitions) {
+                    switch (t.getSemantics()) {
+                        case ACTION:
+                            actions.add(t);
+                            break;
+                        case PROCESS:
+                            processesSet.add(t);
+                            break;
+                        case EVENT:
+                            eventsSet.add(t);
+                            break;
+                    }
                 }
+            } else {
+                out.println("Problem Detected as Unsolvable by AIBR during preprocessing");
+                return false;
             }
             if (!sweepStructuresForUnreachableStatements())
                 return false;
+
         }
         return true;
 //        this.makePddlState(); //remake init so as to account for only reachable actions
@@ -524,14 +563,45 @@ public class PDDLProblem implements SearchProblem {
 
         long start = System.currentTimeMillis();
 
-        if (!easyCleanUp(aibrPreprocessing))
-            return false;
+        boolean relSolvable = easyCleanUp(aibrPreprocessing);
 
         globalConstraints = (AndCond) globalConstraints.normalize();
         makeInit();
+        out.println("UFX:" + relevantUndefinedVariablesPresent);
         out.println("|F|:" + totNumberOfBoolVariables);
         out.println("|X|:" + totNumberOfNumVariables);
-        return true;
+
+        return relSolvable;
+    }
+
+    public void printAllInfo() {
+        out.println("Numeric fluents deemed relevant for search");
+        for (NumFluent nf : NumFluent.numFluentsBank.values()) {
+            if ((this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf))) {
+                out.println(nf);
+            }
+        }
+        out.println("Boolean fluents deemed relevant for search");
+        for (BoolPredicate p : BoolPredicate.getPredicatesDB().values()) {
+            if (this.getActualFluents().contains(p)) {
+                out.println(p);
+            }
+
+        }
+        out.println("Actions deemed relevant for search");
+        for (var action : this.actions) {
+            out.println(action);
+        }
+
+        out.println("Processes deemed relevant for search");
+        for (var action : this.processesSet) {
+            out.println(action);
+        }
+
+        out.println("Events deemed relevant for search");
+        for (var action : this.eventsSet) {
+            out.println(action);
+        }
     }
 
 //    private void idifyConditionsAndTransitions (Collection<GroundAction> reachableActions, ComplexCondition liftedGoals, AndCond globalConstraints) {
@@ -594,7 +664,7 @@ public class PDDLProblem implements SearchProblem {
             for (final Condition c : allConditionalEffects.keySet()) {
                 involved_fluents.addAll(c.getInvolvedFluents());
             }
-            involved_fluents.addAll(a.getNumFluentsNecessaryForExecution());
+
         }
 
 
@@ -603,26 +673,26 @@ public class PDDLProblem implements SearchProblem {
         }
         involved_fluents.addAll(getGoals().getInvolvedFluents());
 
-
-        if (NumFluent.numFluentsBank != null) {
-            Iterator<NumFluent> it = NumFluent.numFluentsBank.values().iterator();
-            while (it.hasNext()) {
-                NumFluent nf2 = it.next();
-                boolean keep_it = false;
-                for (NumFluent nf : involved_fluents) {
-                    if (nf.getName().equals(nf2.getName())) {
-                        keep_it = true;
-                        break;
-                    }
-                }
-                if (!keep_it) {
-                    nf2.needsTrackingInState(false);
-//                    it.remove();
-                } else {
-                    nf2.needsTrackingInState(true);
-                }
+        for (var ele : involved_fluents) {
+            setSubgoalRelevant(ele);
+        }
+        Metric metric = this.getMetric();
+        if (metric != null) {
+            for (var v : metric.getMetExpr().getInvolvedNumericFluents()) {
+                setCostRelevant(v);
             }
         }
+        for (var t : getTransitions()) {
+            for (NumEffect e : t.getConditionalNumericEffects().getAllEffects()) {
+                //if (this.isSubgoalsRelevant(e.getFluentAffected())) {
+                for (var v : e.getRight().getInvolvedNumericFluents()) {
+                    this.setSubgoalRelevant(v);
+                }
+                //}
+            }
+        }
+
+
     }
 
 
@@ -630,7 +700,7 @@ public class PDDLProblem implements SearchProblem {
         Set res = new HashSet();
         if (NumFluent.numFluentsBank != null) {
             for (NumFluent nf : NumFluent.numFluentsBank.values()) {
-                if (this.getActualFluents().contains(nf) && nf.has_to_be_tracked()) {
+                if (this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf)) {
                     res.add(nf);
                 }
             }
@@ -660,13 +730,17 @@ public class PDDLProblem implements SearchProblem {
         HashMap<Integer, Double> numFluents = new HashMap();
         totNumberOfNumVariables = 0;
         totNumberOfBoolVariables = 0;
+        relevantUndefinedVariablesPresent = false;
+
         if (NumFluent.numFluentsBank != null) {
             for (NumFluent nf : NumFluent.numFluentsBank.values()) {
-                if ((this.getActualFluents().contains(nf) && nf.has_to_be_tracked()) || !invAnalysis) {
+                if ((this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf)) || !invAnalysis) {
+
                     if (nf.isGrounded()) {
                         PDDLNumber number = this.getInitNumFluentsValues().get(nf);
                         if (number == null) {
                             numFluents.put(nf.getId(), Double.NaN);
+                            relevantUndefinedVariablesPresent = true;
                         } else {
                             numFluents.put(nf.getId(), number.getNumber().doubleValue());
                         }
@@ -696,12 +770,12 @@ public class PDDLProblem implements SearchProblem {
         }
         PDDLState pddlState = null;
         if (cacheComparison) {
-            pddlState = new PDDLStateWithCache(numFluents, boolFluents);
+            pddlState = new PDDLStateWithCache(numFluents, boolFluents, this);
         } else {
             if (smallExpensive) {
                 pddlState = new PDDLStateWithInt2Double(numFluents, boolFluents);
             } else {
-                pddlState = new PDDLState(numFluents, boolFluents);
+                pddlState = new PDDLState(numFluents, boolFluents, this);
             }
         }
 
@@ -793,9 +867,28 @@ public class PDDLProblem implements SearchProblem {
         return getNumericFluentReference().get(stringRepresentation);
     }
 
+    enum generatorTypes {stateBased,h1,traditional};
+    generatorTypes successorGenerator = generatorTypes.traditional ;
     @Override
     public Iterator<Pair<State, Object>> getSuccessors(State s, Object[] acts) {
-        return new stateIterator(s, acts);
+        switch (successorGenerator) {
+            case stateBased:
+                return new optimisedSuccessorsGenerator(s, acts, getDecActionRepresentation(acts));
+            case traditional:
+                return new naiveSuccessorIterator(s, acts);
+        }
+        return null;
+    }
+
+    private DecActionRepresentation getDecActionRepresentation(Object[] acts) {
+        if (decActRep == null) {
+            IntArraySet intActions = new IntArraySet();
+            for (var act : acts) {
+                intActions.add(((TransitionGround) act).getId());
+            }
+            decActRep = new DecActionRepresentation(intActions);
+        }
+        return decActRep;
     }
 
     @Override
@@ -808,7 +901,7 @@ public class PDDLProblem implements SearchProblem {
         while (true) {
             boolean at_least_one = false;
             for (TransitionGround ev : events) {
-                if (ev.isApplicable(s)) {
+                if (ev.isApplicable(s, this.relevantUndefinedVariablesPresent, this)) {
                     at_least_one = true;
                     s.apply(ev, s.clone());
                     ret.add(ev);
@@ -1414,7 +1507,8 @@ public class PDDLProblem implements SearchProblem {
         liftedGoals = con;
     }
 
-    protected class stateIterator implements ObjectIterator<Pair<State, Object>> {
+
+    protected class naiveSuccessorIterator implements ObjectIterator<Pair<State, Object>> {
         protected final State source;
         final private Object[] actionsSet;
         protected Object current;
@@ -1423,7 +1517,8 @@ public class PDDLProblem implements SearchProblem {
         private boolean processDone;
         private boolean eventsPriority = false;
 
-        public stateIterator(State source, Object[] actionsSet) {
+
+        public naiveSuccessorIterator(State source, Object[] actionsSet) {
             this.source = source;
             this.actionsSet = actionsSet;
             i = 0;
@@ -1432,7 +1527,7 @@ public class PDDLProblem implements SearchProblem {
 
         @Override
         public boolean hasNext() {
-            if (!processesSet.isEmpty()) {
+            if (!processesSet.isEmpty() || !eventsSet.isEmpty()) {
                 if (!processDone) {
                     processDone = true;
                     final ImmutablePair<State, Integer> intelligentSimulation = intelligentSimulation(source, planningDelta, executionDelta, true);
@@ -1448,8 +1543,7 @@ public class PDDLProblem implements SearchProblem {
                 i++;
 
                 if (current instanceof TransitionGround transitionGround) {
-
-                    if (transitionGround.isApplicable(source)) {
+                    if (transitionGround.isApplicable(source, relevantUndefinedVariablesPresent, PDDLProblem.this)) {
                         newState = source.clone();
                         newState.apply(transitionGround, source);
                         if (newState.satisfy(globalConstraints)) {
@@ -1475,7 +1569,7 @@ public class PDDLProblem implements SearchProblem {
             final State prev = source.clone();
             int i = 0;
             while (i < counter) {
-                if (act.isApplicable(prev) && prev.satisfy(globalConstraints)) {
+                if (act.isApplicable(prev, relevantUndefinedVariablesPresent, PDDLProblem.this) && prev.satisfy(globalConstraints)) {
                     prev.apply((act), prev.clone());
                     i++;
                 } else {
@@ -1492,76 +1586,130 @@ public class PDDLProblem implements SearchProblem {
         }
     }
 
+    protected class optimisedSuccessorsGenerator implements ObjectIterator<Pair<State, Object>> {
+        protected final State source;
+        final private Object[] actionsSet;
+        private final IntIterator terminalsIterator;
+        protected Object current;
+        protected State newState;
+        private boolean processDone;
+        private boolean eventsPriority = false;
+
+        final DecActionRepresentation decAct;
+
+        private final int[] achCondition;
+        private int currentTerminal;
+        private Iterator<Integer> actionIterators;
+
+
+        public optimisedSuccessorsGenerator(State source, Object[] actionsSet, DecActionRepresentation dec) {
+            this.source = source;
+            this.actionsSet = actionsSet;
+            processDone = false;
+            decAct = dec;
+            achCondition = new int[TransitionGround.totNumberOfTransitions];
+            terminalsIterator = decAct.universeOfTerminals.iterator();
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (!processesSet.isEmpty() || !eventsSet.isEmpty()) {
+                if (!processDone) {
+                    processDone = true;
+                    final ImmutablePair<State, Integer> intelligentSimulation = intelligentSimulation(source, planningDelta, executionDelta, true);
+                    if (intelligentSimulation != null) {
+                        newState = intelligentSimulation.getLeft();
+                        current = intelligentSimulation.getRight();
+                        return true;
+                    }
+                }
+            }
+
+            while (terminalsIterator.hasNext() || ((actionIterators != null) && (actionIterators.hasNext()))) {
+                while ((actionIterators != null) && (actionIterators.hasNext())) {
+                    int act = actionIterators.next();
+                    Transition transition = TransitionGround.getTransition(act);
+                    achCondition[act]++;
+                    if (achCondition[act] >= decAct.necTerminals[act].size()) {
+                        current = TransitionGround.getTransition(act);
+                        if (current instanceof TransitionGround transitionGround) {
+                            boolean exec = true;
+                            for (var condition : decAct.necNotTerminals[act]) {
+                                if (!source.satisfy(condition)) {
+                                    exec = false;
+                                    break;
+                                }
+                            }
+                            if (exec) {
+                                newState = source.clone();
+                                newState.apply(transitionGround, source);
+                                if (newState.satisfy(globalConstraints)) {
+                                    if (eventsPriority) {
+                                        applyAllEvents(newState);
+                                    }
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                while (terminalsIterator.hasNext()) {
+                    currentTerminal = terminalsIterator.nextInt();
+                    if (decAct.actionsOfNecTerminal[currentTerminal] == null)
+                        continue;
+                    if (decAct.isTrueTerminal(currentTerminal) || source.satisfy(Terminal.getTerminal(currentTerminal))) {
+                        actionIterators = decAct.actionsOfNecTerminal[currentTerminal].iterator();
+                        break;
+                    }
+                }
+            }
+
+
+            return false;
+        }
+
+        public int applyActionMTimes(final TransitionGround act, int counter) {
+            final State prev = source.clone();
+            int i = 0;
+            while (i < counter) {
+                if (act.isApplicable(prev, relevantUndefinedVariablesPresent, PDDLProblem.this) && prev.satisfy(globalConstraints)) {
+                    prev.apply((act), prev.clone());
+                    i++;
+                } else {
+                    break;
+                }
+            }
+            newState = prev;
+            return i;
+        }
+
+        @Override
+        public Pair<State, Object> next() {
+            return new Pair(newState, current);
+        }
+
+    }
+
 
     protected void printInfo(PrintStream out) {
         //out.println("Reachable actions and processes: |A U P U E|:" + TransitionGround.totNumberOfTransitions);
     }
 
-    public boolean validate(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, Object>> userPlan, BigDecimal execDelta, BigDecimal stepSize) throws CloneNotSupportedException {
-        return validate(userPlan, execDelta, stepSize, null);
-    }
 
-    public boolean validate(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, Object>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize, String planTrace) throws CloneNotSupportedException {
+    public List<State> getTrace(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize) throws CloneNotSupportedException {
         BigDecimal previous = BigDecimal.ZERO;
         State current = (PDDLState) this.getInit();
-        System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
-        StringBuilder planTraceString = null;
-        if (planTrace != null) {
-            planTraceString = new StringBuilder();
-            planTraceString.append(current.toString()).append("\n");
-        }
-
-        for (org.apache.commons.lang3.tuple.Pair<BigDecimal, Object> ele : internalPlanRepresentation) {
-            TransitionGround right = (TransitionGround) ele.getRight();
-            if (right.getSemantics().equals(Transition.Semantics.PROCESS)) {
-                final ImmutablePair<State, Integer> stateCollectionPair
-                        = simulation(current, execDelta, stepSize, false, planTraceString);
-                if (stateCollectionPair == null) {
-                    System.out.println("Constraint violated");
-                    return false;
-                } else {
-                    current = stateCollectionPair.getLeft();
-                }
-            }
-            previous = ele.getKey();
-            if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
-                current.apply(right, current.clone());
-                if (planTrace != null) {
-                    planTraceString.append(current.toString()).append("\n");
-                }
-            }
-        }
-        if (planTrace != null) {
-            try {
-                BufferedWriter bf = new BufferedWriter(new FileWriter(planTrace));
-                bf.append(planTraceString);
-                bf.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-//        System.out.println(current);
-        return current.satisfy(this.getGoals());
-    }
-
-    public boolean validateRefactored(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize, String planTrace) throws CloneNotSupportedException {
-        BigDecimal previous = BigDecimal.ZERO;
-        State current = (PDDLState) this.getInit();
-        System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
-        StringBuilder planTraceString = null;
-        if (planTrace != null) {
-            planTraceString = new StringBuilder();
-            planTraceString.append(current.toString()).append("\n");
-        }
-
+        List<State> trace = new LinkedList();
+        trace.add(current);
+        //Important: We are assuming that all processes are equivalent to a waiting action lasting the user defined delta time
         for (org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround> ele : internalPlanRepresentation) {
             TransitionGround right = (TransitionGround) ele.getRight();
             if (right.getSemantics().equals(Transition.Semantics.PROCESS)) {
                 final ImmutablePair<State, Integer> stateCollectionPair
-                        = simulation(current, execDelta, stepSize, false, planTraceString);
+                        = simulation(current, execDelta, stepSize, false, trace);
                 if (stateCollectionPair == null) {
                     System.out.println("Constraint violated");
-                    return false;
+                    return trace;
                 } else {
                     current = stateCollectionPair.getLeft();
                 }
@@ -1569,12 +1717,22 @@ public class PDDLProblem implements SearchProblem {
             previous = ele.getKey();
             if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
                 current.apply(right, current.clone());
-                if (planTrace != null) {
-                    planTraceString.append(current.toString()).append("\n");
-                }
+                trace.add(current);
             }
         }
+//        System.out.println(current);
+        return trace;
+    }
+
+    public boolean validate(List<org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround>> internalPlanRepresentation, BigDecimal execDelta, BigDecimal stepSize, String planTrace) throws CloneNotSupportedException {
+        System.out.println("Plan under Validation/Simulation: " + internalPlanRepresentation);
+        List<State> trace = this.getTrace(internalPlanRepresentation, execDelta, stepSize);
+        StringBuilder planTraceString = null;
         if (planTrace != null) {
+            planTraceString = new StringBuilder();
+            for (var v : trace) {
+                planTraceString.append(v.toString()).append("\n");
+            }
             try {
                 BufferedWriter bf = new BufferedWriter(new FileWriter(planTrace));
                 bf.append(planTraceString);
@@ -1583,8 +1741,7 @@ public class PDDLProblem implements SearchProblem {
                 e.printStackTrace();
             }
         }
-//        System.out.println(current);
-        return current.satisfy(this.getGoals());
+        return trace.get(trace.size() - 1).satisfy(this.getGoals());
     }
 
 //    public ArrayList<Pair<BigDecimal,TransitionGround>> constructPlan(List<org.apache.commons.lang3.tuple.Pair<BigDecimal,Object>> internalPlanRepresentation,BigDecimal execDelta, BigDecimal stepSize, boolean events) throws CloneNotSupportedException {
@@ -1638,12 +1795,12 @@ public class PDDLProblem implements SearchProblem {
         return simulation(s, horizon, executionDelta, intelligent, null);
     }
 
-    protected ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta, boolean intelligent, StringBuilder traceString) {
-        return simulation(s, horizon, executionDelta, intelligent, traceString, null);
+    public ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta, boolean intelligent, List<State> trace) {
+        return simulation(s, horizon, executionDelta, intelligent, trace, null);
     }
 
     protected ImmutablePair<State, Integer> simulation(State s, BigDecimal horizon, BigDecimal executionDelta,
-                                                       boolean intelligent, StringBuilder traceString, ArrayList<TransitionGround> events) {
+                                                       boolean intelligent, List<State> trace, ArrayList<TransitionGround> events) {
         final PDDLState next = (PDDLState) s.clone();
         if (horizon.compareTo(executionDelta) == -1) {
             System.out.println("Horizon: " + horizon + " Execution Delta: " + executionDelta);
@@ -1665,7 +1822,7 @@ public class PDDLProblem implements SearchProblem {
             for (final TransitionGround act : this.getProcessesSet()) {
                 if (act.getSemantics() == Transition.Semantics.PROCESS) {
                     final TransitionGround gp = (TransitionGround) act;
-                    if (gp.isApplicable(next)) {
+                    if (gp.isApplicable(next, relevantUndefinedVariablesPresent, this)) {
                         atLeastOne = true;
                         for (final NumEffect eff : (Collection<NumEffect>) gp.getConditionalNumericEffects().getAllEffects()) {
                             numEffect.add(eff);
@@ -1699,8 +1856,8 @@ public class PDDLProblem implements SearchProblem {
                 events.add(TransitionGround.waitingAction());
             }
             applyAllEvents(next, events);
-            if (traceString != null) {
-                traceString.append(next.toString()).append("\n");
+            if (trace != null) {
+                trace.add(next);
             }
             if (intelligent && next.satisfy(this.getGoals())) {
                 return ImmutablePair.of(next, i + 1);
@@ -1722,7 +1879,7 @@ public class PDDLProblem implements SearchProblem {
         while (true) {
             boolean at_least_one = false;
             for (final TransitionGround ev : this.getEventsSet()) {
-                if (ev.isApplicable(s)) {
+                if (ev.isApplicable(s, relevantUndefinedVariablesPresent, this)) {
                     at_least_one = true;
                     s.apply(ev, s.clone());
                     if (ret != null)
@@ -1768,7 +1925,7 @@ public class PDDLProblem implements SearchProblem {
             }
             previous = timeAction;
             if (planSize > 1) {
-                if (v.getValue().isApplicable(s)) {
+                if (v.getValue().isApplicable(s, relevantUndefinedVariablesPresent, this)) {
                     s.apply(v.getValue(), s);
                     res.add(s.clone());
                 } else {
@@ -1779,6 +1936,4 @@ public class PDDLProblem implements SearchProblem {
         }
         return res;
     }
-
-
 }

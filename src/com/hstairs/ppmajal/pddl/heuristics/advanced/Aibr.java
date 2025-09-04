@@ -33,20 +33,22 @@ public final class Aibr implements SearchHeuristic {
     private final PrintStream out;
     //The following are built around supporters
     private final Int2ObjectMap<String> names = new Int2ObjectArrayMap();
-    Collection<TransitionGround> reachableTransitions = null;
+    private Collection<TransitionGround> reachableTransitions = null;
     private boolean DEBUG = false;
+    private AibrLogger logger;
 
     public Aibr(PDDLProblem problem) {
-        this(problem, false);
+        this(problem, false, false);
     }
 
-    public Aibr(PDDLProblem problem, boolean reachability) {
+    public Aibr(PDDLProblem problem, boolean reachability, boolean aibrDebug) {
         final Int2ObjectMap<Collection<Terminal>> propEffectMap = new Int2ObjectArrayMap();
         final Int2IntArrayMap supporter2transitionMap = new Int2IntArrayMap();
         final Int2ObjectMap<Condition> asymptoticPreconditionFunctionMap = new Int2ObjectArrayMap<>();
         final Int2ObjectMap<NumEffect> numEffectMap = new Int2ObjectArrayMap<>();
         out = problem.out;
         this.problem = problem;
+        this.DEBUG = aibrDebug;
         ArrayList<TransitionGround> array = new ArrayList<>(problem.getTransitions());
         for (final TransitionGround tr : array) {           
             generateNumericSupporters(tr, supporter2transitionMap, asymptoticPreconditionFunctionMap, numEffectMap);
@@ -77,9 +79,20 @@ public final class Aibr implements SearchHeuristic {
         }
 
         this.reachability = reachability;
+        if (DEBUG) {
+            this.logger = new AibrLogger("aibr_log.json");
+        }
+
 //
 //        out.println("AIBR :: Number of Supporters = " + numberOfSupporters);
 
+    }
+
+    public void setDebug(boolean debug) {
+        this.DEBUG = debug;
+        if (debug && logger == null) {
+            this.logger = new AibrLogger("aibr_log.json");
+        }
     }
 
     void generatePropositionalAction(TransitionGround tr, Int2IntArrayMap supporter2transitionMap, Int2ObjectMap<Collection<Terminal>> propEffectMap) {
@@ -181,86 +194,118 @@ public final class Aibr implements SearchHeuristic {
 
     @Override
     public float computeEstimate(State s0) {
+        // Call the helper method with a null StateWrapper
+        return computeEstimateInternal(s0, null);
+    }
+
+    public float computeEstimate(State s0, ArrayList<RelState> relaxedStates) {
+        // Call the helper method with the provided StateWrapper
+        return computeEstimateInternal(s0, relaxedStates);
+    }
+
+
+    public float computeEstimateInternal(State s0, ArrayList<RelState> relaxedStates) {
         final PDDLState s = (PDDLState) s0;
         final RelState relState = s.relaxState();
         final IntArraySet supporters = new IntArraySet(ContiguousSet.create(closedOpen(0, numberOfSupporters), DiscreteDomain.integers()));
         final IntArrayList reachableActionsThisStage = new IntArrayList();
         boolean goalReached = false;
-        if (DEBUG) {
-            System.out.println("====================================================");
-            System.out.println("Supporters");
-            for (int ele = 0; ele < numberOfSupporters; ele++) {
-                System.out.println(names.get(ele));
-                System.out.println("Precondition:"+Transition.getTransition(supporter2transition[ele]).getPreconditions());
-                System.out.println("Prop Effect:"+supporter2propeffect[ele]);
-                System.out.println("Num Effect:"+supporter2numeffect[ele]);
-                System.out.println("Asymptotic condition:"+supporter2aymptoticeffects[ele]);
-            }
-        }
         final BitSet conditionSatisfied = new BitSet();
         final BitSet actionInserted = new BitSet();
-        while (!supporters.isEmpty()) {
+        int stepCount = 0;
+
+        // Print all potential supporters
+        if (DEBUG) {
+            logSupporters(names, supporter2aymptoticeffects, supporter2propeffect, supporter2numeffect, supporter2transition);
+            logComputationStart();
+            logUnsupportedSupporters(supporters);
+        }
+
+        //while ((reachability && !supporters.isEmpty()) || (!supporters.isEmpty() && !reachability && goalReached)) {
+        while (!supporters.isEmpty()){
+            stepCount++;
+            // Log the current state before applying actions
+            if (DEBUG) {
+                logger.logStep(stepCount, "Step " + stepCount, relState.getPossNumValues(), 
+                             -1, "Initial State", null, null, null);
+            }
+            
             final IntIterator iterator = supporters.iterator();
             final IntArrayList propAppliers = new IntArrayList();
             final IntArrayList numAppliers = new IntArrayList();
-            if (DEBUG) {
-                System.out.println("State Before supporter application:" + relState);
-            }
             while (iterator.hasNext()) {
                 int current = iterator.nextInt();
                 final TransitionGround tr = (TransitionGround) Transition.getTransition(supporter2transition[current]);
                 final boolean b = conditionSatisfied.get(current);
-                if (b || relState.satisfy(tr.getPreconditions())) {
-                    if (!b){
-                        conditionSatisfied.set(current,true);
-                    }
-//                if (relState.satisfy(tr.getPreconditions())) {
-////                    if (!b){
-//                        conditionSatisfied.set(current,true);
-////                    }
-                    final int id = tr.getId();
-                    if (!actionInserted.get(id)) {
-                        if (DEBUG) {
-                            System.out.println("Add Supporter: "+names.get(current));
-                            System.out.println("with precondition: "+tr.getPreconditions());
+                if (!reachability || tr.getConditionalNumericEffects().canBeRelaxedApplied(relState,problem)) {
+                    if (b || relState.satisfy(tr.getPreconditions())) {
+                        if (!b) {
+                            conditionSatisfied.set(current, true);
                         }
-                        reachableActionsThisStage.add(id);
-                        actionInserted.set(id, true);
-                    }
-                    //Prop effect
-                    final Collection<Terminal> terminals = supporter2propeffect[current];
-                    if (terminals != null && !terminals.isEmpty()) {
-                        iterator.remove();
-                        propAppliers.add(current);
-                    } else {
-                        final NumEffect numEffect = supporter2numeffect[current];
-                        if (numEffect != null) {
-                            final Condition condition2 = supporter2aymptoticeffects[current];
-                            if (condition2 == null || relState.satisfy(condition2)) {
-                                iterator.remove();
-                                numAppliers.add(current);
+                        final int id = tr.getId();
+                        if (!actionInserted.get(id)) {
+                            reachableActionsThisStage.add(id);
+                            actionInserted.set(id, true);
+                        }
+                        //Prop effect
+                        final Collection<Terminal> terminals = supporter2propeffect[current];
+                        if (terminals != null && !terminals.isEmpty()) {
+                            iterator.remove();
+                            propAppliers.add(current);
+                        } else {
+                            final NumEffect numEffect = supporter2numeffect[current];
+                            if (numEffect != null) {
+                                final Condition condition2 = supporter2aymptoticeffects[current];
+
+                                if (condition2 == null || relState.satisfy(condition2)) {
+                                    iterator.remove();
+                                    numAppliers.add(current);
+                                } else if (DEBUG) {
+                                    // Log why the numeric effect wasn't applied
+                                    logger.logStep(stepCount, "Unsupported Numeric Effect", relState.getPossNumValues(),
+                                                 current, names.get(current), condition2,
+                                                 null, numEffect);
+                                }
                             }
                         }
+                    } else if (DEBUG) {
+                        // Log why the transition wasn't applied
+                        logger.logStep(stepCount, "Unsupported Transition", relState.getPossNumValues(),
+                                     current, names.get(current), tr.getPreconditions(),
+                                     null, null);
                     }
+                } else if (DEBUG) {
+                    // Log why the transition wasn't reachable
+                    logger.logStep(stepCount, "Unreachable Transition", relState.getPossNumValues(),
+                                 current, names.get(current), tr.getPreconditions(),
+                                 null, null);
                 }
             }
 
             if (numAppliers.isEmpty() && propAppliers.isEmpty() && !relState.satisfy(problem.getGoals())) {
                 if (DEBUG) {
-                   System.out.println("UNSAT");
+                    logUnsupportedSupporters(supporters);
+                    logUnsat();
                 }
                 return Float.MAX_VALUE;
             }
             for (final int current : propAppliers) {
                 final Collection<Terminal> terminals = supporter2propeffect[current];
-                relState.apply(terminals, relState.clone());
+                relState.apply(terminals, relState.clone(),this.problem);
+                if (DEBUG) {
+                    logger.logStep(stepCount, names.get(current), relState.getPossNumValues(),
+                                 current, names.get(current), supporter2aymptoticeffects[current],
+                                 terminals, null);
+                }
             }
             for (final int current : numAppliers) {
                 final NumEffect effect = supporter2numeffect[current];
-                relState.apply(effect, relState.clone());
-            }
-            if (DEBUG) {
-                System.out.println("State After Action Application:"+relState);
+                relState.apply(effect, relState.clone(),this.problem);
+                if (DEBUG) {
+                    logger.logStep(stepCount, names.get(current), relState.getPossNumValues(),
+                                 current, names.get(current), supporter2aymptoticeffects[current],
+                                 null, effect);
+                }
             }
             if (relState.satisfy(problem.getGoals())) {
                 goalReached = true;
@@ -273,8 +318,22 @@ public final class Aibr implements SearchHeuristic {
                     }
                 }
             }
+            
+            // After applying actions and updating intervals, log the changes
+            if (DEBUG && !reachableActionsThisStage.isEmpty()) {
+                for (int actionId : reachableActionsThisStage) {
+                    String actionName = names.get(actionId);
+                    logger.logStep(stepCount, actionName, relState.getPossNumValues(),
+                                 actionId, actionName, supporter2aymptoticeffects[actionId],
+                                 supporter2propeffect[actionId], supporter2numeffect[actionId]);
+                }
+            }
         }
-
+        
+        // Save the log at the end of computation
+        if (DEBUG) {
+            logger.saveLog();
+        }
         
         if (reachableTransitions == null) {
             reachableTransitions = new LinkedHashSet<>();
@@ -285,24 +344,28 @@ public final class Aibr implements SearchHeuristic {
             if (reachability) {
                 return 0;
             }
-
         }
         if (goalReached) {
-            
             if (DEBUG){
                 System.err.println("Computing actual estimate using the following transitions:"+reachableTransitions);
             }
-            return fixPointComputation(reachableTransitions, s.relaxState());
+            float res = fixPointComputation(reachableTransitions, s.relaxState(), relaxedStates);
+            if (relaxedStates != null) {
+                relaxedStates.add(relState.clone());
+            }
+            return res;
         }
         return Float.MAX_VALUE;
     }
 
-    private float fixPointComputation(Collection<TransitionGround> reachable, RelState s) {
+    private float fixPointComputation(Collection<TransitionGround> reachable, RelState s, ArrayList<RelState> relaxedStates) {
         int counter = 0;
         int horizon = Integer.MAX_VALUE;
-//        int horizon = 10000;
-//        System.out.println(s);
+        if (relaxedStates != null) {
+            relaxedStates.add(s.clone());
+        }
         BitSet applicable = new BitSet();
+                
         while (counter <= horizon) {
             if (s.satisfy(problem.getGoals())) {
                 return counter;
@@ -313,7 +376,10 @@ public final class Aibr implements SearchHeuristic {
                     if (!b) {
                         applicable.set(transition.getId(), true);
                     }
-                    s.apply(transition, (RelState) s.clone());
+                    s.apply(transition, (RelState) s.clone(),problem);
+                    if (relaxedStates != null) {
+                        relaxedStates.add(s.clone());
+                    }
                     counter++;
                     if (s.satisfy(problem.getGoals())) {
                         return counter;
@@ -328,7 +394,7 @@ public final class Aibr implements SearchHeuristic {
     @Override
     public Collection<TransitionGround> getAllTransitions() {
         if (reachableTransitions == null) {
-            throw new RuntimeException("Helpful Transitions can only be activatated in combination with the relaxed plan extraction");
+            throw new RuntimeException("Reachable transitions computed by AIBR is null");
         }
         return reachableTransitions;
     }
@@ -336,5 +402,33 @@ public final class Aibr implements SearchHeuristic {
     @Override
     public Object[] getTransitions(boolean helpful) {
         return problem.actions.toArray();
+    }
+
+    private void logSupporters(Map<Integer, String> names, Condition[] supporter2aymptoticeffects,
+                             Collection<Terminal>[] supporter2propEffects, NumEffect[] supporter2numeffect,
+                             int[] supporter2transition) {
+        logger.logSupporters(names.size(), names, supporter2aymptoticeffects, 
+                           supporter2propEffects, supporter2numeffect, supporter2transition);
+    }
+
+    private void logComputationStart() {
+        logger.logStep(0, "Starting Computation", new Int2ObjectArrayMap<>(), -1, "none", null, null, null);
+    }
+
+    private void logUnsat() {
+        logger.logStep(-1, "UNSAT", new Int2ObjectArrayMap<>(), -1, "none", null, null, null);
+        logger.saveLog();
+    }
+
+    private void logUnsupportedSupporters(IntArraySet supporters) {
+        if (DEBUG) {
+            IntArraySet unsupported = new IntArraySet();
+            for (int i = 0; i < numberOfSupporters; i++) {
+                if (!supporters.contains(i)) {
+                    unsupported.add(i);
+                }
+            }
+            logger.logUnsupportedSupporters(unsupported, names);
+        }
     }
 }

@@ -18,7 +18,6 @@ import java.util.function.BiFunction;
 
 public class PDDLPlanner {
     final String search;
-    final String heuristic;
     final String redundantConstraints;
     final boolean helpfulTransitions;
     final boolean helpfulActions;
@@ -49,20 +48,28 @@ public class PDDLPlanner {
     };
 
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
-        Map.entry(SE_INFOS[0][0], (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
-        Map.entry(SE_INFOS[1][0], (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG)),
+        Map.entry(SE_INFOS[0][0], (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
+        Map.entry(SE_INFOS[1][0], (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[2][0], (planner, _) -> new EHS(planner.helpfulActions)),
         Map.entry(SE_INFOS[3][0], (planner, _) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
-        Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+        Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
     );
 
-    public PDDLPlanner(String search, String heuristic, String redundantConstraints,
-                    boolean helpfulActionPruning, boolean helpfulTransitions,
-                    float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                    boolean saveSearchSpace, float depthLimit, IExternalLogger extenalLogger) {
+    final private boolean bucketBasedQueueSearch;
+
+    public PDDLPlanner() {
+        this("wastar", "no", false,
+                false, 1,
+                new BigDecimal(1.0), new BigDecimal(1.0),
+                "", false, Float.POSITIVE_INFINITY,false, null);
+    }
+
+    public PDDLPlanner(String search, String redundantConstraints,
+                       boolean helpfulActionPruning, boolean helpfulTransitions,
+                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, IExternalLogger extenalLogger) {
         this.search = search;
-        this.heuristic = heuristic;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
         this.helpfulActions = helpfulActionPruning;
@@ -72,15 +79,10 @@ public class PDDLPlanner {
         this.t = t;
         this.saveSearchSpace = saveSearchSpace;
         this.boundG = depthLimit;
+        this.bucketBasedQueueSearch = bucketBasedQueueSearch;
         this.extenalLogger = extenalLogger;
     }
 
-    public PDDLPlanner(String search, String heuristic, String redundantConstraints,
-                       boolean helpfulActionPruning, boolean helpfulTransitions,
-                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit) {
-        this(search, heuristic, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t, saveSearchSpace, depthLimit, null);
-    }
     public SearchNode searchSpaceHandle;
     public PDDLSolution plan(PDDLProblem p, SearchHeuristic h){
         TieBreaker tb = new TieBreaker(
@@ -88,7 +90,7 @@ public class PDDLPlanner {
         );
 
         searchEngine = SEARCH_ENGINES
-                .getOrDefault(search.toLowerCase(), (pl, tie) -> new WAStar(pl.hWeigth, false, pl.helpfulActions, tie, pl.saveSearchSpace, pl.boundG))
+                .getOrDefault(search.toLowerCase(), (pl, tie) -> new WAStar(pl.hWeigth, false, pl.helpfulActions, tie, pl.saveSearchSpace, pl.boundG, pl.bucketBasedQueueSearch))
                 .apply(this, tb);
 
         searchEngine.setExtenalLogger(this.extenalLogger);
@@ -97,26 +99,26 @@ public class PDDLPlanner {
         final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);
         searchEngine.afterExecution();
         if (solutionHandle == null)
-            return new PDDLSolution(null,null,searchEngine.getStats(), -1);
-        return new PDDLSolution(this.extractPlan(solutionHandle,p),
-                solutionHandle, searchEngine.getStats(), solutionHandle.gValue);
+            return new PDDLSolution(null, null, searchEngine.getStats(), -1);
+        return new PDDLSolution(this.extractPlan(solutionHandle, p),
+                (PDDLState) solutionHandle.s, searchEngine.getStats(), solutionHandle.gValue);
     }
 
-    public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan (SimpleSearchNode input, PDDLProblem p) {
+    public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {
 
-        final LinkedList<ImmutablePair<BigDecimal,TransitionGround>> plan = new LinkedList<>();
+        final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan = new LinkedList<>();
         State lastState = input.s;
         if (!(input instanceof SearchNode c)) {
             SimpleSearchNode temp = input;
             while (temp.transition != null) {
                 Double time = null;
-                plan.addFirst(ImmutablePair.of(BigDecimal.ZERO,(TransitionGround)temp.transition));
+                plan.addFirst(ImmutablePair.of(BigDecimal.ZERO, (TransitionGround) temp.transition));
                 temp = temp.father;
             }
             return plan;
         }
         if (p.getProcessesSet().isEmpty()) {
-            while ((c.transition != null || c.waitingPoints > 0 )) {
+            while ((c.transition != null || c.waitingPoints > 0)) {
                 BigDecimal time = null;
                 if (c.father != null && c.father.s instanceof PDDLState) {
                     time = ((PDDLState) c.father.s).time;
@@ -135,17 +137,17 @@ public class PDDLPlanner {
                 c = (SearchNode) c.father;
 
             }
-        }else {
+        } else {
             System.out.println("Extracting plan with execution delta: " + executionDelta);
             BigDecimal time = ((PDDLState) c.s).time;
             TransitionGround waiting = TransitionGround.waitingAction();
             State current = null;
-            while (c != null ) {
+            while (c != null) {
                 if (c.transition != null) {
                     // This is an action
                     plan.addFirst(ImmutablePair.of(((PDDLState) c.s).time, (TransitionGround) c.transition));
                 } else { //This is when I am waiting
-                    for (int i = 0 ; i < c.waitingPoints; i++ ){
+                    for (int i = 0; i < c.waitingPoints; i++) {
                         time = time.subtract(executionDelta);
                         plan.addFirst(ImmutablePair.of(time, waiting));
                     }
@@ -153,7 +155,7 @@ public class PDDLPlanner {
                 current = c.s;
                 c = (SearchNode) c.father;
             }
-            final LinkedList<ImmutablePair<BigDecimal,TransitionGround>> finalPlan = new LinkedList<>();
+            final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> finalPlan = new LinkedList<>();
             BigDecimal currentTime = new BigDecimal(0);
             for (org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround> ele : plan) {
                 TransitionGround right = ele.getRight();
@@ -161,29 +163,29 @@ public class PDDLPlanner {
                     ArrayList<TransitionGround> sponteneousTransitions = new ArrayList();
                     final ImmutablePair<State, Integer> stateCollectionPair
                             = p.simulation(current, executionDelta,
-                            executionDelta, false, null,sponteneousTransitions);
+                            executionDelta, false, null, sponteneousTransitions);
                     if (stateCollectionPair == null) {
                         throw new RuntimeException("This can't be possible");
                     } else {
-                        if (sponteneousTransitions.isEmpty()){
+                        if (sponteneousTransitions.isEmpty()) {
                             System.out.println("something fishy just happened");
                         }
-                        for (var v: sponteneousTransitions){
+                        for (var v : sponteneousTransitions) {
                             finalPlan.add(ImmutablePair.
                                     of(currentTime, v));
-                            if (v.getSemantics().equals(Transition.Semantics.PROCESS)){
+                            if (v.getSemantics().equals(Transition.Semantics.PROCESS)) {
                                 currentTime = currentTime.add(executionDelta);
                             }
                         }
                     }
                     current = stateCollectionPair.getLeft();
-                }else{
+                } else {
                     if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
                         current.apply(right, current.clone());
                         finalPlan.add(ImmutablePair.
                                 of(currentTime, right));
-                    }else{
-                        throw new RuntimeException("We can't have something different from actions or processes");
+                    } else {
+                        throw new RuntimeException("We can't have something different from actions or processes. Instead I got:" + right);
                     }
                 }
             }

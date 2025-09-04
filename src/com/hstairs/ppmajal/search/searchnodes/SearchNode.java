@@ -21,6 +21,7 @@ package com.hstairs.ppmajal.search.searchnodes;
 import com.hstairs.ppmajal.problem.State;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,7 +33,8 @@ import org.json.simple.parser.ParseException;
 /**
  * @author enrico
  */
-public class SearchNode extends SimpleSearchNode {
+public class SearchNode extends SimpleSearchNode implements BucketPriorityQueueNode {
+
     public final JSONObject jsonRepresentation;
     public float f;
     public int waitingPoints;
@@ -97,7 +99,8 @@ public class SearchNode extends SimpleSearchNode {
         super(s1, 0, null, action_cost_to_get_here);
 
         f = fExt;
-        // System.out.println("F:"+f);
+
+        //System.out.println("F:"+f);
         if (saving_json) {
             jsonRepresentation = new JSONObject();
             if (transition == null) {
@@ -206,4 +209,10 @@ public class SearchNode extends SimpleSearchNode {
                 + (father == null ? "null" : father.id) + '}';
     }
 
+    @Override
+    public float[] getRanks() {
+        float[] ret = new float[1];
+        ret[0] = f;
+        return ret;
+    }
 }

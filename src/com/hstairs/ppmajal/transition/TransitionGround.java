@@ -1,6 +1,7 @@
 package com.hstairs.ppmajal.transition;
 
 import com.google.common.collect.Sets;
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.conditions.BoolPredicate;
 import com.hstairs.ppmajal.conditions.Condition;
 import com.hstairs.ppmajal.conditions.PDDLObject;
@@ -33,7 +34,7 @@ public class TransitionGround extends Transition {
     }
 
     public static TransitionGround createEmptyAction(){
-        return new TransitionGround(null,Semantics.PROCESS,null,null,null,null);
+        return new TransitionGround(null,Semantics.ACTION,null,null,null,null);
     }
     public TransitionGround(ArrayList<NumEffect> numEffect) {
         this(                "waiting", Transition.Semantics.PROCESS, null, null,
@@ -46,8 +47,11 @@ public class TransitionGround extends Transition {
         return parameters;
     }
 
-    public boolean isApplicable(State s) {
-        return (this.preconditions.isSatisfied(s));
+    public boolean isApplicable(State s, boolean checkEffects, PDDLProblem p) {
+        if (checkEffects)
+            return (this.preconditions.isSatisfied(s) && this.conditionalNumericEffects.canBeApplied(s,p));
+        return (this.preconditions == null || this.preconditions.isSatisfied(s));
+
     }
 
     @Override

@@ -28,7 +28,6 @@ import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,7 +37,7 @@ import java.util.Set;
 public class RelState extends Object {
 
     final public Int2IntArrayMap possBollValues;//0 is negative, 1 positive, 2 both
-    final public Int2ObjectArrayMap<HomeMadeRealInterval> possNumValues;
+    private final Int2ObjectArrayMap<HomeMadeRealInterval> possNumValues;
 
     public RelState (Int2IntArrayMap a, Int2ObjectArrayMap<HomeMadeRealInterval> b ) {
         super();
@@ -54,9 +53,9 @@ public class RelState extends Object {
     @Override
     public String toString() {
         StringBuilder str = new StringBuilder("");
-        for (int i: possNumValues.keySet()){
+        for (int i: getPossNumValues().keySet()){
             NumFluent fluent = NumFluent.fromIdToNumFluents.get(i);
-            str.append(fluent).append("=").append(possNumValues.get(i)).append("");
+            str.append(fluent).append("=").append(getPossNumValues().get(i)).append("");
         }
         str.append("\n");
         for (BoolPredicate fluent : PDDLProblem.booleanFluents){
@@ -75,13 +74,13 @@ public class RelState extends Object {
 
     @Override
     public RelState clone ( ) {
-        final RelState ret_val = new RelState(this.possBollValues.clone(),this.possNumValues.clone());
+        final RelState ret_val = new RelState(this.possBollValues.clone(), this.getPossNumValues().clone());
         return ret_val;
     }
 
 
     public double functionInfValue (NumFluent f) {
-        final HomeMadeRealInterval n = this.possNumValues.get(f.getId());
+        final HomeMadeRealInterval n = this.getPossNumValues().get(f.getId());
         if (n != null) {
             return n.lo();
         }
@@ -90,8 +89,8 @@ public class RelState extends Object {
 
     public HomeMadeRealInterval functionValues (NumFluent f) {
 
-        if (!this.possNumValues.isEmpty()) {
-            final HomeMadeRealInterval a = this.possNumValues.get(f.getId());
+        if (!this.getPossNumValues().isEmpty()) {
+            final HomeMadeRealInterval a = this.getPossNumValues().get(f.getId());
             if (a != null) {
                 return a;
             } else {
@@ -103,7 +102,7 @@ public class RelState extends Object {
     }
 
     public double functionSupValue (NumFluent f) {
-        final HomeMadeRealInterval a = this.possNumValues.get(f.getId());
+        final HomeMadeRealInterval a = this.getPossNumValues().get(f.getId());
         if (a != null) {
             return a.hi();
         }
@@ -158,24 +157,12 @@ public class RelState extends Object {
     }
 
     public void setFunctionValues (NumFluent f, HomeMadeRealInterval after) {
-        this.possNumValues.put(f.getId(), after);
+        this.getPossNumValues().put(f.getId(), after);
 
     }
 
 
 
-    public void update_values (HashMap subst) {
-        for (final Object o : subst.keySet()) {
-            if (o instanceof NumFluent) {
-                NumFluent nf = (NumFluent) o;
-                if (nf.has_to_be_tracked()) {
-                    this.setFunctionValues(nf, (HomeMadeRealInterval) subst.get(o));
-                }
-            } else {
-                this.possBollValues.put(((BoolPredicate) o).getId(), (int) subst.get(o));
-            }
-        }
-    }
 //
 //    public RelState apply_with_generalized_interval_based_relaxation (TransitionGround gr) {
 //        HashMap subst = new HashMap();
@@ -211,14 +198,14 @@ public class RelState extends Object {
 //        }
 //        return this;
 //    }
-    public void apply(PostCondition effect, RelState prev) {
+    public void apply(PostCondition effect, RelState prev, PDDLProblem prob) {
         if (effect instanceof AndCond){
             for (PostCondition c: (PostCondition[])((AndCond) effect).sons){
-                this.apply((PostCondition)c, prev);
+                this.apply((PostCondition)c, prev,prob);
             }
 
         }else if (effect instanceof Collection){
-            ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev));
+            ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev,prob));
         }else if (effect instanceof NotCond) {
             final NotCond nc = (NotCond) effect;
             final BoolPredicate p = (BoolPredicate) nc.getSon();
@@ -230,31 +217,35 @@ public class RelState extends Object {
                 this.possBollValues.put(((BoolPredicate) effect).getId(), 2);
             }
         } else if (effect instanceof NumEffect) {
-            ((NumEffect) effect).apply(this,prev);
+            if (prob.isSubgoalsRelevant(((NumEffect) effect).getFluentAffected()))
+                ((NumEffect) effect).apply(this,prev);
         }
     }
 
 
 
-    public void apply(Collection<Terminal> effect, RelState prev){
-        ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev));
+    public void apply(Collection<Terminal> effect, RelState prev, PDDLProblem prob){
+        ((Collection) effect).forEach(o -> this.apply((PostCondition) o,prev, prob));
     }
 
 
-    public void apply (TransitionGround gr, RelState prev) {
+    public void apply (TransitionGround gr, RelState prev, PDDLProblem prob) {
         final Set<ConditionalEffects> effs = Set.of(gr.getConditionalPropositionalEffects(), gr.getConditionalNumericEffects());
         for (final ConditionalEffects<PostCondition> eff: effs) {
             for (final Map.Entry<Condition, Collection<PostCondition>> entry : eff.getActualConditionalEffects().entrySet()) {
                 if (entry.getKey().isSatisfied(this)) {
                     for (final PostCondition n : entry.getValue()) {
-                        this.apply(n, prev);
+                        this.apply(n, prev,prob);
                     }
                 }
             }
             for (final PostCondition n : eff.getUnconditionalEffect()) {
-                this.apply(n, prev);
+                this.apply(n, prev,prob);
             }
         }
     }
 
+    public Int2ObjectArrayMap<HomeMadeRealInterval> getPossNumValues() {
+        return possNumValues;
+    }
 }

@@ -18,6 +18,7 @@
  */
 package com.hstairs.ppmajal.expressions;
 
+import com.hstairs.ppmajal.PDDLProblem.Metric;
 import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.PDDLProblem.PDDLState;
@@ -367,17 +368,6 @@ public class NumFluent extends Expression {
         return ret.replaceAll("\\s+", "");
     }
 
-    public boolean has_to_be_tracked ( ) {
-        if (has_to_be_tracked == null) {
-            if (this.getName().equals("total-cost")) {
-                needsTrackingInState(Boolean.FALSE);
-            } else {
-                needsTrackingInState(Boolean.TRUE);
-            }
-        }
-        return has_to_be_tracked;
-    }
-
     @Override
     public void pddlPrint (boolean typeInformation, StringBuilder bui) {
         bui.append("  (");
@@ -414,12 +404,6 @@ public class NumFluent extends Expression {
     }
 
 
-    /**
-     * @param has_to_be_tracked the has_to_be_tracked to set
-     */
-    public void needsTrackingInState (Boolean has_to_be_tracked) {
-        this.has_to_be_tracked = has_to_be_tracked;
-    }
 
     @Override
     public Expression unifyVariablesReferences (PDDLProblem p) {
