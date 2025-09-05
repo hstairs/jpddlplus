@@ -101,7 +101,7 @@ public class PDDLPlanner {
         if (solutionHandle == null)
             return new PDDLSolution(null, null, searchEngine.getStats(), -1);
         return new PDDLSolution(this.extractPlan(solutionHandle, p),
-                (PDDLState) solutionHandle.s, searchEngine.getStats(), solutionHandle.gValue);
+                solutionHandle, searchEngine.getStats(), solutionHandle.gValue);
     }
 
     public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {
