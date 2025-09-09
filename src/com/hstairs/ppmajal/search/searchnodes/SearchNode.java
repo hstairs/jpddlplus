@@ -211,8 +211,9 @@ public class SearchNode extends SimpleSearchNode implements BucketPriorityQueueN
 
     @Override
     public float[] getRanks() {
-        float[] ret = new float[1];
+        final float[] ret = new float[2];
         ret[0] = f;
+        ret[1] = gValue;
         return ret;
     }
 }

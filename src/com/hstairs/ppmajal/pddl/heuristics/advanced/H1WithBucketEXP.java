@@ -287,8 +287,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
         }
 
 //        Printer.pddlPrint(problem, (PDDLState) gs);
-        final BucketPriorityQueue h = new BucketPriorityQueue(this.totNumberOfActionsRefactored*10,
-                new TieBreaker(SearchEngine.TieBreaking.HIGHERG),0);
+        final BucketPriorityQueue h = new BucketPriorityQueue(this.totNumberOfActionsRefactored*10,0,1);
         for (final int i : getAllConditions()) {
             if (gs.satisfy(Terminal.getTerminal(i))) {
                 conditionCost[i] = 0f;
