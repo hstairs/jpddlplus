@@ -163,7 +163,7 @@ public class WAStar extends SearchEngine {
 
     protected PriorityQueue getPriorityQueue(int size) {
         if (bucketPriorityQueue){
-            return new BucketPriorityQueue(size,tieBreaker);
+            return new BucketPriorityQueue(size,0,1);
         }else{
             return new ObjectHeapPriorityQueue<>(tieBreaker);
         }
