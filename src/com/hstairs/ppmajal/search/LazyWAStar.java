@@ -1,5 +1,6 @@
 package com.hstairs.ppmajal.search;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
@@ -30,18 +31,19 @@ public class LazyWAStar extends WAStar {
         this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false, false);
     }
 
-    Object[] getActionsToSearch(List helpful, SearchHeuristic h) {
+    Object[] getActionsToSearch(List helpful, SearchHeuristic h, SearchProblem problem) {
 
         ArrayList res = new ArrayList();
         res.addAll(h.getAllTransitions());
-        if (helpful!= null){
+        if (problem instanceof PDDLProblem && ((PDDLProblem) problem).getProcessesSet().isEmpty())
+            return res.toArray();
+        if (helpful!= null ){
             for (var v: helpful) {
                 if (!(v instanceof TransitionGround)) {
                     res.add(v);
                 }
             }
         }
-
         return res.toArray();
     }
 
@@ -106,7 +108,7 @@ public class LazyWAStar extends WAStar {
                     bestf = printInfoDuringSearch(timeAtStart, out, bestf, fromTheBeginning,
                              nodesExpanded, nodesEvaluated, frontier, currentNode);
 
-                    Object[] actionsToSearch = getActionsToSearch(helpful,h);
+                    Object[] actionsToSearch = getActionsToSearch(helpful,h, problem);
 
                     for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext(); ) {
 

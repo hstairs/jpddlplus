@@ -524,7 +524,7 @@ public class ENHSP {
         PDDLSolution plan = planner.plan(problem, h);
         overallPlanningTime = (System.currentTimeMillis() - overallStart);
         endGValue = plan.gValueAtTheEnd();
-        printInfo(plan,pddlPlus,savePlan,plan == null ? null : plan.lastState());
+        printInfo(plan,pddlPlus,savePlan,plan.rawPlan() == null ? null : plan.lastState());
         if (savingSearchSpaceJson) {
             planner.getSearchSpaceHandle().printJson(getProblem().getPddlFileReference() + ".sp_log");
         }

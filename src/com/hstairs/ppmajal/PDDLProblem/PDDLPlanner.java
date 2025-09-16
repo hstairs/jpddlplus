@@ -50,8 +50,8 @@ public class PDDLPlanner {
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
         Map.entry(SE_INFOS[0][0], (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[1][0], (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
-        Map.entry(SE_INFOS[2][0], (planner, _) -> new EHS(planner.helpfulActions)),
-        Map.entry(SE_INFOS[3][0], (planner, _) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
+        Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
+        Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
     );

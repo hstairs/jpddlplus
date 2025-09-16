@@ -1538,6 +1538,35 @@ public class PDDLProblem implements SearchProblem {
                     }
                 }
             }
+
+            if (true){
+                ArrayList<TransitionGround> sequence = new ArrayList();
+                while (true) {
+                    int counter = 0;
+                    TransitionGround toApply = null;
+                    for (int idx = 0; idx < actionsSet.length) {
+                        if (actionsSet[idx] instanceof TransitionGround) {
+                            if (((TransitionGround) actionsSet[idx]).isApplicable(source, relevantUndefinedVariablesPresent, PDDLProblem.this)) {
+                                counter++;
+                                toApply = (TransitionGround) actionsSet[idx];
+                            }
+                            if (counter > 1)
+                                break;
+                        }
+                    }
+                    if (counter > 1) {
+                        break;
+                    }else if (counter == 1){
+                        newState = source.clone();
+                        newState.apply(toApply, source);
+                        sequence.add(toApply);
+                    }else{
+                        return false; // Dead End
+                    }
+                }
+
+            }
+
             while (i < actionsSet.length) {
                 current = actionsSet[i];
                 i++;
@@ -1628,7 +1657,6 @@ public class PDDLProblem implements SearchProblem {
             while (terminalsIterator.hasNext() || ((actionIterators != null) && (actionIterators.hasNext()))) {
                 while ((actionIterators != null) && (actionIterators.hasNext())) {
                     int act = actionIterators.next();
-                    Transition transition = TransitionGround.getTransition(act);
                     achCondition[act]++;
                     if (achCondition[act] >= decAct.necTerminals[act].size()) {
                         current = TransitionGround.getTransition(act);

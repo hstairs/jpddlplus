@@ -1,4 +1,4 @@
-/*
+package enhsp2;/*
  * Copyright (C) 2015-2017, Enrico Scala, contact: enricos83@gmail.com
  *
  * This library is free software; you can redistribute it and/or
@@ -16,9 +16,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
-
-
-import enhsp2.ENHSP;
 
 public class main {
     public static void main(String[] args) throws Exception {
