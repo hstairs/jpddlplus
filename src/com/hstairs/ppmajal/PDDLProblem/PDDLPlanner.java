@@ -10,10 +10,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiFunction;
 
 public class PDDLPlanner {
@@ -28,6 +25,7 @@ public class PDDLPlanner {
     final String t;
     final private boolean saveSearchSpace;
     private final float boundG;
+    private final boolean tunnelling;
     private SearchEngine searchEngine;
     private IExternalLogger extenalLogger;
 
@@ -62,13 +60,14 @@ public class PDDLPlanner {
         this("wastar", "no", false,
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
-                "", false, Float.POSITIVE_INFINITY,false, null);
+                "", false, Float.POSITIVE_INFINITY,false, false,
+                null);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, IExternalLogger extenalLogger) {
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, IExternalLogger extenalLogger) {
         this.search = search;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
@@ -81,6 +80,7 @@ public class PDDLPlanner {
         this.boundG = depthLimit;
         this.bucketBasedQueueSearch = bucketBasedQueueSearch;
         this.extenalLogger = extenalLogger;
+        this.tunnelling = tunnelling;
     }
 
     public SearchNode searchSpaceHandle;
@@ -88,6 +88,7 @@ public class PDDLPlanner {
         TieBreaker tb = new TieBreaker(
                 TIE_BREAKERS.getOrDefault(t, SearchEngine.TieBreaking.ARBITRARY)
         );
+        p.tunnelling = tunnelling;
 
         searchEngine = SEARCH_ENGINES
                 .getOrDefault(search.toLowerCase(), (pl, tie) -> new WAStar(pl.hWeigth, false, pl.helpfulActions, tie, pl.saveSearchSpace, pl.boundG, pl.bucketBasedQueueSearch))
@@ -108,6 +109,7 @@ public class PDDLPlanner {
 
         final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan = new LinkedList<>();
         State lastState = input.s;
+        int nTun = 0;
         if (!(input instanceof SearchNode c)) {
             SimpleSearchNode temp = input;
             while (temp.transition != null) {
@@ -130,8 +132,16 @@ public class PDDLPlanner {
                             plan.addFirst(ImmutablePair.of(time, t.left));
                         }
                         System.out.println("JUMP for " + t.left + ":" + t.right);
-                    } else {
+                    } else if (c.transition instanceof TransitionGround){
                         plan.addFirst(ImmutablePair.of(time, (TransitionGround) c.transition));
+                    } else if (c.transition instanceof List){
+                        ArrayList<TransitionGround> transition = (ArrayList<TransitionGround>) c.transition;
+                        nTun+=transition.size();
+                        for (int k = ((ArrayList<?>) c.transition).size()-1; k >=0; k--){
+                            plan.addFirst(ImmutablePair.of(time, transition.get(k)));
+                        }
+                    }else{
+                        throw new RuntimeException("This can't be");
                     }
                 }
                 c = (SearchNode) c.father;
@@ -192,6 +202,8 @@ public class PDDLPlanner {
 
             return finalPlan;
         }
+        if (tunnelling)
+                System.out.println("Cumulative Size of Tunnels:"+nTun);
         return plan;
     }
 

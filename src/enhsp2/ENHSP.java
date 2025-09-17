@@ -107,6 +107,7 @@ public class ENHSP {
     private static boolean aibrDebug = false;
     boolean pls;
     boolean bucketBasedQueueSearch;
+    boolean tunnelling;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
@@ -305,6 +306,8 @@ public class ENHSP {
         options.addOption("aibr_debug", false, "Enable AIBR debug logging");
         options.addOption("pls", false, "Print the very last state");
         options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
+        options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
+
         return options;
     }
 
@@ -442,6 +445,7 @@ public class ENHSP {
             printAllInfo = cmd.hasOption("pai");
             aibrDebug = cmd.hasOption("aibr-debug");
             bucketBasedQueueSearch = cmd.hasOption("bbqs");
+            tunnelling = cmd.hasOption("tun");
 
         } catch (ParseException exp) {
 //            Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
@@ -509,7 +513,7 @@ public class ENHSP {
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
                 tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
-                bucketBasedQueueSearch, this.externalLogger);
+                bucketBasedQueueSearch, tunnelling, this.externalLogger);
 
         if (savingSearchSpaceJson) {
             Runtime.getRuntime().addShutdownHook(new Thread() {//this is to save json also when the planner is interrupted
