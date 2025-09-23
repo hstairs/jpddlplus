@@ -91,7 +91,7 @@ public class IDAStar extends SearchEngine {
                                                                    boolean idastarWithMemory, long timeout) throws TimeoutException {
         final Stack<IdaStarSearchNode> frontier = new Stack();
 
-        IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0);
+        IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0, this.extenalLogger != null);
         causalDeadEnds = 0;
         frontier.push(init);
         this.tryLog(init, ExternalLoggerLogType.Generating);
@@ -173,7 +173,7 @@ public class IDAStar extends SearchEngine {
                                 if (push) {
                                     node.numberOfSons++;
                                     atLeastOne = true;
-                                    IdaStarSearchNode newNode = new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g);
+                                    IdaStarSearchNode newNode = new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g, this.extenalLogger != null);
                                     frontier.push(newNode);
                                     this.tryLog(newNode, ExternalLoggerLogType.Generating);
                                 }

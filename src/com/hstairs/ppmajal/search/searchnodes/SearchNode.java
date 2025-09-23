@@ -40,14 +40,14 @@ public class SearchNode extends SimpleSearchNode implements BucketPriorityQueueN
     public int waitingPoints;
     public Object[] helpfulActions;
 
-    public SearchNode(State s1, Object action, SearchNode father, float g, float h) {
-        super(s1, action, father, g);
+    public SearchNode(State s1, Object action, SearchNode father, float g, float h, boolean trackingUniqueness) {
+        super(s1, action, father, g,trackingUniqueness);
         jsonRepresentation = null;
     }
 
     public SearchNode(State s1, Object action, SearchNode father, float gValue, float fExt, float hValue,
-            boolean jsonSaving) {
-        super(s1, action, father, gValue);
+            boolean jsonSaving, boolean trackingUniqueness) {
+        super(s1, action, father, gValue,trackingUniqueness);
         if (action instanceof final Integer act) {
             this.waitingPoints = act;
             // System.out.println(this.list_of_actions.size());
@@ -95,8 +95,8 @@ public class SearchNode extends SimpleSearchNode implements BucketPriorityQueueN
 
     }
 
-    public SearchNode(State s1, float action_cost_to_get_here, float fExt, float hValue, boolean saving_json) {
-        super(s1, 0, null, action_cost_to_get_here);
+    public SearchNode(State s1, float action_cost_to_get_here, float fExt, float hValue, boolean saving_json, boolean trackingUniqueness) {
+        super(s1, 0, null, action_cost_to_get_here,trackingUniqueness);
 
         f = fExt;
 

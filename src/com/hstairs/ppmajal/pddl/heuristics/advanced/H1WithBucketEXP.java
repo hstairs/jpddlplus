@@ -361,6 +361,9 @@ public class H1WithBucketEXP implements SearchHeuristic {
             for (final int i : actions) {
                 if (!getClosed()[i]) {
                     final float v = estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
+                    if (v < 0){
+                        throw new RuntimeException("This isn't possible!, v can't be negative");
+                    }
                     if (init && v == 0) {
                         actionInit[i] = true;
                     }
@@ -486,7 +489,10 @@ public class H1WithBucketEXP implements SearchHeuristic {
                         }
                     } else if (v == UNKNOWNEFFECT) {//this is a hard condition basically
                         float newCost = 0f;
-                        final float rep = computeRepetition(t, 1f, s);
+                        float rep = computeRepetition(t, 1f, s);
+                        if (rep < 0){
+                            rep = 0f;
+                        }
                         if (isAdditive()) {
                             if (hardConditionthroughNumError) {
                                 newCost = rep*getActionCost()[actionId];

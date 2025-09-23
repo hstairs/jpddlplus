@@ -37,7 +37,7 @@ public class EHS extends SearchEngine {
             out.println("Initial State is not valid");
             return null;
         }
-        SearchNode current = new SearchNode(p.getInit(),null,null,0,0);
+        SearchNode current = new SearchNode(p.getInit(),null,null,0,0,this.extenalLogger != null);
         LinkedList<Pair<BigDecimal, Object>> plan = new LinkedList<>();
         Object visited = null;
         visited = new Object2BooleanLinkedOpenHashMap();
@@ -113,7 +113,7 @@ public class EHS extends SearchEngine {
                     //out.println("try");
                     if (d != Float.MAX_VALUE) {// && d <= current_value) {
                         nodesEvaluated++;
-                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0);
+                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0,this.extenalLogger != null);
                         this.tryLog(newNode, ExternalLoggerLogType.Generating);
                         frontier.add(newNode);
                         if (this.helpfulActions) {

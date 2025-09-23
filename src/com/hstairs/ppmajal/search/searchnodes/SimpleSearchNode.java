@@ -11,7 +11,7 @@ public class SimpleSearchNode {
     public float gValue;
     public final UUID id;
 
-    public SimpleSearchNode(State s, Object transition, SimpleSearchNode father, float g) {
+    public SimpleSearchNode(State s, Object transition, SimpleSearchNode father, float g, boolean trackingUniqueness) {
         this.s = s;
         if (!(transition instanceof Integer)) {
             this.transition = transition;
@@ -20,6 +20,9 @@ public class SimpleSearchNode {
         }
         this.father = father;
         this.gValue = g;
-        this.id = UUID.randomUUID();
+        if (trackingUniqueness)
+            this.id = UUID.randomUUID();
+        else
+            this.id = null;
     }
 }

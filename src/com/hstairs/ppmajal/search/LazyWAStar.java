@@ -71,7 +71,7 @@ public class LazyWAStar extends WAStar {
         } else {
             nodesEvaluated++;
         }
-        SearchNode init = new SearchNode(initState.clone(), 0, hw * hAtInit, hAtInit, saveSearchSpace);
+        SearchNode init = new SearchNode(initState.clone(), 0, hw * hAtInit, hAtInit, saveSearchSpace,this.extenalLogger != null);
         if (this.helpfulActions) {
             init.helpfulActions = h.getTransitions(helpfulActions);
         }
@@ -145,7 +145,7 @@ public class LazyWAStar extends WAStar {
                                     //if (hValue != Float.MAX_VALUE && (!helpT || hValue <hExpanded)) {
                                         final SearchNode toExplore = new SearchNode(successorState, act,
                                                 currentNode, successorG, !optimality
-                                                ? hValue : successorG + hValue * hw, hValue, saveSearchSpace);
+                                                ? hValue : successorG + hValue * hw, hValue, saveSearchSpace,this.extenalLogger != null);
                                         if (saveSearchSpace) {
                                             currentNode.add_descendant(toExplore);
                                         }

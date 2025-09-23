@@ -59,9 +59,9 @@ public class WAStar extends SearchEngine {
             if (hValue != Float.MAX_VALUE) {// && (d + succ_g) < this.depthLimit) {
                 final SearchNode node = !optimality ?
                         new SearchNode(successorState, actionsBefore,
-                                current_node, gSuccessor, hValue * hw, hValue, saveSearchSpace)
+                                current_node, gSuccessor, hValue * hw, hValue, saveSearchSpace,this.extenalLogger != null)
                         : new SearchNode(successorState, actionsBefore,
-                        current_node, gSuccessor, hValue * hw + gSuccessor, hValue, saveSearchSpace);
+                        current_node, gSuccessor, hValue * hw + gSuccessor, hValue, saveSearchSpace,this.extenalLogger != null);
                 if (this.helpfulActions) {
                     node.helpfulActions = h.getTransitions(helpfulActions);
                 }
@@ -111,7 +111,7 @@ public class WAStar extends SearchEngine {
             nodesEvaluated++;
         }
         SearchNode init = new SearchNode(initState.clone(),
-                0,hw*hAtInit,hAtInit, saveSearchSpace);
+                0,hw*hAtInit,hAtInit, saveSearchSpace, this.extenalLogger != null);
         if (this.helpfulActions) {
             init.helpfulActions = h.getTransitions(helpfulActions);
         }

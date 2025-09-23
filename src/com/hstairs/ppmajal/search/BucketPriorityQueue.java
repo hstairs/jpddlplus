@@ -72,6 +72,9 @@ public class BucketPriorityQueue implements PriorityQueue<BucketPriorityQueueNod
 
 
     public void enqueue(BucketPriorityQueueNode n, int f){
+        if (f < 0){
+            throw new RuntimeException("f got negative!");
+        }
         try {//System.out.println("Value of f" +f);
             if (f >= q.length) {
                 q = Arrays.copyOf(q, f+2);

@@ -120,8 +120,8 @@ public class OldSearchEngineMethods {
             final float hValue = getHeuristic().computeEstimate(successorState);
             setHeuristicCpuTime(getHeuristicCpuTime() + System.currentTimeMillis() - start);
             if (hValue != Float.MAX_VALUE) {// && (d + succ_g) < this.depthLimit) {
-                final SearchNode node = gbfs ? new SearchNode(successorState, actionsBefore, current_node, succ_g, hValue * this.getHw(), hValue, this.saveSearchTreeAsJson)
-                        : new SearchNode(successorState, actionsBefore, current_node, succ_g, hValue * this.getHw() + succ_g, hValue, this.saveSearchTreeAsJson);
+                final SearchNode node = gbfs ? new SearchNode(successorState, actionsBefore, current_node, succ_g, hValue * this.getHw(), hValue, this.saveSearchTreeAsJson,false)
+                        : new SearchNode(successorState, actionsBefore, current_node, succ_g, hValue * this.getHw() + succ_g, hValue, this.saveSearchTreeAsJson,false);
                 if (this.helpfulActionsPruning) {
                     node.helpfulActions = getHeuristic().getTransitions(helpfulActionsPruning);
                 }
@@ -237,7 +237,7 @@ public class OldSearchEngineMethods {
         Queue<SearchNode> frontier = new LinkedList<>();
         float currentValue = heuristic.computeEstimate(current);
 
-        SearchNode init = new SearchNode(current, null, null, 0, currentValue);
+        SearchNode init = new SearchNode(current, null, null, 0, currentValue, false);
         frontier.add(init);
         visited.put(init.s, true);
         if (this.helpfulActionsPruning) {
@@ -278,7 +278,7 @@ public class OldSearchEngineMethods {
                     setEvaluatedStates(getEvaluatedStates() + 1);
                     if (d != Float.MAX_VALUE) {// && d <= current_value) {
 
-                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0);
+                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0,false);
                         frontier.add(newNode);
                         if (this.helpfulActionsPruning) {
                             newNode.helpfulActions = heuristic.getTransitions(true);
@@ -306,7 +306,7 @@ public class OldSearchEngineMethods {
     public LinkedList<org.apache.commons.lang3.tuple.Pair<BigDecimal, Object>> UCS(SearchProblem problem) {
         final ObjectHeapPriorityQueue<SearchNode> frontier = new ObjectHeapPriorityQueue<>(new TieBreaker(this.tbRule));
         final State init = problem.getInit();
-        frontier.enqueue(new SearchNode(init, 0,0, 0, false));
+        frontier.enqueue(new SearchNode(init, 0,0, 0, false,false));
         final Object2BooleanOpenHashMap closed = new Object2BooleanOpenHashMap();
         final Object2FloatLinkedOpenHashMap gNode = new Object2FloatLinkedOpenHashMap();
         long start = System.currentTimeMillis();
@@ -339,7 +339,7 @@ public class OldSearchEngineMethods {
                             final float gValue = problem.gValue(currentNode.s, next.getSecond(), next.getFirst(), currentNode.gValue);
                             float aFloat = gNode.getOrDefault(next.getFirst(),-1);
                             if (aFloat == -1 || aFloat > gValue){
-                                final SearchNode searchNode = new SearchNode(next.getFirst(), next.getSecond(), currentNode, gValue, gValue, 0, false);
+                                final SearchNode searchNode = new SearchNode(next.getFirst(), next.getSecond(), currentNode, gValue, gValue, 0, false, false);
                                 frontier.enqueue(searchNode);
                                 gNode.put(next.getFirst(),gValue);
                             }
@@ -355,7 +355,7 @@ public class OldSearchEngineMethods {
     
     private SearchNode _breathFirstSearch(SearchProblem problem){
         State init = problem.getInit();
-        SearchNode sn = new SearchNode(init, null,null, 0, 0);
+        SearchNode sn = new SearchNode(init, null,null, 0, 0, false);
         if (problem.goalSatisfied(init)){
             return sn;
         }
@@ -377,7 +377,7 @@ public class OldSearchEngineMethods {
                 if (!reached.contains(next.getFirst())) {
                     this.numberOfEvaluatedStates++;
                     SearchNode newNode;
-                    newNode = new SearchNode(next.getFirst(), next.getSecond(), currentNode, currentNode.gValue+1,currentNode.gValue+1, 0, this.saveSearchTreeAsJson);
+                    newNode = new SearchNode(next.getFirst(), next.getSecond(), currentNode, currentNode.gValue+1,currentNode.gValue+1, 0, this.saveSearchTreeAsJson, false);
                     if (problem.goalSatisfied(newNode.s)) {
                         this.overallSearchTime = System.currentTimeMillis()-this.beginningTime;
                         return newNode;
@@ -455,7 +455,7 @@ public class OldSearchEngineMethods {
         out.println("h(n = s_0)=" + hAtInit);//debugging information
 
 //        getHeuristic().why_not_active = false;
-        SearchNode init = new SearchNode(initState.clone(), 0,hw*hAtInit,hAtInit, this.saveSearchTreeAsJson);
+        SearchNode init = new SearchNode(initState.clone(), 0,hw*hAtInit,hAtInit, this.saveSearchTreeAsJson, false);
         if (this.helpfulActionsPruning) {
             init.helpfulActions = getHeuristic().getTransitions(helpfulActionsPruning);
         }
@@ -802,7 +802,7 @@ public class OldSearchEngineMethods {
     private Pair<IdaStarSearchNode, Float> boundedDepthFirstSearch(SearchProblem problem, float bound, boolean anytime, boolean checkAlongPrefix, boolean showExpansion, boolean idastarWithMemory, long timeout) throws TimeoutException {
         final Stack<IdaStarSearchNode> frontier = new Stack();
 
-        IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0);
+        IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0, false);
         causalDeadEnds = 0;
         frontier.push(init);
         float newBound = Float.POSITIVE_INFINITY;
@@ -882,7 +882,7 @@ public class OldSearchEngineMethods {
                                 if (push) {
                                     node.numberOfSons++;
                                     atLeastOne = true;
-                                    frontier.push(new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g));
+                                    frontier.push(new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g, false));
                                 }
                             }
                             if (!atLeastOne) {
