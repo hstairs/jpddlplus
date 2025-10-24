@@ -52,7 +52,8 @@ public class NumericGoalCounting extends GoalCounting {
             }
             return min;
         } else if (goals instanceof Comparison g) {
-            return (float) (-1f * g.getLeft().eval(s));
+            return (float) Math.abs(g.getLeft().eval(s));
+
         } else if (goals instanceof BoolPredicate g) {
             return 1f;
         }

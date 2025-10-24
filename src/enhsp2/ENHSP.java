@@ -9,6 +9,7 @@ import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import com.hstairs.enhsp2.SimpleExternalLogger;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
+import com.hstairs.ppmajal.transition.TransitionSchema;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -134,6 +135,7 @@ public class ENHSP {
             final PDDLDomain localDomain = new PDDLDomain(domainFile);
             //domain.substituteEqualityConditions();
             pddlPlus = !localDomain.getProcessesSchema().isEmpty() || !localDomain.getEventsSchema().isEmpty();
+
             out.println("Domain parsed");
             final PDDLProblem localProblem = new PDDLProblem(problemFile, localDomain.getConstants(),
                     localDomain.getTypes(), localDomain, out, groundingType, sdac, ignoreMetric,new BigDecimal(deltaPlanning),new BigDecimal(deltaExecution));
@@ -206,6 +208,7 @@ public class ENHSP {
             printStats();
             setHeuristic();
             if (autoAnytime){
+                System.out.println("Auto Anytime Modality");
                 conf.add(new AnytimeConfigurations("lazygbfs","hmrp", true, "4"));
                 conf.add(new AnytimeConfigurations("lazywastar","hmrp", false, "8"));
                 conf.add(new AnytimeConfigurations("lazywastar","hmrp", false, "4"));

@@ -62,15 +62,15 @@ public class PDDLHeuristic {
         { "hlm-count", "HLMCount", "Landmark-count heuristic estimating distance by number of unsatisfied landmarks." },
         { "hlm-lp", "HLM-LP", "Landmark heuristic using linear programming (LP) with CPLEX." },
         { "hlm-lp-gurobi", "HLM-LP-Gurobi", "Landmark heuristic using LP solved with Gurobi." },
-        { "hgen", "HGen", "Generic heuristic generator (experimental baseline heuristic)." },
+        { "hgen", "HGen", "H_gen heuristic, generalisation of hmax for handling conjunctions directly" },
     };
 
     private static final Map<String, HeuristicFactory> HEURISTICS = Map.ofEntries(
             Map.entry(HEURISTIC_INFOS[0][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new GoalCounting(p)),
             Map.entry(HEURISTIC_INFOS[1][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new H1(p, true, false, false, rc, ha, false, ht, false, redC, to1, lea)),
             Map.entry(HEURISTIC_INFOS[2][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new H1WithBucketEXP(p, true, false, false, rc, ha, false, ht, false, redC, to1, lea)),
-            Map.entry(HEURISTIC_INFOS[3][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new StructureSensitiveNumericGoalCounting(p)),
-            Map.entry(HEURISTIC_INFOS[4][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new NumericGoalCounting(p)),
+            Map.entry(HEURISTIC_INFOS[3][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new NumericGoalCounting(p)),
+            Map.entry(HEURISTIC_INFOS[4][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new StructureSensitiveNumericGoalCounting(p)),
             Map.entry(HEURISTIC_INFOS[5][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new ManhattanHeuristic(p)),
             Map.entry(HEURISTIC_INFOS[6][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new H1(p, true, false, false, "brute", false, false, false, false, to1, lea)),
             Map.entry(HEURISTIC_INFOS[7][0], (p, rc, ha, ht, to1, lea, dbg, redC) -> new H1(p, false, false, false, "brute", false, false, false, false, to1, lea)),
