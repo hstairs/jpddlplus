@@ -1,0 +1,12 @@
+{
+  "1 - harmony(pleasure) <= 0": 6,
+  "1 - locale(food) <= 0": 7,
+  "craves": 1,
+  "eats": 0,
+  "false_1 - harmony(pleasure) <= 0": 8,
+  "false_1 - locale(food) <= 0": 9,
+  "fears": 2,
+  "goal_craves": 4,
+  "goal_eats": 3,
+  "goal_fears": 5
+}

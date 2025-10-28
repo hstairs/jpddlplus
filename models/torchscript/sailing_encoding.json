@@ -1,0 +1,12 @@
+{
+  "- x(boat) + y(boat) -  d(person) -  25 <= 0": 5,
+  "d(person) + x(boat) -  y(boat) <= 0": 3,
+  "d(person) -  y(boat) -  x(boat) <= 0": 2,
+  "false_- x(boat) + y(boat) -  d(person) -  25 <= 0": 9,
+  "false_d(person) + x(boat) -  y(boat) <= 0": 7,
+  "false_d(person) -  y(boat) -  x(boat) <= 0": 6,
+  "false_x(boat) + y(boat) -  d(person) -  25 <= 0": 8,
+  "goal_saved": 1,
+  "saved": 0,
+  "x(boat) + y(boat) -  d(person) -  25 <= 0": 4
+}

@@ -1,0 +1,12 @@
+{
+  "1 - sled_supplies(sled) <= 0": 4,
+  "1 - waypoint_supplies(waypoint) <= 0": 5,
+  "at_": 0,
+  "false_1 - sled_supplies(sled) <= 0": 7,
+  "false_1 - waypoint_supplies(waypoint) <= 0": 8,
+  "false_sled_supplies(sled) - sled_capacity(sled) < 0": 9,
+  "goal_at_": 2,
+  "goal_is_next": 3,
+  "is_next": 1,
+  "sled_supplies(sled) - sled_capacity(sled) < 0": 6
+}

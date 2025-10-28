@@ -1,0 +1,11 @@
+{
+  "1 - x(farm) <= 0": 5,
+  "4 * num_of_cars(station) - x(farm) <= 0": 4,
+  "adj": 0,
+  "augmented_condition": 8,
+  "false_1 - x(farm) <= 0": 7,
+  "false_4 * num_of_cars(station) - x(farm) <= 0": 6,
+  "goal_1 - x(farm) <= 0": 2,
+  "goal_adj": 1,
+  "goal_augmented_condition": 3
+}

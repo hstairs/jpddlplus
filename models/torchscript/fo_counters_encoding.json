@@ -1,0 +1,12 @@
+{
+  "0  + rate_value(counter) -  value(counter)  <= 0": 2,
+  "1 - rate_value(counter) <= 0": 4,
+  "false_0  + rate_value(counter) -  value(counter)  <= 0": 6,
+  "false_1 - rate_value(counter) <= 0": 8,
+  "false_rate_value(counter) + 1 - 10 <= 0": 7,
+  "false_rate_value(counter) + value(counter) - max_int <= 0": 5,
+  "goal_value(counter) + 1 - value(counter) <= 0": 0,
+  "rate_value(counter) + 1 - 10 <= 0": 3,
+  "rate_value(counter) + value(counter) - max_int <= 0": 1,
+  "value(counter) + 1 - value(counter) <= 0": 9
+}

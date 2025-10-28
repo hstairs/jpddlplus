@@ -1,0 +1,8 @@
+{
+  "1 - value(counter) <= 0": 3,
+  "false_1 - value(counter) <= 0": 4,
+  "false_value(counter) + 1 - max_int <= 0": 2,
+  "goal_value(counter) + 1 - value(counter) <= 0": 0,
+  "value(counter) + 1 - max_int <= 0": 1,
+  "value(counter) + 1 - value(counter) <= 0": 5
+}

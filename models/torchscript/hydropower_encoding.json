@@ -1,0 +1,16 @@
+{
+  "1 - stored_capacity(station) <= 0": 8,
+  "1 - stored_units(station) <= 0": 9,
+  "21 * value(turnvalue) / 20 - funds(station) <= 0": 7,
+  "before": 1,
+  "demand": 2,
+  "false_1 - stored_capacity(station) <= 0": 11,
+  "false_1 - stored_units(station) <= 0": 12,
+  "false_21 * value(turnvalue) / 20 - funds(station) <= 0": 10,
+  "goal_before": 4,
+  "goal_demand": 5,
+  "goal_objective(station) - funds(station) <= 0": 6,
+  "goal_timenow": 3,
+  "objective(station) - funds(station) <= 0": 13,
+  "timenow": 0
+}

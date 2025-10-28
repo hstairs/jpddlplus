@@ -33,6 +33,7 @@ import com.hstairs.ppmajal.extraUtils.ArrayShifter;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.ConditionalEffects;
 import com.hstairs.ppmajal.transition.Transition;
 import static com.hstairs.ppmajal.transition.Transition.getTransition;
 import com.hstairs.ppmajal.transition.TransitionGround;
@@ -109,6 +110,8 @@ public class H1 implements SearchHeuristic {
     final boolean[] visited;
     protected final int[] maxNumRepetition ;
     private boolean hardConditionthroughNumError;
+    private Collection<TransitionGround> initActions;
+    private final boolean storeInitActions;
 
 
     public H1(PDDLProblem problem) {
@@ -124,18 +127,21 @@ public class H1 implements SearchHeuristic {
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
+                redConstraints, helpfulActionsComputation, reachability,
+                helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, -1);
+                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions,
+                conjunctionsMax, null, unitaryCost, -1);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
-
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+        this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
         this.problem = problem;
@@ -297,6 +303,17 @@ public class H1 implements SearchHeuristic {
             actionHCost[freePreconditionAction] = 0f;
             actionInit[freePreconditionAction] = true;
             addActionsInPriority(freePreconditionAction, h, 0f);
+        }
+        
+        if (storeInitActions){
+            initActions = new ArrayList<>();
+            for (var act: allActions ){
+                try {
+                    initActions.add((TransitionGround) getTransition(cp.cpTr2TrMap()[act]));
+                }catch(final Exception e){
+                    throw new UnsupportedOperationException("Init actions storage only works without processes");
+                }
+            }
         }
         return h;
     }
@@ -738,6 +755,15 @@ public class H1 implements SearchHeuristic {
 //            }
         }
         return res.toArray();
+    }
+
+
+    public Collection<TransitionGround> getPotentialApplicableActions(){
+        if (storeInitActions){
+            return this.initActions;
+        }else{
+            return this.getAllTransitions();
+        }
     }
 
     @Override

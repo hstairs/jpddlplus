@@ -360,7 +360,11 @@ protected DoubleArrayList numFluents;
         } 
     }
 
-
-
+public BitSet getBoolFluents() {
+        return boolFluents;
+}
+public PDDLProblem getP(){
+        return p;
+}
 
 }

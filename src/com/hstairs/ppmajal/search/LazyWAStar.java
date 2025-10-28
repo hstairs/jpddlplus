@@ -1,5 +1,7 @@
 package com.hstairs.ppmajal.search;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
+import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
@@ -29,18 +31,19 @@ public class LazyWAStar extends WAStar {
         this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false, false);
     }
 
-    Object[] getActionsToSearch(List helpful, SearchHeuristic h) {
+    Object[] getActionsToSearch(List helpful, SearchHeuristic h, SearchProblem problem) {
 
         ArrayList res = new ArrayList();
         res.addAll(h.getAllTransitions());
-        if (helpful!= null){
+        if (problem instanceof PDDLProblem && ((PDDLProblem) problem).getProcessesSet().isEmpty())
+            return res.toArray();
+        if (helpful!= null ){
             for (var v: helpful) {
                 if (!(v instanceof TransitionGround)) {
                     res.add(v);
                 }
             }
         }
-
         return res.toArray();
     }
 
@@ -68,19 +71,22 @@ public class LazyWAStar extends WAStar {
         } else {
             nodesEvaluated++;
         }
-        SearchNode init = new SearchNode(initState.clone(),
-                0, hw * hAtInit, hAtInit, saveSearchSpace);
+        SearchNode init = new SearchNode(initState.clone(), 0, hw * hAtInit, hAtInit, saveSearchSpace);
         if (this.helpfulActions) {
             init.helpfulActions = h.getTransitions(helpfulActions);
         }
         super.initHandle(init); //This is to inspect the search space if needed
         enqueue(frontier,init);
+        this.tryLog(init, ExternalLoggerLogType.Generating);
+
         Object2FloatMap<State> gValueMap = new Object2FloatOpenHashMap<>();
         gValueMap.put(initState, 0f);//The initial state is at 0 distance, of course.
         float bestf = 0;
         previous = 0;
         while (!isEmpty(frontier)) {
             final SearchNode currentNode = (SearchNode) dequeue(frontier);
+            this.tryLog(currentNode, ExternalLoggerLogType.Expanding);
+
             //System.out.println(currentNode.f);
             if (currentNode.gValue == getPreviousCost(gValueMap, currentNode.s)) {
                 nodesExpanded++;
@@ -102,7 +108,7 @@ public class LazyWAStar extends WAStar {
                     bestf = printInfoDuringSearch(timeAtStart, out, bestf, fromTheBeginning,
                              nodesExpanded, nodesEvaluated, frontier, currentNode);
 
-                    Object[] actionsToSearch = getActionsToSearch(helpful,h);
+                    Object[] actionsToSearch = getActionsToSearch(helpful,h, problem);
 
                     for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext(); ) {
 
@@ -156,6 +162,7 @@ public class LazyWAStar extends WAStar {
                     deadEndsDetected++;
                 }
             }
+            this.tryLog(currentNode, ExternalLoggerLogType.Closing);
         }
 
         return null;
