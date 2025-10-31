@@ -148,6 +148,8 @@ public class Comparison extends Terminal {
     }
 
     public boolean isSatisfied(Double first, Double second){
+        if (this.isValid())
+            return true;
         if ((first == null) || (second == null) ||
             first.isNaN() || second.isNaN()) {
             return false;//negation by failure.
