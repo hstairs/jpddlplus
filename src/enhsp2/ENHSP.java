@@ -118,9 +118,6 @@ public class ENHSP {
         return planLength;
     }
 
-    public String[][] getAvailableHeuristics(){
-        return PDDLHeuristic.getAvailableHeuristics();
-    }
 
     public String[][] getAvailableSearchEngines(){
         return (PDDLPlanner.getAvailableSearchEngines());

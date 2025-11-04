@@ -74,7 +74,6 @@ public class programmaticMain {
         
         problem.addAction(c);
         problem.setGoals(BoolPredicate.getPredicate("b"));
-
         problem.addFactValue(BoolPredicate.getPredicate("a"), true);
         problem.prettyPrint();
         pddlDomain.saveDomain("/tmp/d.pddl");

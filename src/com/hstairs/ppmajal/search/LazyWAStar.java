@@ -37,7 +37,7 @@ public class LazyWAStar extends WAStar {
         res.addAll(h.getAllTransitions());
         if (problem instanceof PDDLProblem && ((PDDLProblem) problem).getProcessesSet().isEmpty())
             return res.toArray();
-        if (helpful!= null ){
+        if (helpful != null ){
             for (var v: helpful) {
                 if (!(v instanceof TransitionGround)) {
                     res.add(v);
