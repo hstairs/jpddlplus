@@ -55,4 +55,12 @@ public interface SearchHeuristic {
     default Collection<TransitionGround> getPotentialApplicableActions(){
         return getAllTransitions();
     }
+
+    default boolean[] getHelpfulTransitionMap(){
+        return null;
+    };
+
+    default void setComputeHelpfulActionsMap(){
+
+    }
 }
