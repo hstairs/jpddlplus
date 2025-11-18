@@ -731,7 +731,7 @@ public class H1 implements SearchHeuristic {
 
     @Override
     public Object[] getTransitions(final boolean helpful) {
-        Collection res = null;
+        Collection res = new ArrayList();
         if (helpfulActions == null || !helpful) {
             if (reachableTransitionsInstances == null) {
                 if (reachableTransitions == null) {
@@ -750,7 +750,7 @@ public class H1 implements SearchHeuristic {
                 res = reachableTransitionsInstances;
             }
         } else {
-            return helpfulActions.toArray();
+            res.addAll(helpfulActions);
         }
         if (helpfulTransitions) {
 //            if (helpfulActionsComputation) {

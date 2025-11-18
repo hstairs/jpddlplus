@@ -25,7 +25,7 @@ jar cf jpddlplus.jar -C "$output_directory" . -C tmp_extracted_jars .
 temp_manifest="MANIFEST.MF"
 {
   echo "Manifest-Version: 1.0"
-  echo "Main-Class: main"
+  echo "Main-Class: enhsp2.main"
   
   # Generate the Class-Path field
   class_path="Class-Path: "
