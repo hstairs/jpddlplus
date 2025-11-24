@@ -31,16 +31,18 @@ public class LazyWAStar extends WAStar {
         this(hw, optimality, helpfulActions, saveSearchSpace,tb, boundG,false, false);
     }
 
-    Object[] getActionsToSearch(List helpful, SearchHeuristic h, SearchProblem problem) {
+    Object[] getActionsToSearch(Object[] helpful, SearchHeuristic h, SearchProblem problem) {
 
         ArrayList res = new ArrayList();
         res.addAll(h.getAllTransitions());
-        if (problem instanceof PDDLProblem && ((PDDLProblem) problem).getProcessesSet().isEmpty())
+        if (problem instanceof PDDLProblem && !((PDDLProblem) problem).getProcessesSet().isEmpty())
             return res.toArray();
         if (helpful != null ){
             for (var v: helpful) {
                 if (!(v instanceof TransitionGround)) {
                     res.add(v);
+                }else{
+
                 }
             }
         }
@@ -105,14 +107,13 @@ public class LazyWAStar extends WAStar {
                 final long start = System.currentTimeMillis();
                 final float hExpanded = h.computeEstimate(currentNode.s);
                 if (hExpanded != Float.MAX_VALUE) {
-                    //final List helpful = helpfulActions ? List.of(h.getTransitions(true)) : null;
+                    final Object[] helpful = helpfulActions ? h.getTransitions(true) : null;
 
                     heuristicTime += System.currentTimeMillis() - start;
                     bestf = printInfoDuringSearch(timeAtStart, out, bestf, fromTheBeginning,
                              nodesExpanded, nodesEvaluated, frontier, currentNode);
 
-                    //Object[] actionsToSearch = getActionsToSearch(helpful,h, problem);
-                    Object[] actionsToSearch = h.getTransitions(false);
+                    Object[] actionsToSearch = getActionsToSearch(helpful,h, problem);
                     for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext(); ) {
 
                         final Pair<State, Object> next = it.next();
@@ -130,12 +131,15 @@ public class LazyWAStar extends WAStar {
                                     boolean helpT = false;
                                     if (act instanceof ImmutablePair tr) {
                                         t = tr.getLeft();
+                                        if ((Integer)tr.getRight() <= 1){
+                                            continue;
+                                        }
                                         helpT = true;
                                     } else {
                                         t = act;
                                     }
                                     //if (!helpfulActions || helpfulActionsWithPruning || helpful.contains(t)){
-                                    if (helpfulActions && h.getHelpfulTransitionMap()[((Transition)t).getId()]) {
+                                    if (helpfulActions && (! (t instanceof Integer)) && h.getHelpfulTransitionMap()[((Transition)t).getId()]) {
                                         hValue -= (successorG - currentNode.gValue);
                                         hValue = Math.max(0, hValue);
                                     }

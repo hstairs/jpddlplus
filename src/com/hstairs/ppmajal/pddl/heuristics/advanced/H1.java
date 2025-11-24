@@ -90,7 +90,7 @@ public class H1 implements SearchHeuristic {
     final private IntArraySet[] deleters;
     protected int[] establishedAchiever;
     protected float[] numRepetition;
-    private List<TransitionGround> helpfulActions;
+    private List helpfulActions;
     IntArraySet reachableTransitions;
     private Collection<TransitionGround> reachableTransitionsInstances;
 
@@ -731,7 +731,7 @@ public class H1 implements SearchHeuristic {
 
     @Override
     public Object[] getTransitions(final boolean helpful) {
-        Collection res = new ArrayList();
+        Collection res;
         if (helpfulActions == null || !helpful) {
             if (reachableTransitionsInstances == null) {
                 if (reachableTransitions == null) {
@@ -750,7 +750,7 @@ public class H1 implements SearchHeuristic {
                 res = reachableTransitionsInstances;
             }
         } else {
-            res.addAll(helpfulActions);
+            res = helpfulActions;
         }
         if (helpfulTransitions) {
 //            if (helpfulActionsComputation) {
@@ -783,7 +783,9 @@ public class H1 implements SearchHeuristic {
             }
             reachableTransitionsInstances = new LinkedHashSet<TransitionGround>();
             for (final int i : reachableTransitions) {
-                reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
+                TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
+                if (transition.getSemantics().equals((Transition.Semantics.ACTION)))
+                    reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
             }
             reachableTransitionsInstances = new ArrayList<>(reachableTransitionsInstances);
             return reachableTransitionsInstances;
