@@ -17,7 +17,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.*;
@@ -399,6 +398,7 @@ public final class GnnValTSHeuristic implements SearchHeuristic {
         //set the seed to ensure reproducibility
         Engine.getInstance().setRandomSeed(17);
 
+
         // Build DJL Criteria and load model with custom Translator
         try {
             Criteria<TorchInputs, Float> criteria = Criteria.builder()
@@ -450,9 +450,26 @@ public final class GnnValTSHeuristic implements SearchHeuristic {
         return problem.actions.toArray();
     }
 
+    private Collection<TransitionGround> reachableTransitionsInstances;
+
     @Override
     public Collection<TransitionGround> getAllTransitions() {
-        return Collections.emptyList();
+        if (this.reachableTransitionsInstances == null) {
+            // Inizializza le transizioni raggiungibili se non già fatto
+            this.reachableTransitionsInstances = new ArrayList<>();
+
+            // Ottieni tutte le transizioni dal problema
+            // in futuro sarebbe meglio modificarlo e ottenere solo quelle effettivamente raggiungibili
+            Set<TransitionGround> allTransitions = problem.getTransitions();
+
+            // Per questa implementazione, ritorniamo tutte le transizioni come raggiungibili
+            this.reachableTransitionsInstances.addAll(allTransitions);
+        }
+
+        return this.reachableTransitionsInstances;
+
+
+
     }
 
     // --- Encoding helpers ---
