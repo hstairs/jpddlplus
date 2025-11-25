@@ -11,9 +11,7 @@ import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import org.jgrapht.alg.util.Pair;
 
 import java.io.PrintStream;
-import java.util.Iterator;
-import java.util.Objects;
-import java.util.Queue;
+import java.util.*;
 
 public class PWAStar extends SearchEngine {
     protected final boolean optimality;
@@ -77,6 +75,34 @@ public class PWAStar extends SearchEngine {
         }
         return retCode.duplicated;
     }
+
+    protected retCode queueSuccessorWithPrecomputedH(Object frontier, State successorState,
+                                                     SearchNode current_node, Object actionsBefore,
+                                                     float prev_cost, float gSuccessor, Object2FloatMap<State> g,
+                                                     SearchHeuristic h, float hw, float precomputedHValue) {
+        if (Objects.equals(prev_cost, this.G_DEFAULT) || gSuccessor < prev_cost) {
+            if (precomputedHValue != Float.MAX_VALUE) {
+                final SearchNode node = !optimality ?
+                        new SearchNode(successorState, actionsBefore,
+                                current_node, gSuccessor, precomputedHValue * hw, precomputedHValue, saveSearchSpace)
+                        : new SearchNode(successorState, actionsBefore,
+                        current_node, gSuccessor, precomputedHValue * hw + gSuccessor, precomputedHValue, saveSearchSpace);
+                if (this.helpfulActions) {
+                    node.helpfulActions = h.getTransitions(helpfulActions);
+                }
+                if (saveSearchSpace) {
+                    current_node.add_descendant(node);
+                }
+                addInFrontier(frontier, node);
+                g.put(successorState.getRepresentative(), gSuccessor);
+                return retCode.inserted;
+            } else {
+                return retCode.deadend;
+            }
+        }
+        return retCode.duplicated;
+    }
+
     protected void addInFrontier(Object frontier, SearchNode newNode) {
         if (frontier instanceof Queue) {
             ((Queue) frontier).add(newNode);
@@ -143,25 +169,50 @@ public class PWAStar extends SearchEngine {
                 bestf = printInfoDuringSearch(timeAtStart,out,bestf,fromTheBeginning,
                         nodesExpanded,nodesEvaluated,frontier,currentNode);
                 final Object[] actionsToSearch = getActionsToSearch(currentNode, problem, h);
+
+                // Colleziona tutti i possibili stati successori
+                List<Pair<State, Object>> allSuccessors = new ArrayList<>();
+                List<State> validSuccessorStates = new ArrayList<>();
+                List<Float> successorGValues = new ArrayList<>();
+
                 for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext();) {
                     final Pair<State, Object> next = it.next();
                     final State successorState = next.getFirst();
                     final Object act = next.getSecond();
                     final float successorG = problem.gValue(currentNode.s, act, successorState, currentNode.gValue);
-                    if (successorG < gBound) {
-                        if (Objects.equals(successorG, this.G_DEFAULT)) {
-                            deadEndsDetected++;
-                            continue;
-                        }
-                        switch (this.queueSuccessor(frontier, successorState, currentNode, act,
-                                getPreviousCost(gValue, successorState), successorG, gValue, h, hw)) {
-                            case inserted -> nodesEvaluated++;
-                            case deadend -> deadEndsDetected++;
-                            case duplicated -> duplicatedDetected++;
+
+                    if (successorG < gBound && !Objects.equals(successorG, this.G_DEFAULT)) {
+                        float previousCost = getPreviousCost(gValue, successorState);
+                        if (Objects.equals(previousCost, this.G_DEFAULT) || (optimality && successorG < previousCost)) {
+                            allSuccessors.add(next);
+                            validSuccessorStates.add(successorState);
+                            successorGValues.add(successorG);
                         }
                     }
                 }
+
+                // Calcola le euristiche in batch
+                final long start = System.currentTimeMillis();
+                Map<State, Float> heuristics = h.computeBatchEstimates(validSuccessorStates);
+                heuristicTime += System.currentTimeMillis() - start;
+
+                // Processa i risultati
+                for (int i = 0; i < allSuccessors.size(); i++) {
+                    final Pair<State, Object> successorPair = allSuccessors.get(i);
+                    final State successorState = successorPair.getFirst();
+                    final Object act = successorPair.getSecond();
+                    final float successorG = successorGValues.get(i);
+                    final float hValue = heuristics.get(successorState);
+
+                    switch (this.queueSuccessorWithPrecomputedH(frontier, successorState, currentNode, act,
+                            getPreviousCost(gValue, successorState), successorG, gValue, h, hw, hValue)) {
+                        case inserted -> nodesEvaluated++;
+                        case deadend -> deadEndsDetected++;
+                        case duplicated -> duplicatedDetected++;
+                    }
+                }
             }
+
 
             this.tryLog(currentNode, ExternalLoggerLogType.Closing);
         }

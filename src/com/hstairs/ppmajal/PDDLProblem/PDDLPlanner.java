@@ -42,7 +42,9 @@ public class PDDLPlanner {
         {"ehs", "EHS", "Enhanced Heuristic Search"},
         {"ida", "IDA", "Iterative Deepening A*"},
         {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
-        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"}
+        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"},
+            {"pwastar", "PWAStar", "Parallel Weighted A* Search"},
+            {"pgbfs", "PGBFS", "Parallel Greedy Best-First Search"}
     };
 
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
@@ -51,7 +53,9 @@ public class PDDLPlanner {
         Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
         Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
-        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+            Map.entry(SE_INFOS[6][0], (planner, tb) -> new PWAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
+            Map.entry(SE_INFOS[7][0], (planner, tb) -> new PWAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch))
     );
 
     final private boolean bucketBasedQueueSearch;

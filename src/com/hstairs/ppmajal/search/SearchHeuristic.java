@@ -55,4 +55,12 @@ public interface SearchHeuristic {
     default Collection<TransitionGround> getPotentialApplicableActions(){
         return getAllTransitions();
     }
+
+    /**
+     * @param validSuccessorStates, a list containing all possible successors
+     * @return distance to the goal for all the possible successor states
+     */
+    default Map<State, Float> computeBatchEstimates(List<State> validSuccessorStates) {
+        return null;
+    }
 }

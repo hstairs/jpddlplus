@@ -1,5 +1,6 @@
 package com.hstairs.ppmajal.pddl.heuristics.advanced;
 
+import ai.djl.training.ParameterStore;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.PDDLProblem.PDDLState;
 import com.hstairs.ppmajal.conditions.*;
@@ -20,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.*;
+import java.util.stream.Collectors;
 
 // DJL imports (add DJL Core + DJL PyTorch engine jars to jar_dependencies)
 //import ai.djl.Model;
@@ -58,8 +60,8 @@ public final class GnnValTSHeuristic implements SearchHeuristic {
     private final PDDLProblem problem;
     private final PDDLProblem frozenProblem;
     // DJL model and predictor
-    private final ZooModel<TorchInputs, Float> model;
-    private final Predictor<TorchInputs, Float> predictor;
+    private final ZooModel<TorchInputs, float[]> model;
+    private final Predictor<TorchInputs, float[]> predictor;
 
     //encoding parameters
     private final Map<String, Integer> encoding;
@@ -401,8 +403,8 @@ public final class GnnValTSHeuristic implements SearchHeuristic {
 
         // Build DJL Criteria and load model with custom Translator
         try {
-            Criteria<TorchInputs, Float> criteria = Criteria.builder()
-                    .setTypes(TorchInputs.class, Float.class)
+            Criteria<TorchInputs, float[]> criteria = Criteria.builder()
+                    .setTypes(TorchInputs.class, float[].class)
                     .optModelPath(Paths.get(modelPath))
                     .optEngine("PyTorch")
                     .optTranslator(new TorchScriptTranslator())
@@ -434,17 +436,25 @@ public final class GnnValTSHeuristic implements SearchHeuristic {
 
         final TorchInputs inputs = encodeStateForModel(s);
         try {
-            Float out = predictor.predict(inputs);
-            if (out == null || out.isNaN()) {
+            // New translator returns float[]
+            float[] out = predictor.predict(inputs);
+
+            if (out == null || out.length == 0) {
                 return Float.MAX_VALUE;
             }
-            return out;
+
+            float v = out[0];
+            if (Float.isNaN(v) || Float.isInfinite(v)) {
+                return Float.MAX_VALUE;
+            }
+
+            return v;
+
         } catch (Exception e) {
             // If inference fails, return an uninformed large value
             return Float.MAX_VALUE;
         }
     }
-
     @Override
     public Object[] getTransitions(boolean onlyHelpful) {
         return problem.actions.toArray();
@@ -807,6 +817,7 @@ expr = expr.replace("-", "- ");
         return sb.toString();
     }
 
+
     // Container for model inputs
     private static final class TorchInputs {
         final Map<Integer, long[]> input;  // predicateId -> indices
@@ -821,7 +832,7 @@ expr = expr.replace("-", "- ");
     }
 
     // Translator turning TorchInputs into NDList for the TorchScript model, and reading back a scalar float
-    private static final class TorchScriptTranslator implements Translator<TorchInputs, Float> {
+    private static final class TorchScriptTranslator implements Translator<TorchInputs, float[]> {
 
         @Override
         public NDList processInput(TranslatorContext ctx, TorchInputs inputs) {
@@ -904,16 +915,167 @@ expr = expr.replace("-", "- ");
 
 
         @Override
-        public Float processOutput(TranslatorContext ctx, NDList list) {
-            // Expect a single scalar output
+        public float[] processOutput(TranslatorContext ctx, NDList list) {
             NDArray out = list.singletonOrThrow();
-            return out.toFloatArray()[0];
+            return out.toFloatArray();
         }
+
 
         @Override
         public Batchifier getBatchifier() {
             // Single-state evaluation at a time
-            return Batchifier.STACK;
+            //return Batchifier.STACK;
+            return null;
         }
     }
+
+    @Override
+    public Map<State, Float> computeBatchEstimates(List<State> states) {
+        Map<State, Float> results = new HashMap<>();
+        if (states == null || states.isEmpty()) {
+            return results;
+        }
+
+        // Build per-state TorchInputs using encodeStateForModel
+        List<TorchInputs> perStateInputs = new ArrayList<>();
+        List<State> encodableStates = new ArrayList<>();
+
+        for (State s : states) {
+            if (!(s instanceof PDDLState)) {
+                // Not a PDDLState -> uninformed
+                results.put(s, Float.MAX_VALUE);
+                continue;
+            }
+            PDDLState ps = (PDDLState) s;
+            TorchInputs ti = encodeStateForModel(ps); // sizes.length == 1
+            perStateInputs.add(ti);
+            encodableStates.add(s);
+        }
+
+        if (perStateInputs.isEmpty()) {
+            return results;
+        }
+
+        try {
+            // Collate like Python
+            TorchInputs batchInput = collateTorchInputs(perStateInputs);
+
+            // Predict → returns float[] with one entry per state
+            float[] out = predictor.predict(batchInput);
+
+            if (out == null) {
+                throw new RuntimeException("Model returned null output array");
+            }
+            if (out.length != encodableStates.size()) {
+                throw new RuntimeException(
+                        "Model returned " + out.length +
+                                " values but batch had " + encodableStates.size());
+            }
+
+            // Assign predicted values
+            for (int i = 0; i < encodableStates.size(); i++) {
+                float v = out[i];
+                if (Float.isNaN(v) || Float.isInfinite(v)) {
+                    v = Float.MAX_VALUE;
+                }
+                results.put(encodableStates.get(i), v);
+            }
+
+        } catch (Exception e) {
+            // In case of any error, fallback to single predictions
+            System.err.println(
+                    "Batch processing failed, falling back to single predictions: " + e.getMessage());
+            e.printStackTrace();
+            for (State s : states) {
+                if (!results.containsKey(s)) {
+                    results.put(s, computeEstimate(s));
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private TorchInputs collateTorchInputs(List<TorchInputs> batch) {
+        // Combined maps
+        Map<Integer, List<long[]>> perKeyIndexLists = new HashMap<>(); // predicate -> list of arrays
+        Map<Integer, List<double[]>> perKeyInitLists = new HashMap<>(); // predicate -> list of numeric arrays
+        List<Long> sizesList = new ArrayList<>();
+        long offset = 0L;
+
+        for (TorchInputs t : batch) {
+            // each t.sizes is a long[] with a single entry (object count) as produced by encodeStateForModel
+            long thisSize = (t.sizes != null && t.sizes.length > 0) ? t.sizes[0] : 0L;
+            sizesList.add(thisSize);
+
+            // For each predicate in t.input: shift indices by current offset and append
+            for (Map.Entry<Integer, long[]> e : t.input.entrySet()) {
+                int key = e.getKey();
+                long[] arr = e.getValue();
+                if (arr == null || arr.length == 0) {
+                    // still ensure the key exists with empty contribution
+                    perKeyIndexLists.computeIfAbsent(key, k -> new ArrayList<>()).add(new long[0]);
+                    continue;
+                }
+                long[] shifted = new long[arr.length];
+                for (int i = 0; i < arr.length; ++i) {
+                    shifted[i] = arr[i] + offset;
+                }
+                perKeyIndexLists.computeIfAbsent(key, k -> new ArrayList<>()).add(shifted);
+            }
+
+            // Numeric inits: just append (no offset)
+            for (Map.Entry<Integer, double[]> e : t.inits.entrySet()) {
+                int key = e.getKey();
+                double[] arr = e.getValue();
+                if (arr == null || arr.length == 0) {
+                    perKeyInitLists.computeIfAbsent(key, k -> new ArrayList<>()).add(new double[0]);
+                    continue;
+                }
+                perKeyInitLists.computeIfAbsent(key, k -> new ArrayList<>()).add(arr);
+            }
+
+            offset += thisSize;
+        }
+
+        // Now flatten perKeyIndexLists into Map<Integer,long[]>
+        Map<Integer, long[]> finalInput = new HashMap<>();
+        for (Map.Entry<Integer, List<long[]>> e : perKeyIndexLists.entrySet()) {
+            List<long[]> parts = e.getValue();
+            int total = parts.stream().mapToInt(a -> a.length).sum();
+            long[] cat = new long[total];
+            int pos = 0;
+            for (long[] p : parts) {
+                if (p.length > 0) {
+                    System.arraycopy(p, 0, cat, pos, p.length);
+                    pos += p.length;
+                }
+            }
+            finalInput.put(e.getKey(), cat);
+        }
+
+        // Flatten numeric inits
+        Map<Integer, double[]> finalInits = new HashMap<>();
+        for (Map.Entry<Integer, List<double[]>> e : perKeyInitLists.entrySet()) {
+            List<double[]> parts = e.getValue();
+            int total = parts.stream().mapToInt(a -> a.length).sum();
+            double[] cat = new double[total];
+            int pos = 0;
+            for (double[] p : parts) {
+                if (p.length > 0) {
+                    System.arraycopy(p, 0, cat, pos, p.length);
+                    pos += p.length;
+                }
+            }
+            finalInits.put(e.getKey(), cat);
+        }
+
+        // sizes -> long[]
+        long[] sizesArr = new long[sizesList.size()];
+        for (int i = 0; i < sizesArr.length; ++i) sizesArr[i] = sizesList.get(i);
+
+        return new TorchInputs(finalInput, sizesArr, finalInits);
+    }
+
+
 }
