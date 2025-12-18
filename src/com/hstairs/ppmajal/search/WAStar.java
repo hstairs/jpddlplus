@@ -125,7 +125,12 @@ public class WAStar extends SearchEngine {
         gValue.put(initState, 0f);//The initial state is at 0 distance, of course.
         float bestf = 0;
         previous = 0;
+        int number = 0;
         while (!frontier.isEmpty()) {
+            number++;
+            if(number==100){
+                int debugger = 10;
+            }
             final SearchNode currentNode = frontier.dequeue();
             this.tryLog(currentNode, ExternalLoggerLogType.Expanding);
 

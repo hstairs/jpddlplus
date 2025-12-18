@@ -28,12 +28,9 @@ import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.parser.PddlLexer;
 import com.hstairs.ppmajal.parser.PddlParser;
-import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.problem.*;
 import com.hstairs.ppmajal.propositionalFactory.*;
-import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.SearchProblem;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
@@ -46,7 +43,6 @@ import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.logging.Level;
@@ -876,6 +872,8 @@ public class PDDLProblem implements SearchProblem {
         switch (successorGenerator) {
             case stateBased:
                 return new optimisedSuccessorsGenerator(s, acts, getDecActionRepresentation(acts));
+            case h1:
+                throw new UnsupportedOperationException("To be implemented");
             case traditional:
                 return new naiveSuccessorIterator(s, acts);
         }
@@ -1524,6 +1522,7 @@ public class PDDLProblem implements SearchProblem {
     }
 
 
+
     protected class naiveSuccessorIterator implements ObjectIterator<Pair<State, Object>> {
         protected final State source;
         final private Object[] actionsSet;
@@ -2000,4 +1999,46 @@ public class PDDLProblem implements SearchProblem {
         }
         return res;
     }
+
+    public int getTotNumberOfNumVariables(){
+        return totNumberOfNumVariables;
+    }
+
+    public int getTotNumberOfBoolVariables(){
+        return totNumberOfBoolVariables;
+    }
+
+    private void getSubgoalsFromPreconditions(Condition c, Set<Terminal> results){
+        if(c instanceof Terminal){
+            results.add((Terminal) c);
+        } else if (c instanceof ComplexCondition){
+            for (var child : ((ComplexCondition) c).sons){
+                if (child instanceof Condition){
+                    getSubgoalsFromPreconditions((Condition) child, results);
+                }
+            }
+        }
+    }
+
+    private Set<Terminal> collectTerminalConditions(Condition c)
+    {
+        Set<Terminal> result = new HashSet<>();
+        getSubgoalsFromPreconditions(c, result);
+        return result;
+    }
+
+    public Set<Terminal> createSubgoals(){
+        Set<Terminal> subgoals = new HashSet<>();
+        for(var action: this.actions){
+            Condition c = action.getPreconditions();
+            subgoals.addAll(collectTerminalConditions(c));
+        }
+
+        Condition goalCondition = this.getGoals();
+        subgoals.addAll(collectTerminalConditions(goalCondition));
+
+        return subgoals;
+    }
+
+
 }
