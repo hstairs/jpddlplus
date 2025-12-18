@@ -270,9 +270,9 @@ public class ENHSP {
         options.addOption("h", true, "allows to select heuristic (default is hadd). " + PDDLHeuristic.getHelpString() + "\n");
         options.addOption("s", true, "allows to select search strategy (default is WAStar):\n" + PDDLPlanner.getHelpString() + "\n");
         options.addOption("nov", true, "heuristic novelty: options:\n"
-                + "aqb, Atom Quantified Both novelty heuristic"
-                + "aw, Atom Width novelty heuristic"
-                + "iqb, Interval Quantified Both novelty heuristic"
+                + "aqb, Atom Quantified Both novelty heuristic\n"
+                + "aw, Atom Width novelty heuristic\n"
+                + "iqb, Interval Quantified Both novelty heuristic\n"
                 + "iw, Interval Width novelty heuristic" );
         options.addOption("knov", true, "novelty k parameter, 1 or 2");
         options.addOption("ties", true, "tie-breaking (default is arbitrary): larger_g, smaller_g, arbitrary");
@@ -515,13 +515,6 @@ public class ENHSP {
     }
 
     private void setHeuristic() {
-<<<<<<< HEAD
-//        System.out.println("ha:" + helpfulActionsPruning + " ht" + helpfulTransitions);
-        h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                unitCostHeuristic || ignoreMetric, linearEffectsAbstraction,aibrDebug );
-=======
-
-
         if(novelty!=null){
             SearchHeuristic h_temp;
             h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
@@ -532,7 +525,6 @@ public class ENHSP {
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
                 unitCostHeuristic, linearEffectsAbstraction, false);
 
->>>>>>> f7f58b4eeb134aa67456e1b6ed67460e85da8d1b
     }
 
     private PDDLSolution search() throws Exception {
