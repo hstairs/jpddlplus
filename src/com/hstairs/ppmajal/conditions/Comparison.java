@@ -148,6 +148,8 @@ public class Comparison extends Terminal {
     }
 
     public boolean isSatisfied(Double first, Double second){
+        if (this.isValid())
+            return true;
         if ((first == null) || (second == null) ||
             first.isNaN() || second.isNaN()) {
             return false;//negation by failure.
@@ -720,7 +722,7 @@ public class Comparison extends Terminal {
 
     @Override
     public ComplexCondition and(Condition precondition) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        throw new UnsupportedOperationException("Not supported yet. This:"+this+" input condition:"+precondition); //To change body of generated methods, choose Tools | Templates.
     }
 
 

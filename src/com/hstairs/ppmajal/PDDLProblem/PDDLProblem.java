@@ -70,6 +70,7 @@ public class PDDLProblem implements SearchProblem {
     private boolean[] costRelevantFluents;
     private boolean aibrDebugPreprocessing = false;
     private DecActionRepresentation decActRep;
+    public boolean tunnelling;
 
     /**
      * @return the name
@@ -89,6 +90,7 @@ public class PDDLProblem implements SearchProblem {
     private boolean cleanUp = false;
     final public BigDecimal executionDelta;
     final public BigDecimal planningDelta;
+
 
     public PDDLProblem(PDDLDomain pddlDomain) {
         this(pddlDomain, "internal", System.out, false, false);
@@ -1476,12 +1478,26 @@ public class PDDLProblem implements SearchProblem {
             return getTransitionCost(s, gr, gValue, ignoreMetric, m);
         } else if (act instanceof Integer) { //this was just a waiting action
             return gValue + 1;
-        }
-        {
+        }else if (act instanceof ImmutablePair){
             final ImmutablePair<TransitionGround, Integer> res = (ImmutablePair<TransitionGround, Integer>) act;
-
             return getTransitionCost(s, res.left, gValue, ignoreMetric, m, res.right);
+        }else if (act instanceof List){
+            ArrayList<TransitionGround> seq = (ArrayList<TransitionGround>) act;
+            if (!ignoreMetric || m == null) {
+                float ret = gValue;
+                State s1 = s.clone();
+                for (var a : seq) {
+                    ret = getTransitionCost(s1, a, ret, ignoreMetric, m);
+                    s1.apply(a, s1.clone());
+                }
+                return ret;
+            }else{
+                return gValue + seq.size();
+            }
+        }else{
+            throw new UnsupportedOperationException();
         }
+
     }
 
     float getTransitionCost(State s, TransitionGround gr, Float previousG, boolean ignoreCost, Metric m) {
@@ -1516,13 +1532,14 @@ public class PDDLProblem implements SearchProblem {
         private int i;
         private boolean processDone;
         private boolean eventsPriority = false;
-
+        ArrayList<TransitionGround> sequence;
 
         public naiveSuccessorIterator(State source, Object[] actionsSet) {
             this.source = source;
             this.actionsSet = actionsSet;
             i = 0;
             processDone = false;
+            sequence = null;
         }
 
         @Override
@@ -1538,10 +1555,33 @@ public class PDDLProblem implements SearchProblem {
                     }
                 }
             }
+
+            if (sequence == null && tunnelling){
+                sequence = new ArrayList<>();
+                while (true) {
+                    if (source.satisfy(PDDLProblem.this.getGoals())){
+                        current = sequence;
+                        newState = source;
+                        return true;
+                    }
+                    TransitionGround toApply = noOtherChoice(source,relevantUndefinedVariablesPresent,PDDLProblem.this);
+                    if (toApply == null) {
+                        break;
+                    }else{
+                        source.apply(toApply,source.clone());
+                        if (source.satisfy(globalConstraints)){
+                            sequence.add(toApply);
+                        }else{
+                            return false;
+                        }
+
+                    }
+                }
+            }
+
             while (i < actionsSet.length) {
                 current = actionsSet[i];
                 i++;
-
                 if (current instanceof TransitionGround transitionGround) {
                     if (transitionGround.isApplicable(source, relevantUndefinedVariablesPresent, PDDLProblem.this)) {
                         newState = source.clone();
@@ -1549,6 +1589,10 @@ public class PDDLProblem implements SearchProblem {
                         if (newState.satisfy(globalConstraints)) {
                             if (eventsPriority) {
                                 applyAllEvents(newState);
+                            }
+                            if (sequence != null && !sequence.isEmpty()){
+                                current = sequence.clone();
+                                ( (ArrayList<TransitionGround>)current).add(transitionGround);
                             }
                             return true;
                         }
@@ -1558,11 +1602,32 @@ public class PDDLProblem implements SearchProblem {
                     final int b = applyActionMTimes(tempVar.getFirst(), tempVar.getSecond());
                     if (b > 1) {
                         current = new ImmutablePair(((Pair<TransitionGround, Integer>) this.current).getFirst(), b);
+                        if (sequence != null && !sequence.isEmpty()){
+                            throw  new RuntimeException("Not supported up to jumping with tunnelling");
+                        }
                         return true;
                     }
                 }
             }
             return false;
+        }
+
+        private TransitionGround noOtherChoice(State source, boolean relevantUndefinedVariablesPresent, PDDLProblem pddlProblem) {
+            int counter = 0;
+            TransitionGround ret = null;
+            ArrayList temp = new ArrayList();
+            for (int i= 0; i<  actionsSet.length; i++){
+                TransitionGround transitionGround = (TransitionGround) actionsSet[i];
+                if (transitionGround.isApplicable(source,relevantUndefinedVariablesPresent,PDDLProblem.this)){
+                    counter++;
+                    temp.add(transitionGround);
+                    if (counter > 1){
+                        return null;
+                    }
+                    ret =(TransitionGround)actionsSet[i];
+                }
+            }
+            return ret;
         }
 
         public int applyActionMTimes(final TransitionGround act, int counter) {
@@ -1628,7 +1693,6 @@ public class PDDLProblem implements SearchProblem {
             while (terminalsIterator.hasNext() || ((actionIterators != null) && (actionIterators.hasNext()))) {
                 while ((actionIterators != null) && (actionIterators.hasNext())) {
                     int act = actionIterators.next();
-                    Transition transition = TransitionGround.getTransition(act);
                     achCondition[act]++;
                     if (achCondition[act] >= decAct.necTerminals[act].size()) {
                         current = TransitionGround.getTransition(act);

@@ -272,7 +272,6 @@ protected DoubleArrayList numFluents;
     @Override
     public boolean satisfy (final Condition input) {
         return input.isSatisfied(this);
-
     }
 
     public boolean whatIsNotsatisfied (AndCond con) {

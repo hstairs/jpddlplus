@@ -7,10 +7,11 @@ import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.*;
+import java.util.function.BiFunction;
 
 public class PDDLPlanner {
     final String search;
@@ -24,7 +25,34 @@ public class PDDLPlanner {
     final String t;
     final private boolean saveSearchSpace;
     private final float boundG;
+    private final boolean tunnelling;
     private SearchEngine searchEngine;
+    private IExternalLogger extenalLogger;
+
+    // ---------------- Static Maps ---------------- //
+    private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
+        "smaller_g", SearchEngine.TieBreaking.LOWERG,
+        "larger_g", SearchEngine.TieBreaking.HIGHERG,
+        "arbitrary", SearchEngine.TieBreaking.ARBITRARY
+    );
+
+    private static final String[][] SE_INFOS = {
+        {"wastar", "WAStar", "Weighted A* Search"},
+        {"gbfs", "GBFS", "Greedy Best-First Search"},
+        {"ehs", "EHS", "Enhanced Heuristic Search"},
+        {"ida", "IDA", "Iterative Deepening A*"},
+        {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
+        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"}
+    };
+
+    private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
+        Map.entry(SE_INFOS[0][0], (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
+        Map.entry(SE_INFOS[1][0], (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
+        Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
+        Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
+        Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
+        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+    );
 
     final private boolean bucketBasedQueueSearch;
 
@@ -32,13 +60,14 @@ public class PDDLPlanner {
         this("wastar", "no", false,
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
-                "", false, Float.POSITIVE_INFINITY,false);
+                "", false, Float.POSITIVE_INFINITY,false, false,
+                null);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch) {
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, IExternalLogger extenalLogger) {
         this.search = search;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
@@ -50,64 +79,37 @@ public class PDDLPlanner {
         this.saveSearchSpace = saveSearchSpace;
         this.boundG = depthLimit;
         this.bucketBasedQueueSearch = bucketBasedQueueSearch;
+        this.extenalLogger = extenalLogger;
+        this.tunnelling = tunnelling;
     }
 
     public SearchNode searchSpaceHandle;
+    public PDDLSolution plan(PDDLProblem p, SearchHeuristic h){
+        TieBreaker tb = new TieBreaker(
+                TIE_BREAKERS.getOrDefault(t, SearchEngine.TieBreaking.ARBITRARY)
+        );
+        p.tunnelling = tunnelling;
 
-    public PDDLSolution plan(PDDLProblem p, SearchHeuristic h) {
-        TieBreaker tb;
-        switch (t) {
-            case "smaller_g":
-                tb = new TieBreaker(SearchEngine.TieBreaking.LOWERG);
-                break;
-            case "larger_g":
-                tb = new TieBreaker(SearchEngine.TieBreaking.HIGHERG);
-                break;
-            default:
-                tb = new TieBreaker(SearchEngine.TieBreaking.ARBITRARY);
-                break;
-        }
-        switch (search.toLowerCase()) {
-            case "wastar":
-                searchEngine = new WAStar(hWeigth, true, helpfulActions, tb, saveSearchSpace, boundG,bucketBasedQueueSearch);
-                break;
-            case "gbfs":
-                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG,bucketBasedQueueSearch);
-                break;
-            case "ehs":
-                searchEngine = new EHS(helpfulActions);
-                break;
-            case "ida":
-                searchEngine = new IDAStar(helpfulActions, hWeigth, false, false,
-                        false, System.out);
-                break;
-            case "lazygbfs":
-                searchEngine = new LazyWAStar(hWeigth, false, helpfulActions, saveSearchSpace, tb, boundG,false,bucketBasedQueueSearch);
-                break;
-            case "lazywastar":
-                searchEngine = new LazyWAStar(hWeigth, true, helpfulActions, saveSearchSpace, tb, boundG);
-                break;
+        searchEngine = SEARCH_ENGINES
+                .getOrDefault(search.toLowerCase(), (pl, tie) -> new WAStar(pl.hWeigth, false, pl.helpfulActions, tie, pl.saveSearchSpace, pl.boundG, pl.bucketBasedQueueSearch))
+                .apply(this, tb);
 
-            default:
-                searchEngine = new WAStar(hWeigth, false, helpfulActions, tb, saveSearchSpace, boundG,bucketBasedQueueSearch);
-                break;
-        }
+        searchEngine.setExtenalLogger(this.extenalLogger);
 
+        searchEngine.beforeExecution();
         final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);
+        searchEngine.afterExecution();
         if (solutionHandle == null)
             return new PDDLSolution(null, null, searchEngine.getStats(), -1);
         return new PDDLSolution(this.extractPlan(solutionHandle, p),
-                (PDDLState) solutionHandle.s, searchEngine.getStats(), solutionHandle.gValue);
-    }
-
-    public SearchNode getSearchSpaceHandle() {
-        return searchEngine.getSearchSpaceHandle();
+                solutionHandle, searchEngine.getStats(), solutionHandle.gValue);
     }
 
     public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {
 
         final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan = new LinkedList<>();
         State lastState = input.s;
+        int nTun = 0;
         if (!(input instanceof SearchNode c)) {
             SimpleSearchNode temp = input;
             while (temp.transition != null) {
@@ -130,8 +132,16 @@ public class PDDLPlanner {
                             plan.addFirst(ImmutablePair.of(time, t.left));
                         }
                         System.out.println("JUMP for " + t.left + ":" + t.right);
-                    } else {
+                    } else if (c.transition instanceof TransitionGround){
                         plan.addFirst(ImmutablePair.of(time, (TransitionGround) c.transition));
+                    } else if (c.transition instanceof List){
+                        ArrayList<TransitionGround> transition = (ArrayList<TransitionGround>) c.transition;
+                        nTun+=transition.size();
+                        for (int k = ((ArrayList<?>) c.transition).size()-1; k >=0; k--){
+                            plan.addFirst(ImmutablePair.of(time, transition.get(k)));
+                        }
+                    }else{
+                        throw new RuntimeException("This can't be");
                     }
                 }
                 c = (SearchNode) c.father;
@@ -192,6 +202,29 @@ public class PDDLPlanner {
 
             return finalPlan;
         }
+        if (tunnelling)
+                System.out.println("Cumulative Size of Tunnels:"+nTun);
         return plan;
+    }
+
+    public SearchNode getSearchSpaceHandle(){
+        return searchEngine.getSearchSpaceHandle();
+    }
+
+    public static String[][] getAvailableSearchEngines() {
+        return SE_INFOS;
+    }
+
+    public static Collection<String> getAvailableTieBreakers() {
+        return TIE_BREAKERS.keySet();
+    }
+
+    public static String getHelpString(){
+        StringBuilder sb = new StringBuilder();
+        sb.append("Available Search Engines:\n");
+        for (String[] seInfo : SE_INFOS) {
+            sb.append(" - ").append(seInfo[0]).append(": ").append(seInfo[1]).append("\n");
+        }
+        return sb.toString();
     }
 }

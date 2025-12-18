@@ -1,10 +1,16 @@
 package com.hstairs.ppmajal.search;
 
+import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
+import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
+import com.hstairs.ppmajal.extraUtils.IExternalLogger;
+import com.hstairs.ppmajal.transition.Transition;
+import com.hstairs.ppmajal.transition.TransitionGround;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 public abstract class SearchEngine {
@@ -19,6 +25,7 @@ public abstract class SearchEngine {
     State lastState;
     final boolean helpfulActions;
     private SearchNode searchSpaceHandle;
+    protected IExternalLogger extenalLogger;
 
     protected SearchEngine(boolean helpfulActionsPruning) {
         this.helpfulActions = helpfulActionsPruning;
@@ -52,7 +59,20 @@ public abstract class SearchEngine {
     }
     Object[] getActionsToSearch(SimpleSearchNode currentNode, SearchProblem problem, SearchHeuristic h) {
         if (helpfulActions && currentNode != null) {
-            return ((SearchNode)currentNode).helpfulActions;
+            if (problem instanceof PDDLProblem && !((PDDLProblem) problem).getProcessesSet().isEmpty()) {
+                ArrayList ret = new ArrayList();
+                for (var v: ((SearchNode)currentNode).helpfulActions){
+                    if (v instanceof TransitionGround){
+                        TransitionGround transition = (TransitionGround) v;
+                        if (transition.getSemantics().equals(Transition.Semantics.ACTION))
+                            ret.add(v);
+                    }
+
+                }
+                return ret.toArray();
+            }else{
+                return ((SearchNode)currentNode).helpfulActions;
+            }
         }
         return h.getTransitions(false);
     }
@@ -68,5 +88,24 @@ public abstract class SearchEngine {
     }
 
     public record SearchStats(int nodesExpanded, int nodesEvaluated, int deadEnds, int duplicates, long searchTime, long heuristicTime) {
+    }
+
+    public void beforeExecution() {
+        if(this.extenalLogger == null) return;
+        this.extenalLogger.beforeExecution();
+    }
+
+    public void afterExecution() {
+        if(this.extenalLogger == null) return;
+        this.extenalLogger.afterExecution();
+    }
+
+    public void setExtenalLogger(IExternalLogger extenalLogger) {
+        this.extenalLogger = extenalLogger;
+    }
+
+    public void tryLog(SimpleSearchNode node, ExternalLoggerLogType logType) {
+        if(this.extenalLogger == null) return;
+        this.extenalLogger.log(node, logType);
     }
 }

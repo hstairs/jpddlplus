@@ -56,7 +56,7 @@ public class StructureSensitiveNumericGoalCounting extends GoalCounting {
             if (bestContribution.getFirst() == 0f) {
                 return Float.MAX_VALUE;
             }
-            return (float) (-1f * g.getLeft().eval(s) / bestContribution.getFirst())*bestContribution.getSecond();
+            return (float) (Math.abs(g.getLeft().eval(s)) / bestContribution.getFirst())*bestContribution.getSecond();
         } else if (goals instanceof BoolPredicate g) {
             final Pair<Float, Float> bestContribution = getBestContribution(g);
             if (bestContribution.getFirst() == Float.MAX_VALUE)

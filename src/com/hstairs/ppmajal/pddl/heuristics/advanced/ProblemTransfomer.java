@@ -362,7 +362,11 @@ public class ProblemTransfomer {
             for (final TransitionGround b : transitions) {
                 HashSetValuedHashMap<Condition, Object> condeffs = tr2condeffs.get(b.getId());
                 for (Condition condition : condeffs.keySet()) {
-                    Condition c = b.getPreconditions().and(condition);
+                    Condition c = b.getPreconditions();
+                    if (!condition.isValid()){
+                        c = c.and(condition);
+                    }
+
                     preconditionFunctionMap.put(i, normalizeAndTighthenCondition(c, redConstraints));
                     final IntArraySet propositional = new IntArraySet();
                     final Collection numEffect = new LinkedHashSet();

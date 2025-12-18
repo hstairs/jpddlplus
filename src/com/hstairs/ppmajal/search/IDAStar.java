@@ -1,5 +1,6 @@
 package com.hstairs.ppmajal.search;
 
+import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.IdaStarSearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
@@ -90,15 +91,17 @@ public class IDAStar extends SearchEngine {
                                                                    boolean idastarWithMemory, long timeout) throws TimeoutException {
         final Stack<IdaStarSearchNode> frontier = new Stack();
 
-        IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0);
+        IdaStarSearchNode init = new IdaStarSearchNode(problem.getInit().clone(), null, null, 0, this.extenalLogger != null);
         causalDeadEnds = 0;
         frontier.push(init);
+        this.tryLog(init, ExternalLoggerLogType.Generating);
         float newBound = Float.POSITIVE_INFINITY;
         out.println("f(n): " + bound + "(Expanded Nodes: " + nodesExpanded + ")");
         out.println("-------------------(Dead-Ends: " + deadEndsDetected + ")");
         IdaStarSearchNode bestSol = null;
         while (!frontier.isEmpty()) {
             final IdaStarSearchNode node = frontier.pop();
+            this.tryLog(node, ExternalLoggerLogType.Expanding);
             long now = System.currentTimeMillis();
             if (now - this.startTime > timeout) {
                 throw new TimeoutException("");
@@ -170,7 +173,9 @@ public class IDAStar extends SearchEngine {
                                 if (push) {
                                     node.numberOfSons++;
                                     atLeastOne = true;
-                                    frontier.push(new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g));
+                                    IdaStarSearchNode newNode = new IdaStarSearchNode(next.getFirst(), next.getSecond(), node, g, this.extenalLogger != null);
+                                    frontier.push(newNode);
+                                    this.tryLog(newNode, ExternalLoggerLogType.Generating);
                                 }
                             }
                             if (!atLeastOne) {
@@ -188,6 +193,8 @@ public class IDAStar extends SearchEngine {
                     }
                 }
             }
+
+            this.tryLog(node, ExternalLoggerLogType.Closing);
         }
         if ((newBound == Float.POSITIVE_INFINITY && !anytime) || (bestSol == null && anytime)) {
             return null;

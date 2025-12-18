@@ -90,7 +90,7 @@ public class H1 implements SearchHeuristic {
     final private IntArraySet[] deleters;
     protected int[] establishedAchiever;
     protected float[] numRepetition;
-    private IntArraySet helpfulActions;
+    private List helpfulActions;
     IntArraySet reachableTransitions;
     private Collection<TransitionGround> reachableTransitionsInstances;
 
@@ -108,8 +108,12 @@ public class H1 implements SearchHeuristic {
     //Plan Fixing Data Structures;
     final boolean[] visited;
     protected final int[] maxNumRepetition ;
+    public boolean[] helpfulTransitionsMap = null;
     private boolean hardConditionthroughNumError;
+    private Collection<TransitionGround> initActions;
+    private final boolean storeInitActions;
 
+    private boolean isHelpfulMap = false;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
@@ -124,18 +128,21 @@ public class H1 implements SearchHeuristic {
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
+                redConstraints, helpfulActionsComputation, reachability,
+                helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, -1);
+                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions,
+                conjunctionsMax, null, unitaryCost, -1);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
-
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+        this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
         this.problem = problem;
@@ -298,6 +305,17 @@ public class H1 implements SearchHeuristic {
             actionInit[freePreconditionAction] = true;
             addActionsInPriority(freePreconditionAction, h, 0f);
         }
+        
+        if (storeInitActions){
+            initActions = new ArrayList<>();
+            for (var act: allActions ){
+                try {
+                    initActions.add((TransitionGround) getTransition(cp.cpTr2TrMap()[act]));
+                }catch(final Exception e){
+                    throw new UnsupportedOperationException("Init actions storage only works without processes");
+                }
+            }
+        }
         return h;
     }
 
@@ -357,7 +375,7 @@ public class H1 implements SearchHeuristic {
         if (actions != null) {
             for (final int i : actions) {
                 if (!getClosed()[i]) {
-                    final float v = estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
+                    float v = estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
                     if (init && v == 0) {
                         actionInit[i] = true;
                     }
@@ -384,9 +402,13 @@ public class H1 implements SearchHeuristic {
         stack.push(getActivatingConditions(goal));
         plan = new IntArraySet();
         Arrays.fill(visited, false);
-        helpfulActions = new IntArraySet();
+        helpfulActions = new ArrayList();
         Arrays.fill(maxNumRepetition, 0);
         Arrays.fill(repetitionsInThePlan, null);
+
+        if (isHelpfulMap){
+            helpfulTransitionsMap = new boolean[Transition.totNumberOfTransitions];
+        }
         while (!stack.isEmpty()) {
 
             final Pair<Collection, Float> elements;
@@ -400,7 +422,11 @@ public class H1 implements SearchHeuristic {
                             }
                             for (final int id : getAchievers(conditionId)) {
                                 if (getActionInit()[id]) {
-                                    helpfulActions.add(id);
+
+                                    helpfulActions.add((TransitionGround) getTransition(cp.cpTr2TrMap()[id]));
+                                    if (helpfulTransitionsMap != null){
+                                        helpfulTransitionsMap[cp.cpTr2TrMap()[id]] = true;
+                                    }
                                 }
                             }
                         }
@@ -470,7 +496,7 @@ public class H1 implements SearchHeuristic {
                     final double v = this.numericContribution(actionId, (Comparison) t);
                     if (v > 0) {
 
-                        final float rep = computeRepetition(t,v,s);
+                        float rep = computeRepetition(t,v,s);
                         final float newCost = rep * getActionCost()[actionId];
                         boolean localUpdate = false;
                         if (isAdditive()) {
@@ -487,8 +513,12 @@ public class H1 implements SearchHeuristic {
                             updateRelPlanInfo(conditionId, actionId, rep);
                         }
                     } else if (v == UNKNOWNEFFECT) {//this is a hard condition basically
+
                         float newCost = 0f;
-                        final float rep = computeRepetition(t, 1f, s);
+                        float rep = computeRepetition(t, 1f, s);
+                        if (rep < 0){
+                            rep = 0f;
+                        }
                         if (isAdditive()) {
                             if (hardConditionthroughNumError) {
                                 newCost = rep*getActionCost()[actionId];
@@ -572,7 +602,11 @@ public class H1 implements SearchHeuristic {
         }
     }
 
-    
+    @Override
+    public boolean[] getHelpfulTransitionMap() {
+        return this.helpfulTransitionsMap;
+    }
+
     protected float estimateCost(final Condition c, float previous) {
         return this.estimateCost(c, isAdditive(),previous);
     }
@@ -697,7 +731,7 @@ public class H1 implements SearchHeuristic {
 
     @Override
     public Object[] getTransitions(final boolean helpful) {
-        Collection res = null;
+        Collection res;
         if (helpfulActions == null || !helpful) {
             if (reachableTransitionsInstances == null) {
                 if (reachableTransitions == null) {
@@ -716,15 +750,7 @@ public class H1 implements SearchHeuristic {
                 res = reachableTransitionsInstances;
             }
         } else {
-            final Collection actions = new ArrayList<>();
-            for (final int i : helpfulActions) {
-                final TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
-                if (transition.getSemantics() == Transition.Semantics.ACTION) {
-                    actions.add(transition);
-                }
-            }
-            res = actions;
-
+            res = helpfulActions;
         }
         if (helpfulTransitions) {
 //            if (helpfulActionsComputation) {
@@ -740,6 +766,15 @@ public class H1 implements SearchHeuristic {
         return res.toArray();
     }
 
+
+    public Collection<TransitionGround> getPotentialApplicableActions(){
+        if (storeInitActions){
+            return this.initActions;
+        }else{
+            return this.getAllTransitions();
+        }
+    }
+
     @Override
     public Collection<TransitionGround> getAllTransitions() {
         if (reachableTransitionsInstances == null) {
@@ -748,7 +783,9 @@ public class H1 implements SearchHeuristic {
             }
             reachableTransitionsInstances = new LinkedHashSet<TransitionGround>();
             for (final int i : reachableTransitions) {
-                reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
+                TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
+                if (transition.getSemantics().equals((Transition.Semantics.ACTION)))
+                    reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
             }
             reachableTransitionsInstances = new ArrayList<>(reachableTransitionsInstances);
             return reachableTransitionsInstances;
@@ -1024,5 +1061,8 @@ public class H1 implements SearchHeuristic {
         return actionInit;
     }
 
+    public void setComputeHelpfulActionsMap(){
+        isHelpfulMap = true;
+    }
 
 }

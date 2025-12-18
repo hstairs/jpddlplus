@@ -1,5 +1,6 @@
 package com.hstairs.ppmajal.search;
 
+import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
@@ -36,7 +37,7 @@ public class EHS extends SearchEngine {
             out.println("Initial State is not valid");
             return null;
         }
-        SearchNode current = new SearchNode(p.getInit(),null,null,0,0);
+        SearchNode current = new SearchNode(p.getInit(),null,null,0,0,this.extenalLogger != null);
         LinkedList<Pair<BigDecimal, Object>> plan = new LinkedList<>();
         Object visited = null;
         visited = new Object2BooleanLinkedOpenHashMap();
@@ -60,8 +61,10 @@ public class EHS extends SearchEngine {
             }
         }
         totalTime = System.currentTimeMillis()-startTime;
+        this.extenalLogger.afterExecution();
         return null;
-    }
+    }    
+
     private SearchNode oldBreathFirstSearchImplementation(SearchNode init, SearchProblem problem,
                                                           SearchHeuristic heuristic,
                                                           Object2BooleanMap<State> visited,
@@ -71,6 +74,7 @@ public class EHS extends SearchEngine {
         Queue<SearchNode> frontier = new LinkedList<>();
         float currentValue = heuristic.computeEstimate(init.s);
         frontier.add(init);
+        this.tryLog(init, ExternalLoggerLogType.Generating);
         if (this.helpfulActions) {
             //throw new UnsupportedOperationException();
             init.helpfulActions = heuristic.getTransitions(true);
@@ -80,6 +84,7 @@ public class EHS extends SearchEngine {
         float current_gn = 0;
         while (!frontier.isEmpty()) {
             SearchNode node = frontier.poll();
+            this.tryLog(node, ExternalLoggerLogType.Expanding);
             nodesExpanded++;
             if (node.gValue > current_gn) {
                 out.println(" " + node.gValue);
@@ -108,7 +113,8 @@ public class EHS extends SearchEngine {
                     //out.println("try");
                     if (d != Float.MAX_VALUE) {// && d <= current_value) {
                         nodesEvaluated++;
-                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0);
+                        SearchNode newNode = new SearchNode(temp, act, node, newG, 0,this.extenalLogger != null);
+                        this.tryLog(newNode, ExternalLoggerLogType.Generating);
                         frontier.add(newNode);
                         if (this.helpfulActions) {
                             newNode.helpfulActions = heuristic.getTransitions(true);
@@ -125,6 +131,8 @@ public class EHS extends SearchEngine {
                 }
 
             }
+
+            this.tryLog(node, ExternalLoggerLogType.Closing);
         }
         return null;
 

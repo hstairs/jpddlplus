@@ -51,4 +51,16 @@ public interface SearchHeuristic {
      * @return All actions that are deemed reachable by the heuristic model
      */
     Collection<TransitionGround> getAllTransitions();
+
+    default Collection<TransitionGround> getPotentialApplicableActions(){
+        return getAllTransitions();
+    }
+
+    default boolean[] getHelpfulTransitionMap(){
+        return null;
+    };
+
+    default void setComputeHelpfulActionsMap(){
+
+    }
 }
