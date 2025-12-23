@@ -521,10 +521,10 @@ public class ENHSP {
                     unitCostHeuristic, linearEffectsAbstraction, false);
             h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
         }
-        else
+        else {
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                unitCostHeuristic, linearEffectsAbstraction, false);
-
+                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug);
+        }
     }
 
     private PDDLSolution search() throws Exception {
