@@ -9,6 +9,8 @@ import com.hstairs.ppmajal.PDDLProblem.PDDLSearchEngine;
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import java.math.BigDecimal;
 import java.util.LinkedList;
+
+import com.hstairs.ppmajal.transition.Sdac;
 import org.apache.commons.lang3.tuple.Pair;
 
 /*
@@ -41,7 +43,7 @@ public class PlannerUtils {
 
     private void setup(String domainFileName, String problemFileName, String heuristic) throws Exception {
         d = new PDDLDomain(domainFileName);
-        p = new PDDLProblem(problemFileName, d.constants, d.getTypes(), d, System.out, heuristic, true, false,new BigDecimal(1.0),new BigDecimal(1.0));
+        p = new PDDLProblem(problemFileName, d.constants, d.getTypes(), d, System.out, heuristic, Sdac.disabled, false,new BigDecimal(1.0),new BigDecimal(1.0));
         d.substituteEqualityConditions();
         if (!d.getProcessesSchema().isEmpty()) {
             p.setDeltaTimeVariable("1");

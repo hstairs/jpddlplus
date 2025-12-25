@@ -8,6 +8,7 @@ import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.transition.Sdac;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import com.hstairs.enhsp2.SimpleExternalLogger;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
@@ -98,7 +99,7 @@ public class ENHSP {
     boolean stopAfterGrounding;
     boolean printEvents;
 
-    boolean sdac;
+    Sdac sdac;
     boolean onlyPlan;
     boolean ignoreMetric;
     boolean printActions;
@@ -300,7 +301,7 @@ public class ENHSP {
         options.addOption("timeout", true, "Timeout for anytime modality");
         options.addOption("stopgro", false, "Stop After Grounding");
         options.addOption("ival", false, "Internal Validation");
-        options.addOption("sdac", false, "Activate State Dependent Action Cost (Very Experimental!)");
+        options.addOption("sdac", true, "Activate State Dependent Action Cost (Very Experimental!). Options are: disabled, rhs, condition");
         options.addOption("onlyplan",false,"Print only the plan without waiting");
         options.addOption("print_actions",false,"Print all actions after grounding");
         options.addOption("tolerance",true,"Numeric tolerance in evaluating numeric conditions. Default is 0.00001");
@@ -437,7 +438,17 @@ public class ENHSP {
                 out = System.out;
             }
 
-            sdac = cmd.hasOption("sdac");
+            String sdacValue = cmd.getOptionValue("sdac");
+            if (sdacValue == null || sdacValue.equals("disabled")){
+                sdac = Sdac.disabled;
+            }else if (sdacValue.equals("rhs")){
+                sdac = Sdac.byRHS;
+            }else if (sdacValue.equals("condition")){
+                sdac = Sdac.byCondition;
+            }else{
+                new UnsupportedOperationException("Sdac value can be one of the followings:" +
+                        "disables, rhs, condition");
+            }
             printMakespan = !cmd.hasOption("npm");
             helpfulActions = cmd.getOptionValue("ha") != null && "true".equals(cmd.getOptionValue("ha"));
             autoAnytime = cmd.hasOption("autoanytime");

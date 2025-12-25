@@ -22,13 +22,12 @@ import com.hstairs.ppmajal.expressions.PDDLNumber;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.search.WAStar;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
-import com.hstairs.ppmajal.transition.ConditionalEffects;
+import com.hstairs.ppmajal.transition.*;
+
 import static com.hstairs.ppmajal.transition.ConditionalEffects.numEffects;
 import static com.hstairs.ppmajal.transition.ConditionalEffects.stripsEffects;
-import com.hstairs.ppmajal.transition.Transition;
 import static com.hstairs.ppmajal.transition.Transition.Semantics.ACTION;
-import com.hstairs.ppmajal.transition.TransitionGround;
-import com.hstairs.ppmajal.transition.TransitionSchema;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -105,7 +104,7 @@ public class programmaticMain {
         pddlDomain.addPredicate("b", new ArrayList());
         pddlDomain.addType(Type.type("Person"));
 
-        PDDLProblem problem = new PDDLProblem(pddlDomain, "internal", System.out, false, false);
+        PDDLProblem problem = new PDDLProblem(pddlDomain, "internal", System.out, Sdac.disabled, false);
         problem.getObjects().add(PDDLObject.object("Enrico", Type.type("Person")));
 
         //Define Actions
@@ -147,7 +146,7 @@ public class programmaticMain {
         pddlDomain.addFunction("a", new ArrayList());
         
 
-        PDDLProblem problem = new PDDLProblem(pddlDomain, "internal", System.out, false, false);
+        PDDLProblem problem = new PDDLProblem(pddlDomain, "internal", System.out, Sdac.disabled, false);
         problem.getObjects().add(object("Enrico", type("Person")));
 
         //Define Actions

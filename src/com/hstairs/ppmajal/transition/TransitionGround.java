@@ -130,7 +130,7 @@ public class TransitionGround extends Transition {
     }
     
     private List<Pair<Condition, Float>> getSdac(PDDLState init, Metric metric) {
-        return getSdac(init,metric,false);
+        return getSdac(init,metric,Sdac.disabled);
     }
     
     private float getImpact(Float n, String opt){
@@ -140,11 +140,47 @@ public class TransitionGround extends Transition {
             return n;
         }
     }
-    private List<Pair<Condition, Float>> getSdac(PDDLState init, Metric metric, boolean sdacEnabled) {
+    private List<Pair<Condition, Float>> getSdac(PDDLState init, Metric metric, Sdac sdac) {
+
+        if (sdac == Sdac.byRHS) {
+            if (this.sdac == null){
+                this.sdac = new ArrayList();
+                ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
+                //first numeric effect normal
+                for (NumEffect effNum :  this.getConditionalNumericEffects().getAllEffects()) {
+                    for (ExtendedAddendum ad : expr.summations) {
+                        if (ad.f != null) {
+                            if (effNum.getFluentAffected().equals(ad.f)){
+                                this.sdac.add(effNum);
+                            }
+                        }
+                    }
+                }
+            }
+            Float exprImpact = 0f;
+            ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
+            for (var eff : this.sdac){
+                for (ExtendedAddendum ad : expr.summations){
+                    if (ad.f != null){
+                        exprImpact += ad.n.floatValue() * this.getExprImpact(init, (NumEffect)eff, ad.f);
+                    }
+                }
+            }
+            if ((exprImpact <= 0 && metric.getOptimization().equals("maximize"))
+                    || (exprImpact >= 0 && metric.getOptimization().equals("minimize"))) {
+                BoolPredicate truePredicate = BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE);
+                return java.util.Collections.singletonList(
+                        Pair.of(truePredicate, getImpact(exprImpact, metric.getOptimization())));
+            }else{
+                throw new RuntimeException("Metric not supported in that it induces negative costs");
+            }
+
+        }
+
         if (this.sdac == null) {
             this.sdac = new ArrayList<>();
             if (metric != null && metric.getMetExpr() != null) {
-                if (!sdacEnabled){
+                if (sdac == Sdac.disabled){
                     ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
                     //first numeric effect normal
                     Float exprImpact = 0f;
@@ -161,7 +197,7 @@ public class TransitionGround extends Transition {
                         BoolPredicate truePredicate = BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE);
                         this.sdac.add(Pair.of(truePredicate, getImpact(exprImpact,metric.getOptimization())));
                     }
-                }else{
+                }else if (sdac == Sdac.byCondition){
                     final ConditionalEffects<NumEffect> conditionalNumericEffects1 = this.getConditionalNumericEffects();
                     final Map<Condition, Collection<NumEffect>> actualConditionalEffects = conditionalNumericEffects1.getActualConditionalEffects();
                     for (Map.Entry<Condition,Collection<NumEffect>> ele: actualConditionalEffects.entrySet()) {
@@ -195,15 +231,17 @@ public class TransitionGround extends Transition {
                         this.sdac.add(Pair.of(BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE), getImpact(exprImpact,metric.getOptimization())));
                     }
                     
+                } else{
+                    throw new UnsupportedOperationException("Sdac option not supported"+ sdac);
                 }
             }
         }
         return this.sdac;
     }
     public Float getActionCost(State s, Metric m){
-        return getActionCost(s, m, false);
+        return getActionCost(s, m, Sdac.disabled);
     }
-    public Float getActionCost(State s, Metric m, boolean sdac){
+    public Float getActionCost(State s, Metric m, Sdac sdac){
         if (m == null || m.getMetExpr() == null ){
             return 1f;
         }
@@ -214,7 +252,7 @@ public class TransitionGround extends Transition {
 
         List<Pair<Condition, Float>> sdac1 = this.getSdac((PDDLState) s, m, sdac);
         float impact = 0f;
-        for (Pair<Condition,Float> ele : sdac1){
+        for (final Pair<Condition,Float> ele : sdac1){
             if (ele.getLeft().isSatisfied(s)){
                 impact += ele.getRight();
             }

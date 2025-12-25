@@ -33,10 +33,7 @@ import com.hstairs.ppmajal.problem.*;
 import com.hstairs.ppmajal.propositionalFactory.*;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.SearchProblem;
-import com.hstairs.ppmajal.transition.ConditionalEffects;
-import com.hstairs.ppmajal.transition.Transition;
-import com.hstairs.ppmajal.transition.TransitionGround;
-import com.hstairs.ppmajal.transition.TransitionSchema;
+import com.hstairs.ppmajal.transition.*;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.objects.Object2FloatMap;
@@ -89,11 +86,11 @@ public class PDDLProblem implements SearchProblem {
 
 
     public PDDLProblem(PDDLDomain pddlDomain) {
-        this(pddlDomain, "internal", System.out, false, false);
+        this(pddlDomain, "internal", System.out, Sdac.disabled, false);
     }
 
     public PDDLProblem(String arg, PDDLDomain d) {
-        this(arg, d.constants, d.getTypes(), d, System.out, "internal", false, false, new BigDecimal(1.0), new BigDecimal(1.0));
+        this(arg, d.constants, d.getTypes(), d, System.out, "internal", Sdac.disabled, false, new BigDecimal(1.0), new BigDecimal(1.0));
     }
 
 
@@ -150,16 +147,16 @@ public class PDDLProblem implements SearchProblem {
     final public PrintStream out;
     final private String groundingMethod;
     private long groundingTime;
-    private boolean sdac;
+    private Sdac sdac;
     private boolean readyForSearch;
 
 
-    public PDDLProblem(PDDLDomain domain, String groundingMethod, PrintStream out, boolean sdac, boolean ignoreMetric) {
+    public PDDLProblem(PDDLDomain domain, String groundingMethod, PrintStream out, Sdac sdac, boolean ignoreMetric) {
         this(domain, groundingMethod, out, sdac, ignoreMetric, new BigDecimal(1.0), new BigDecimal(1.0));
     }
 
 
-    public PDDLProblem(PDDLDomain domain, String groundingMethod, PrintStream out, boolean sdac, boolean ignoreMetric, BigDecimal planningDelta, BigDecimal executionDelta) {
+    public PDDLProblem(PDDLDomain domain, String groundingMethod, PrintStream out, Sdac sdac, boolean ignoreMetric, BigDecimal planningDelta, BigDecimal executionDelta) {
         indexInit = 0;
         indexGoals = 0;
         objects = new PDDLObjects();
@@ -186,7 +183,7 @@ public class PDDLProblem implements SearchProblem {
 
 
     public PDDLProblem(String problemFile, PDDLObjects constants, Set<Type> types,
-                       PDDLDomain domain, PrintStream out, String groundingMethod, boolean sdac, boolean ignoreMetric, BigDecimal planningDelta, BigDecimal executionDelta) {
+                       PDDLDomain domain, PrintStream out, String groundingMethod, Sdac sdac, boolean ignoreMetric, BigDecimal planningDelta, BigDecimal executionDelta) {
 
         this(domain, groundingMethod, out, sdac, ignoreMetric, planningDelta, executionDelta);
         try {
@@ -205,16 +202,10 @@ public class PDDLProblem implements SearchProblem {
     /**
      * @return the sdac
      */
-    public boolean isSdac() {
+    public Sdac isSdac() {
         return sdac;
     }
 
-    /**
-     * @param sdac the sdac to set
-     */
-    public void setSdac(boolean sdac) {
-        this.sdac = sdac;
-    }
 
     public long getGroundingTime() {
         return groundingTime;
