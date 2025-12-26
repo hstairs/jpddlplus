@@ -28,13 +28,12 @@ public class ComparisonTest extends TestCase {
     }
 
     public void testComparison() {
-        Comparison g = Comparison.comparison(">", new PDDLNumber(0.0), new PDDLNumber(0.0), true);
-        Comparison l = Comparison.comparison("<", new PDDLNumber(0.0), new PDDLNumber(0.0), true);
-
-        Comparison ge = Comparison.comparison(">=", new PDDLNumber(0.0), new PDDLNumber(0.0), true);
-
-        Comparison le = Comparison.comparison("<=", new PDDLNumber(0.0), new PDDLNumber(0.0), true);
-        Comparison eq = Comparison.comparison("=", new PDDLNumber(0.0), new PDDLNumber(0.0), true);
+        var zero = new PDDLNumber(0.0);
+        Comparison g  = Comparison.comparison(Comparison.Comparator.GT, zero, zero, true);
+        Comparison l  = Comparison.comparison(Comparison.Comparator.LT, zero, zero, true);
+        Comparison ge = Comparison.comparison(Comparison.Comparator.GE, zero, zero, true);
+        Comparison le = Comparison.comparison(Comparison.Comparator.LE, zero, zero, true);
+        Comparison eq = Comparison.comparison(Comparison.Comparator.EQ, zero, zero, true);
 
         assertEquals(false, g.isSatisfied(0.0, 0.0));
         assertEquals(true, g.isSatisfied(0.001, 0.0));

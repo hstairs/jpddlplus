@@ -26,11 +26,9 @@ import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.parser.PddlParser;
 import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
+
+import java.util.*;
+
 import org.antlr.runtime.tree.Tree;
 
 /**
@@ -127,9 +125,20 @@ public class FactoryConditions {
                 return not;
             //Crea un not e per ogni figlio di questo nodo invoca creaformula
             //gestendo il valore di ritorno come un attributo di not
-            case PddlParser.COMPARISON_GD:
-                return Comparison.comparison(tree.getChild(0).getText(), createExpression(tree.getChild(1), parTable), createExpression(tree.getChild(2), parTable),false);
-            //Create an equality structure for comparing Objects
+            case PddlParser.COMPARISON_GD: {
+                String sym = tree.getChild(0).getText();
+                try {
+                    Comparison.Comparator cmp = Comparison.Comparator.fromSymbol(sym);
+                    return Comparison.comparison(
+                            cmp,
+                            createExpression(tree.getChild(1), parTable),
+                            createExpression(tree.getChild(2), parTable),
+                            false
+                    );
+                } catch (IllegalArgumentException e) {
+                    throw new RuntimeException("Unsupported comparator in PDDL: " + sym, e);
+                }
+            }      //Create an equality structure for comparing Objects
             case PddlParser.EQUALITY_CON:
 //                PDDLObjectsEquality equality = new Predicate();
 //
@@ -447,9 +456,14 @@ public class FactoryConditions {
             //gestendo il valore di ritorno come un attributo di not
         } else if (infoAction.getType() == PddlParser.COMPARISON_GD) {
             //System.out.println("Comparison:" + infoAction.getText());
-            Collection ret = new HashSet();
-            ret.add(Comparison.comparison(infoAction.getChild(0).getText(), createExpression(infoAction.getChild(1)), createExpression(infoAction.getChild(2)),false));
-            return new AndCond(ret);
+            return new AndCond(Set.of(
+                    Comparison.comparison(
+                            Comparison.Comparator.fromSymbol(infoAction.getChild(0).getText()),
+                            createExpression(infoAction.getChild(1)),
+                            createExpression(infoAction.getChild(2)),
+                            false
+                    )
+            ));
             //Crea un not e per ogni figlio di questo nodo invoca creaformula
             //gestendo il valore di ritorno come un attributo di not
         } else if (infoAction.getType() == PddlParser.ONEOF) {

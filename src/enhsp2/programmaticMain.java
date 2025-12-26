@@ -1,13 +1,12 @@
 package enhsp2;
 
 import com.hstairs.ppmajal.PDDLProblem.*;
-import com.hstairs.ppmajal.conditions.BoolPredicate;
+import com.hstairs.ppmajal.conditions.*;
+
 import static com.hstairs.ppmajal.conditions.BoolPredicate.BoolFluent;
 import static com.hstairs.ppmajal.conditions.Comparison.comparison;
-import com.hstairs.ppmajal.conditions.NotCond;
-import com.hstairs.ppmajal.conditions.PDDLObject;
 import static com.hstairs.ppmajal.conditions.PDDLObject.object;
-import com.hstairs.ppmajal.conditions.Terminal;
+
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.domain.SchemaParameters;
 import static com.hstairs.ppmajal.domain.SchemaParameters.createPar;
@@ -162,7 +161,7 @@ public class programmaticMain {
         problem.addNumValue(numericFluent("a"), 0);
         
         //goal
-        problem.setGoals(comparison(">=", numericFluent("a"), new PDDLNumber(100),false));
+        problem.setGoals(comparison(Comparison.Comparator.GE, numericFluent("a"), new PDDLNumber(100),false));
 
         //After this everything is destroyed and need to be recreated (actions, processes, events, facts)
         problem.prepareForSearch(); /* This is very necessary prior to any planning*/

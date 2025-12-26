@@ -140,15 +140,15 @@ public class TransitionGround extends Transition {
             return n;
         }
     }
-    private List<Pair<Condition, Float>> getSdac(PDDLState init, Metric metric, Sdac sdac) {
+    private List<Pair<Condition, Float>> getSdac(PDDLState state, Metric metric, Sdac sdacConfiguration) {
 
-        if (sdac == Sdac.byRHS) {
+        if (sdacConfiguration == Sdac.byRHS) {
             if (this.sdac == null){
                 this.sdac = new ArrayList();
-                ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
+                final ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
                 //first numeric effect normal
-                for (NumEffect effNum :  this.getConditionalNumericEffects().getAllEffects()) {
-                    for (ExtendedAddendum ad : expr.summations) {
+                for (final NumEffect effNum :  this.getConditionalNumericEffects().getAllEffects()) {
+                    for (final ExtendedAddendum ad : expr.summations) {
                         if (ad.f != null) {
                             if (effNum.getFluentAffected().equals(ad.f)){
                                 this.sdac.add(effNum);
@@ -162,7 +162,7 @@ public class TransitionGround extends Transition {
             for (var eff : this.sdac){
                 for (ExtendedAddendum ad : expr.summations){
                     if (ad.f != null){
-                        exprImpact += ad.n.floatValue() * this.getExprImpact(init, (NumEffect)eff, ad.f);
+                        exprImpact += ad.n.floatValue() * this.getExprImpact(state, (NumEffect)eff, ad.f);
                     }
                 }
             }
@@ -180,14 +180,14 @@ public class TransitionGround extends Transition {
         if (this.sdac == null) {
             this.sdac = new ArrayList<>();
             if (metric != null && metric.getMetExpr() != null) {
-                if (sdac == Sdac.disabled){
+                if (sdacConfiguration == Sdac.disabled){
                     ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
                     //first numeric effect normal
                     Float exprImpact = 0f;
                     for (NumEffect effNum :  this.getConditionalNumericEffects().getAllEffects()) {
                         for (ExtendedAddendum ad : expr.summations) {
                             if (ad.f != null) {
-                                exprImpact += ad.n.floatValue() * this.getExprImpact(init, effNum, ad.f);
+                                exprImpact += ad.n.floatValue() * this.getExprImpact(state, effNum, ad.f);
                             }
                         }
                     }
@@ -197,7 +197,7 @@ public class TransitionGround extends Transition {
                         BoolPredicate truePredicate = BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE);
                         this.sdac.add(Pair.of(truePredicate, getImpact(exprImpact,metric.getOptimization())));
                     }
-                }else if (sdac == Sdac.byCondition){
+                }else if (sdacConfiguration == Sdac.byCondition){
                     final ConditionalEffects<NumEffect> conditionalNumericEffects1 = this.getConditionalNumericEffects();
                     final Map<Condition, Collection<NumEffect>> actualConditionalEffects = conditionalNumericEffects1.getActualConditionalEffects();
                     for (Map.Entry<Condition,Collection<NumEffect>> ele: actualConditionalEffects.entrySet()) {
@@ -206,7 +206,7 @@ public class TransitionGround extends Transition {
                         for (NumEffect effNum :  ele.getValue()) {
                             for (ExtendedAddendum ad : expr.summations) {
                                 if (ad.f != null) {
-                                    exprImpact += ad.n.floatValue() * this.getExprImpact(init, effNum, ad.f);
+                                    exprImpact += ad.n.floatValue() * this.getExprImpact(state, effNum, ad.f);
                                 }
                             }
                         }
@@ -221,7 +221,7 @@ public class TransitionGround extends Transition {
                     for (NumEffect effNum :  conditionalNumericEffects1.getUnconditionalEffect()) {
                         for (ExtendedAddendum ad : expr.summations) {
                             if (ad.f != null) {
-                                exprImpact += ad.n.floatValue() * this.getExprImpact(init, effNum, ad.f);
+                                exprImpact += ad.n.floatValue() * this.getExprImpact(state, effNum, ad.f);
                             }
                         }
                     }
@@ -232,7 +232,7 @@ public class TransitionGround extends Transition {
                     }
                     
                 } else{
-                    throw new UnsupportedOperationException("Sdac option not supported"+ sdac);
+                    throw new UnsupportedOperationException("Sdac option not supported"+ sdacConfiguration);
                 }
             }
         }

@@ -550,7 +550,7 @@ public class AndCond extends ComplexCondition implements PostCondition {
             new_comparator = a1.getComparator();
         }
 
-        Comparison newC = (Comparison) Comparison.comparison(new_comparator, expr.normalize(), new ExtendedNormExpression(0d), false).normalize();
+        Comparison newC = (Comparison) Comparison.comparison(Comparison.Comparator.fromSymbol(new_comparator), expr.normalize(), new ExtendedNormExpression(0d), false).normalize();
         if (newC == null) {
             return null;
         }
