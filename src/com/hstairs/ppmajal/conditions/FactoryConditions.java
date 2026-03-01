@@ -280,6 +280,20 @@ public class FactoryConditions {
                 ret.setArg(createExpression(t.getChild(0), parTable));
                 return ret;
             }
+            case PddlParser.ASIN: {
+                TrigonometricFunction ret = new TrigonometricFunction();
+//                System.out.println(t.getChild(1));
+                ret.setOperator("asin");
+                ret.setArg(createExpression(t.getChild(0), parTable));
+                return ret;
+            }
+            case PddlParser.ACOS: {
+                TrigonometricFunction ret = new TrigonometricFunction();
+//                System.out.println(t.getChild(1));
+                ret.setOperator("acos");
+                ret.setArg(createExpression(t.getChild(0), parTable));
+                return ret;
+            }
             case PddlParser.NUMBER: {
                 PDDLNumber ret = new PDDLNumber(Float.parseFloat(t.getText()));
                 return ret;
