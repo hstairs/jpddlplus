@@ -133,8 +133,9 @@ public class WAStar extends SearchEngine {
             }
             final SearchNode currentNode = frontier.dequeue();
             this.tryLog(currentNode, ExternalLoggerLogType.Expanding);
-
             if (currentNode.gValue == getPreviousCost(gValue, currentNode.s)){
+                if (saveSearchSpace)
+                    currentNode.set_visited(nodesExpanded);
                 nodesExpanded++;
                 long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);
                 final Boolean res = problem.goalSatisfied(currentNode.s);

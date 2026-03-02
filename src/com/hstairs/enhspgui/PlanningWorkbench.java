@@ -12,6 +12,8 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultEditorKit;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
@@ -19,22 +21,25 @@ import javax.swing.undo.CannotRedoException;
 import javax.swing.undo.CannotUndoException;
 import javax.swing.undo.UndoManager;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Line2D;
-import java.awt.geom.RoundRectangle2D;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +48,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.prefs.Preferences;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
 public class PlanningWorkbench {
 
@@ -61,12 +72,30 @@ public class PlanningWorkbench {
         private final JList<String> planList;
         private final JButton viewStateButton;
         private final JTextArea statsArea;
-        private final JTextField searchField;
-        private final JTextField heuristicField;
-        private final JCheckBox debugModeCheck;
+        private final JTextField quickTimeoutField;
         private final JButton runButton;
         private final JButton pauseButton;
         private final JButton stopButton;
+        private boolean autocompleteEnabled = false;
+        private boolean vsCodeIntegrationEnabled = true;
+        private boolean vsCodeAutoReloadEnabled = true;
+        private final Timer vsCodeReloadTimer;
+        private final Timer vsCodePushTimer;
+        private Path vsCodeIntegrationDir;
+        private Path vsCodeDomainFile;
+        private Path vsCodeProblemFile;
+        private Path currentDomainFile;
+        private Path currentProblemFile;
+        private volatile Path lastSearchJsonPath;
+        private HttpServer sjrFileServer;
+        private int sjrFileServerPort = -1;
+        private volatile Path sjrServedPath;
+        private long vsCodeDomainLastModified = -1L;
+        private long vsCodeProblemLastModified = -1L;
+        private boolean suppressEditorDirtyTracking = false;
+        private boolean domainDirtySinceVsCodeSync = false;
+        private boolean problemDirtySinceVsCodeSync = false;
+        private AiAssistantDialog aiAssistantDialog;
         private SwingWorker<PlanningResult, Void> currentWorker;
         private PlannerExecutionController executionController;
         private volatile Thread planningThread;
@@ -77,6 +106,8 @@ public class PlanningWorkbench {
         private PlanningResult latestPlanningResult;
         private LazySearchTreeWindow searchTreeWindow;
         private boolean showSearchTree = false;
+        private boolean liveSearchTree = false;
+        private boolean debugModeEnabled = false;
         private Path lastLoadedDirectory = Path.of(System.getProperty("user.home"));
 
         PlanningFrame() {
@@ -84,6 +115,11 @@ public class PlanningWorkbench {
             setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             setSize(1200, 800);
             setLocationRelativeTo(null);
+            vsCodeReloadTimer = new Timer(1200, e -> maybeAutoReloadFromVsCode());
+            vsCodeReloadTimer.setRepeats(true);
+            vsCodeReloadTimer.start();
+            vsCodePushTimer = new Timer(450, e -> maybeAutoPushToVsCode());
+            vsCodePushTimer.setRepeats(false);
 
             applyModernTheme();
             JPanel root = new JPanel(new BorderLayout(10, 10));
@@ -99,14 +135,6 @@ public class PlanningWorkbench {
                     BorderFactory.createLineBorder(new Color(220, 225, 234)),
                     new EmptyBorder(6, 8, 6, 8)
             ));
-            controls.add(new JLabel("Search:"));
-            searchField = new JTextField("gbfs", 10);
-            controls.add(searchField);
-            controls.add(new JLabel("Heuristic:"));
-            heuristicField = new JTextField("hadd", 10);
-            controls.add(heuristicField);
-            debugModeCheck = new JCheckBox("Debug Mode");
-            controls.add(debugModeCheck);
             JButton plannerOptionsButton = new JButton("Planner Options...");
             plannerOptionsButton.addActionListener(e -> openPlannerOptionsDialog());
             controls.add(plannerOptionsButton);
@@ -114,6 +142,10 @@ public class PlanningWorkbench {
             runButton.addActionListener(e -> runPlanning());
             styleActionButton(runButton, new Color(20, 145, 60), Color.WHITE);
             controls.add(runButton);
+            controls.add(new JLabel("Timeout (s):"));
+            quickTimeoutField = new JTextField(6);
+            quickTimeoutField.setToolTipText("Empty = infinity");
+            controls.add(quickTimeoutField);
             pauseButton = new JButton("Pause");
             pauseButton.addActionListener(e -> togglePausePlanning());
             pauseButton.setEnabled(false);
@@ -131,6 +163,8 @@ public class PlanningWorkbench {
 
             JLabel problemStatus = new JLabel(" ");
             problemArea = new LispSyntaxTextPane(EditorKind.PROBLEM, defaultProblem(), report -> updateStatus(problemStatus, report));
+            setAutocompleteEnabled(autocompleteEnabled);
+            installVsCodeDirtyTracking();
 
             JSplitPane editors = new JSplitPane(
                     JSplitPane.HORIZONTAL_SPLIT,
@@ -185,6 +219,28 @@ public class PlanningWorkbench {
             JMenuItem loadProblem = new JMenuItem("Load Problem...");
             loadProblem.addActionListener(e -> loadProblemFile());
             fileMenu.add(loadProblem);
+            JMenuItem saveDomain = new JMenuItem("Save Domain");
+            saveDomain.addActionListener(e -> saveDomainFile());
+            fileMenu.add(saveDomain);
+            JMenuItem saveDomainAs = new JMenuItem("Save Domain As...");
+            saveDomainAs.addActionListener(e -> saveDomainFileAs());
+            fileMenu.add(saveDomainAs);
+            JMenuItem saveProblem = new JMenuItem("Save Problem");
+            saveProblem.addActionListener(e -> saveProblemFile());
+            fileMenu.add(saveProblem);
+            JMenuItem saveProblemAs = new JMenuItem("Save Problem As...");
+            saveProblemAs.addActionListener(e -> saveProblemFileAs());
+            fileMenu.add(saveProblemAs);
+            fileMenu.addSeparator();
+            JMenuItem editDomainInVsCode = new JMenuItem("Edit Domain in VS Code");
+            editDomainInVsCode.addActionListener(e -> openDomainInVsCode());
+            fileMenu.add(editDomainInVsCode);
+            JMenuItem editProblemInVsCode = new JMenuItem("Edit Problem in VS Code");
+            editProblemInVsCode.addActionListener(e -> openProblemInVsCode());
+            fileMenu.add(editProblemInVsCode);
+            JMenuItem reloadFromVsCode = new JMenuItem("Reload From VS Code Files");
+            reloadFromVsCode.addActionListener(e -> reloadFromVsCodeFiles());
+            fileMenu.add(reloadFromVsCode);
             bar.add(fileMenu);
 
             JMenu editMenu = new JMenu("Edit");
@@ -194,35 +250,116 @@ public class PlanningWorkbench {
             JMenuItem formatProblem = new JMenuItem("Format Problem");
             formatProblem.addActionListener(e -> formatProblemEditor());
             editMenu.add(formatProblem);
+            editMenu.addSeparator();
+            JCheckBoxMenuItem autocompleteToggle = new JCheckBoxMenuItem("Auto-completion", autocompleteEnabled);
+            autocompleteToggle.addActionListener(e -> setAutocompleteEnabled(autocompleteToggle.isSelected()));
+            editMenu.add(autocompleteToggle);
+            JCheckBoxMenuItem vsCodeToggle = new JCheckBoxMenuItem("VS Code External Editing", vsCodeIntegrationEnabled);
+            vsCodeToggle.addActionListener(e -> setVsCodeIntegrationEnabled(vsCodeToggle.isSelected()));
+            editMenu.add(vsCodeToggle);
+            JCheckBoxMenuItem vsCodeAutoReloadToggle = new JCheckBoxMenuItem("VS Code Auto-reload", vsCodeAutoReloadEnabled);
+            vsCodeAutoReloadToggle.addActionListener(e -> vsCodeAutoReloadEnabled = vsCodeAutoReloadToggle.isSelected());
+            editMenu.add(vsCodeAutoReloadToggle);
             bar.add(editMenu);
 
-            JMenu viewMenu = new JMenu("View");
+            JMenu examplesMenu = new JMenu("Examples");
+            JMenuItem countersExample = new JMenuItem("Counters (Instance 8)");
+            countersExample.addActionListener(e -> loadExamplePair(
+                    Path.of("examples", "gui", "counters", "domain.pddl"),
+                    Path.of("examples", "gui", "counters", "problem_instance_8.pddl"),
+                    "Counters (Instance 8)"
+            ));
+            examplesMenu.add(countersExample);
+            JMenuItem blocksworldExample = new JMenuItem("Blocksworld (3 Blocks)");
+            blocksworldExample.addActionListener(e -> loadExamplePair(
+                    Path.of("examples", "gui", "blocksworld", "domain.pddl"),
+                    Path.of("examples", "gui", "blocksworld", "problem_3blocks.pddl"),
+                    "Blocksworld (3 Blocks)"
+            ));
+            examplesMenu.add(blocksworldExample);
+            JMenuItem sailingExample = new JMenuItem("Sailing (2-3)");
+            sailingExample.addActionListener(e -> loadExamplePair(
+                    Path.of("examples", "sailing", "domain.pddl"),
+                    Path.of("examples", "sailing", "small_instances", "instance_2_3_1229.pddl"),
+                    "Sailing (2-3)"
+            ));
+            examplesMenu.add(sailingExample);
+            JMenuItem carExample = new JMenuItem("Car Non-Linear (1)");
+            carExample.addActionListener(e -> loadExamplePair(
+                    Path.of("examples", "pddl+", "car_non_linear", "domain.pddl"),
+                    Path.of("examples", "pddl+", "car_non_linear", "instances", "instance_1_30.0_0.1_10.0.pddl"),
+                    "Car Non-Linear (1)"
+            ));
+            examplesMenu.add(carExample);
+            bar.add(examplesMenu);
+
+            JMenu configMenu = new JMenu("Config");
+            JCheckBoxMenuItem debugModeToggle = new JCheckBoxMenuItem("Debug Mode", debugModeEnabled);
+            debugModeToggle.addActionListener(e -> debugModeEnabled = debugModeToggle.isSelected());
+            configMenu.add(debugModeToggle);
+            configMenu.addSeparator();
             JMenuItem zoomIn = new JMenuItem("Zoom In");
             zoomIn.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS,
                     Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
             zoomIn.addActionListener(e -> zoomEditors(1));
-            viewMenu.add(zoomIn);
+            configMenu.add(zoomIn);
             JMenuItem zoomOut = new JMenuItem("Zoom Out");
             zoomOut.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS,
                     Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
             zoomOut.addActionListener(e -> zoomEditors(-1));
-            viewMenu.add(zoomOut);
+            configMenu.add(zoomOut);
             JMenuItem zoomReset = new JMenuItem("Reset Zoom");
             zoomReset.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_0,
                     Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
             zoomReset.addActionListener(e -> resetEditorZoom());
-            viewMenu.add(zoomReset);
-            viewMenu.addSeparator();
+            configMenu.add(zoomReset);
+            configMenu.addSeparator();
+            final boolean[] syncingTreeToggles = {false};
             JCheckBoxMenuItem treeView = new JCheckBoxMenuItem("Search Tree", false);
+            JCheckBoxMenuItem treeLiveView = new JCheckBoxMenuItem("Search Tree Live (slow)", false);
             treeView.addActionListener(e -> {
+                if (syncingTreeToggles[0]) {
+                    return;
+                }
                 showSearchTree = treeView.isSelected();
                 if (showSearchTree) {
-                    ensureSearchTreeWindow().showWindow();
-                } else if (searchTreeWindow != null) {
-                    searchTreeWindow.hideWindow();
+                    plannerOptions.saveSearchJson = true;
+                    LazySearchTreeWindow window = ensureSearchTreeWindow();
+                    window.setLiveJsonMode(liveSearchTree);
+                    window.showWindow();
+                } else {
+                    if (liveSearchTree) {
+                        syncingTreeToggles[0] = true;
+                        liveSearchTree = false;
+                        treeLiveView.setSelected(false);
+                        syncingTreeToggles[0] = false;
+                    }
+                    if (searchTreeWindow != null) {
+                        searchTreeWindow.hideWindow();
+                    }
                 }
             });
-            viewMenu.add(treeView);
+            configMenu.add(treeView);
+            treeLiveView.addActionListener(e -> {
+                if (syncingTreeToggles[0]) {
+                    return;
+                }
+                liveSearchTree = treeLiveView.isSelected();
+                if (liveSearchTree && !showSearchTree) {
+                    syncingTreeToggles[0] = true;
+                    showSearchTree = true;
+                    treeView.setSelected(true);
+                    syncingTreeToggles[0] = false;
+                    plannerOptions.saveSearchJson = true;
+                    LazySearchTreeWindow window = ensureSearchTreeWindow();
+                    window.setLiveJsonMode(true);
+                    window.showWindow();
+                }
+                if (searchTreeWindow != null) {
+                    searchTreeWindow.setLiveJsonMode(liveSearchTree);
+                }
+            });
+            configMenu.add(treeLiveView);
             JMenuItem setActiveNodes = new JMenuItem("Set Active Nodes Limit...");
             setActiveNodes.addActionListener(e -> {
                 LazySearchTreeWindow w = ensureSearchTreeWindow();
@@ -237,8 +374,11 @@ public class PlanningWorkbench {
                     JOptionPane.showMessageDialog(this, "Please insert a valid integer.", "Invalid number", JOptionPane.ERROR_MESSAGE);
                 }
             });
-            viewMenu.add(setActiveNodes);
-            bar.add(viewMenu);
+            configMenu.add(setActiveNodes);
+            JMenuItem openSjrInBrowser = new JMenuItem("Open Last -sjr Tree in ENHSPTree");
+            openSjrInBrowser.addActionListener(e -> openLastSjrTreeInBrowser());
+            configMenu.add(openSjrInBrowser);
+            bar.add(configMenu);
 
             JMenu syntaxMenu = new JMenu("Syntax");
             JMenuItem syntaxHelp = new JMenuItem("Help");
@@ -254,35 +394,59 @@ public class PlanningWorkbench {
             area.setEditable(false);
             area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
             area.setText(
-                    "Input Syntax (Automatic)\n" +
+                    "Guida Rapida: Modellare in PDDL\n" +
+                    "===============================\n\n" +
+                    "1) Struttura del DOMAIN\n" +
+                    "-----------------------\n" +
+                    "- (define (domain NOME))\n" +
+                    "- (:requirements ...)\n" +
+                    "- (:predicates ...)\n" +
+                    "- (:functions ...)   ; se usi variabili numeriche\n" +
+                    "- (:action ...)\n" +
+                    "  :parameters (...)\n" +
+                    "  :precondition (and ...)\n" +
+                    "  :effect (and ...)\n\n" +
+                    "2) Struttura del PROBLEM\n" +
                     "------------------------\n" +
-                    "Il parser GUI riconosce automaticamente input ibridi PDDL / ~PDDL.\n" +
-                    "Non c'e piu una selezione di modalita: puoi mischiare forme standard e approximate\n" +
-                    "nello stesso file. Le parti gia standard PDDL vengono lasciate invariate.\n\n" +
-                    "Regole principali in ~PDDL\n" +
-                    "--------------------------\n" +
-                    "1) Espressioni infisse supportate\n" +
+                    "- (define (problem NOME-PROBLEM))\n" +
+                    "- (:domain NOME-DOMAIN)\n" +
+                    "- (:objects ...)\n" +
+                    "- (:init ...)\n" +
+                    "- (:goal (and ...))\n" +
+                    "- (:metric minimize|maximize (...))   ; opzionale\n\n" +
+                    "3) Buone pratiche di modellazione\n" +
+                    "---------------------------------\n" +
+                    "- Tieni separati fatti booleani (:predicates) e quantità numeriche (:functions).\n" +
+                    "- Metti in :init tutti i fatti iniziali e i valori numerici con (= (f ...) val).\n" +
+                    "- Scrivi precondizioni il più possibile locali all'azione.\n" +
+                    "- In :goal usa condizioni verificabili sullo stato finale.\n\n" +
+                    "Sintassi Friendly (~PDDL) di questa GUI\n" +
+                    "=======================================\n" +
+                    "Questa GUI supporta una forma più naturale per le espressioni numeriche.\n" +
+                    "Puoi scrivere input ibrido PDDL / ~PDDL: la parte standard PDDL resta invariata,\n" +
+                    "la parte friendly viene tradotta automaticamente in PDDL puro.\n\n" +
+                    "Regole principali\n" +
+                    "-----------------\n" +
+                    "1) Espressioni infisse\n" +
                     "   (x + y * 2), (a - b), (n / d)\n" +
-                    "   Vengono convertite in forma prefissa PDDL.\n\n" +
-                    "2) Chiamate funzione stile naturale\n" +
-                    "   fuel()          -> (fuel)\n" +
-                    "   weight(a)       -> (weight a)\n" +
-                    "   dist(x,y)       -> (dist x y)\n\n" +
+                    "   -> convertite in forma prefissa PDDL.\n\n" +
+                    "2) Chiamate funzione naturali\n" +
+                    "   fuel()     -> (fuel)\n" +
+                    "   weight(a)  -> (weight a)\n" +
+                    "   dist(x,y)  -> (dist x y)\n\n" +
                     "3) Confronti infissi\n" +
-                    "   (weight(a) <= grip-limit())  -> (<= (weight a) (grip-limit))\n" +
-                    "   (fuel() > 0)                 -> (> (fuel) 0)\n\n" +
-                    "4) Assegnamento in effetti\n" +
-                    "   In :effect, '=' viene convertito automaticamente:\n" +
-                    "   (fuel() = fuel() + 2)        -> (increase (fuel) 2)\n" +
-                    "   (fuel() = fuel() - 1)        -> (decrease (fuel) 1)\n" +
-                    "   Altrimenti fallback su assign.\n\n" +
+                    "   (weight(a) <= grip-limit()) -> (<= (weight a) (grip-limit))\n" +
+                    "   (fuel() > 0)                -> (> (fuel) 0)\n\n" +
+                    "4) Assegnamenti in :effect\n" +
+                    "   (fuel() = fuel() + 2) -> (increase (fuel) 2)\n" +
+                    "   (fuel() = fuel() - 1) -> (decrease (fuel) 1)\n" +
+                    "   (x() = y())           -> (assign (x) (y))\n\n" +
                     "5) Assegnamenti booleani\n" +
-                    "   (ready() = T)                -> (ready)\n" +
-                    "   (ready() = F)                -> (not (ready))\n\n" +
-                    "Limitazioni pratiche\n" +
-                    "--------------------\n" +
-                    "- La conversione lavora bene su clausole lineari dentro parentesi.\n" +
-                    "- Strutture molto annidate o forme miste non standard possono richiedere PDDL standard.\n"
+                    "   (ready() = T) -> (ready)\n" +
+                    "   (ready() = F) -> (not (ready))\n\n" +
+                    "Nota\n" +
+                    "----\n" +
+                    "Per casi complessi/annidati conviene usare direttamente la forma PDDL standard.\n"
             );
             JScrollPane sp = new JScrollPane(area);
             sp.setPreferredSize(new Dimension(820, 560));
@@ -369,24 +533,122 @@ public class PlanningWorkbench {
             return scrollPane;
         }
 
-        private void loadIntoEditor(JTextPane editor) {
+        private void installVsCodeDirtyTracking() {
+            domainArea.getDocument().addDocumentListener(new DocumentListener() {
+                @Override
+                public void insertUpdate(DocumentEvent e) {
+                    markDirty();
+                }
+
+                @Override
+                public void removeUpdate(DocumentEvent e) {
+                    markDirty();
+                }
+
+                @Override
+                public void changedUpdate(DocumentEvent e) {
+                    markDirty();
+                }
+
+                private void markDirty() {
+                    if (!suppressEditorDirtyTracking) {
+                        domainDirtySinceVsCodeSync = true;
+                        scheduleAutoPushToVsCode();
+                    }
+                }
+            });
+
+            problemArea.getDocument().addDocumentListener(new DocumentListener() {
+                @Override
+                public void insertUpdate(DocumentEvent e) {
+                    markDirty();
+                }
+
+                @Override
+                public void removeUpdate(DocumentEvent e) {
+                    markDirty();
+                }
+
+                @Override
+                public void changedUpdate(DocumentEvent e) {
+                    markDirty();
+                }
+
+                private void markDirty() {
+                    if (!suppressEditorDirtyTracking) {
+                        problemDirtySinceVsCodeSync = true;
+                        scheduleAutoPushToVsCode();
+                    }
+                }
+            });
+        }
+
+        private void scheduleAutoPushToVsCode() {
+            if (!vsCodeIntegrationEnabled) {
+                return;
+            }
+            if (suppressEditorDirtyTracking) {
+                return;
+            }
+            if (vsCodePushTimer.isRunning()) {
+                vsCodePushTimer.restart();
+            } else {
+                vsCodePushTimer.start();
+            }
+        }
+
+        private void maybeAutoPushToVsCode() {
+            if (!vsCodeIntegrationEnabled) {
+                return;
+            }
+            if (!hasLocalUnsyncedEditorChanges()) {
+                return;
+            }
+            try {
+                syncEditorsToVsCodeFiles();
+            } catch (IOException ignored) {
+            }
+        }
+
+        private boolean hasLocalUnsyncedEditorChanges() {
+            return domainDirtySinceVsCodeSync || problemDirtySinceVsCodeSync;
+        }
+
+        private void markEditorsSyncedWithVsCode() {
+            domainDirtySinceVsCodeSync = false;
+            problemDirtySinceVsCodeSync = false;
+        }
+
+        private Path loadIntoEditor(JTextPane editor) {
             JFileChooser chooser = lastLoadedDirectory == null
                     ? new JFileChooser()
                     : new JFileChooser(lastLoadedDirectory.toFile());
             chooser.setDialogTitle("Load PDDL file");
             int res = chooser.showOpenDialog(this);
             if (res != JFileChooser.APPROVE_OPTION) {
-                return;
+                return null;
             }
             Path file = chooser.getSelectedFile().toPath();
             try {
-                editor.setText(Files.readString(file, StandardCharsets.UTF_8));
+                suppressEditorDirtyTracking = true;
+                try {
+                    editor.setText(Files.readString(file, StandardCharsets.UTF_8));
+                } finally {
+                    suppressEditorDirtyTracking = false;
+                }
                 Path parent = file.getParent();
                 if (parent != null) {
                     lastLoadedDirectory = parent;
                 }
+                if (vsCodeIntegrationEnabled) {
+                    syncEditorsToVsCodeFiles();
+                } else {
+                    markEditorsSyncedWithVsCode();
+                }
+                return file;
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Cannot load file:\n" + e.getMessage(), "Load Error", JOptionPane.ERROR_MESSAGE);
+                return null;
             }
         }
 
@@ -408,11 +670,129 @@ public class PlanningWorkbench {
         }
 
         private void loadDomainFile() {
-            loadIntoEditor(domainArea);
+            Path loaded = loadIntoEditor(domainArea);
+            if (loaded != null) {
+                currentDomainFile = loaded;
+            }
+        }
+
+        private void loadExamplePair(Path domainPath, Path problemPath, String label) {
+            try {
+                if (!Files.exists(domainPath) || !Files.exists(problemPath)) {
+                    JOptionPane.showMessageDialog(this,
+                            "Example files not found:\n" + domainPath + "\n" + problemPath,
+                            "Examples",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                suppressEditorDirtyTracking = true;
+                try {
+                    domainArea.setText(Files.readString(domainPath, StandardCharsets.UTF_8));
+                    problemArea.setText(Files.readString(problemPath, StandardCharsets.UTF_8));
+                } finally {
+                    suppressEditorDirtyTracking = false;
+                }
+                currentDomainFile = domainPath;
+                currentProblemFile = problemPath;
+                Path parent = domainPath.getParent();
+                if (parent != null) {
+                    lastLoadedDirectory = parent;
+                }
+                markEditorsSyncedWithVsCode();
+                if (vsCodeIntegrationEnabled) {
+                    syncEditorsToVsCodeFiles();
+                }
+                JOptionPane.showMessageDialog(this,
+                        "Loaded example: " + label,
+                        "Examples",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Unable to load example files:\n" + ex.getMessage(),
+                        "Examples",
+                        JOptionPane.ERROR_MESSAGE);
+            }
         }
 
         private void loadProblemFile() {
-            loadIntoEditor(problemArea);
+            Path loaded = loadIntoEditor(problemArea);
+            if (loaded != null) {
+                currentProblemFile = loaded;
+            }
+        }
+
+        private void saveDomainFile() {
+            if (currentDomainFile == null) {
+                saveDomainFileAs();
+                return;
+            }
+            saveEditorToFile(domainArea, currentDomainFile, "Save Domain");
+        }
+
+        private void saveProblemFile() {
+            if (currentProblemFile == null) {
+                saveProblemFileAs();
+                return;
+            }
+            saveEditorToFile(problemArea, currentProblemFile, "Save Problem");
+        }
+
+        private void saveDomainFileAs() {
+            Path target = chooseSavePath("Save Domain As...", currentDomainFile, "domain.pddl");
+            if (target == null) {
+                return;
+            }
+            if (saveEditorToFile(domainArea, target, "Save Domain")) {
+                currentDomainFile = target;
+            }
+        }
+
+        private void saveProblemFileAs() {
+            Path target = chooseSavePath("Save Problem As...", currentProblemFile, "problem.pddl");
+            if (target == null) {
+                return;
+            }
+            if (saveEditorToFile(problemArea, target, "Save Problem")) {
+                currentProblemFile = target;
+            }
+        }
+
+        private Path chooseSavePath(String title, Path currentFile, String fallbackName) {
+            JFileChooser chooser = lastLoadedDirectory == null
+                    ? new JFileChooser()
+                    : new JFileChooser(lastLoadedDirectory.toFile());
+            chooser.setDialogTitle(title);
+            if (currentFile != null) {
+                chooser.setSelectedFile(currentFile.toFile());
+            } else {
+                chooser.setSelectedFile(Path.of(fallbackName).toFile());
+            }
+            int res = chooser.showSaveDialog(this);
+            if (res != JFileChooser.APPROVE_OPTION) {
+                return null;
+            }
+            Path target = chooser.getSelectedFile().toPath();
+            Path parent = target.getParent();
+            if (parent != null) {
+                lastLoadedDirectory = parent;
+            }
+            return target;
+        }
+
+        private boolean saveEditorToFile(JTextPane editor, Path target, String actionName) {
+            try {
+                Files.writeString(target, editor.getText(), StandardCharsets.UTF_8);
+                if (vsCodeIntegrationEnabled) {
+                    syncEditorsToVsCodeFiles();
+                }
+                return true;
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this,
+                        actionName + " failed:\n" + e.getMessage(),
+                        actionName + " Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
         }
 
         private void formatDomainEditor() {
@@ -421,6 +801,218 @@ public class PlanningWorkbench {
 
         private void formatProblemEditor() {
             problemArea.formatDocument();
+        }
+
+        private void setAutocompleteEnabled(boolean enabled) {
+            autocompleteEnabled = enabled;
+            domainArea.setAutocompleteEnabled(enabled);
+            problemArea.setAutocompleteEnabled(enabled);
+        }
+
+        private void setVsCodeIntegrationEnabled(boolean enabled) {
+            vsCodeIntegrationEnabled = enabled;
+            if (!enabled) {
+                if (vsCodePushTimer.isRunning()) {
+                    vsCodePushTimer.stop();
+                }
+                return;
+            }
+            try {
+                ensureVsCodeFiles();
+                syncEditorsToVsCodeFiles();
+            } catch (IOException e) {
+                vsCodeIntegrationEnabled = false;
+                JOptionPane.showMessageDialog(this,
+                        "Cannot enable VS Code integration:\n" + e.getMessage(),
+                        "VS Code Integration Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private void ensureVsCodeFiles() throws IOException {
+            if (vsCodeIntegrationDir == null) {
+                vsCodeIntegrationDir = Files.createTempDirectory("jpddlplus_vscode_");
+                vsCodeDomainFile = vsCodeIntegrationDir.resolve("domain.pddl");
+                vsCodeProblemFile = vsCodeIntegrationDir.resolve("problem.pddl");
+                writeVsCodeIntegrationSettings();
+            }
+            if (vsCodeDomainFile == null || vsCodeProblemFile == null) {
+                throw new IOException("Invalid VS Code integration paths.");
+            }
+            if (!Files.exists(vsCodeDomainFile)) {
+                Files.writeString(vsCodeDomainFile, domainArea.getText(), StandardCharsets.UTF_8);
+            }
+            if (!Files.exists(vsCodeProblemFile)) {
+                Files.writeString(vsCodeProblemFile, problemArea.getText(), StandardCharsets.UTF_8);
+            }
+            updateVsCodeModifiedTimestamps();
+        }
+
+        private void writeVsCodeIntegrationSettings() throws IOException {
+            if (vsCodeIntegrationDir == null) {
+                return;
+            }
+            Path vscodeDir = vsCodeIntegrationDir.resolve(".vscode");
+            Files.createDirectories(vscodeDir);
+            Path settings = vscodeDir.resolve("settings.json");
+            String json = "{\n"
+                    + "  \"files.autoSave\": \"afterDelay\",\n"
+                    + "  \"files.autoSaveDelay\": 400\n"
+                    + "}\n";
+            Files.writeString(settings, json, StandardCharsets.UTF_8);
+        }
+
+        private void syncEditorsToVsCodeFiles() throws IOException {
+            ensureVsCodeFiles();
+            String transpiledDomain;
+            String transpiledProblem;
+            try {
+                transpiledDomain = ApproxPddlTranslator.transpile(domainArea.getText(), true);
+                transpiledProblem = ApproxPddlTranslator.transpile(problemArea.getText(), false);
+            } catch (Exception e) {
+                throw new IOException("Unable to transpile current editors to standard PDDL for VS Code.", e);
+            }
+            Files.writeString(vsCodeDomainFile, transpiledDomain, StandardCharsets.UTF_8);
+            Files.writeString(vsCodeProblemFile, transpiledProblem, StandardCharsets.UTF_8);
+            updateVsCodeModifiedTimestamps();
+            markEditorsSyncedWithVsCode();
+        }
+
+        private void syncFromVsCodeFilesIntoEditors() throws IOException {
+            ensureVsCodeFiles();
+            String domainText = Files.readString(vsCodeDomainFile, StandardCharsets.UTF_8);
+            String problemText = Files.readString(vsCodeProblemFile, StandardCharsets.UTF_8);
+            suppressEditorDirtyTracking = true;
+            try {
+                if (!domainText.equals(domainArea.getText())) {
+                    domainArea.setText(domainText);
+                }
+                if (!problemText.equals(problemArea.getText())) {
+                    problemArea.setText(problemText);
+                }
+            } finally {
+                suppressEditorDirtyTracking = false;
+            }
+            updateVsCodeModifiedTimestamps();
+            markEditorsSyncedWithVsCode();
+        }
+
+        private void maybeAutoReloadFromVsCode() {
+            if (!vsCodeIntegrationEnabled || !vsCodeAutoReloadEnabled) {
+                return;
+            }
+            if (vsCodeDomainFile == null || vsCodeProblemFile == null) {
+                return;
+            }
+            try {
+                long domainMTime = Files.exists(vsCodeDomainFile) ? Files.getLastModifiedTime(vsCodeDomainFile).toMillis() : -1L;
+                long problemMTime = Files.exists(vsCodeProblemFile) ? Files.getLastModifiedTime(vsCodeProblemFile).toMillis() : -1L;
+                boolean changed = domainMTime > vsCodeDomainLastModified || problemMTime > vsCodeProblemLastModified;
+                if (changed) {
+                    if (hasLocalUnsyncedEditorChanges()) {
+                        maybeAutoPushToVsCode();
+                        return;
+                    }
+                    syncFromVsCodeFilesIntoEditors();
+                }
+            } catch (IOException ignored) {
+            }
+        }
+
+        private void updateVsCodeModifiedTimestamps() throws IOException {
+            vsCodeDomainLastModified = Files.exists(vsCodeDomainFile) ? Files.getLastModifiedTime(vsCodeDomainFile).toMillis() : -1L;
+            vsCodeProblemLastModified = Files.exists(vsCodeProblemFile) ? Files.getLastModifiedTime(vsCodeProblemFile).toMillis() : -1L;
+        }
+
+        private void openDomainInVsCode() {
+            openInVsCode(true);
+        }
+
+        private void openProblemInVsCode() {
+            openInVsCode(false);
+        }
+
+        private void reloadFromVsCodeFiles() {
+            if (!vsCodeIntegrationEnabled) {
+                JOptionPane.showMessageDialog(this,
+                        "Enable 'Edit > VS Code External Editing' first.",
+                        "VS Code Integration",
+                        JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            try {
+                if (hasLocalUnsyncedEditorChanges()) {
+                    int choice = JOptionPane.showConfirmDialog(
+                            this,
+                            "You have local unsynced edits in GUI.\nReloading from VS Code will overwrite them.\nContinue?",
+                            "Reload From VS Code",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.WARNING_MESSAGE
+                    );
+                    if (choice != JOptionPane.YES_OPTION) {
+                        return;
+                    }
+                }
+                syncFromVsCodeFilesIntoEditors();
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this,
+                        "Unable to reload from VS Code files:\n" + e.getMessage(),
+                        "VS Code Integration Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private void openInVsCode(boolean domain) {
+            if (!vsCodeIntegrationEnabled) {
+                JOptionPane.showMessageDialog(this,
+                        "Enable 'Edit > VS Code External Editing' first.",
+                        "VS Code Integration",
+                        JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            try {
+                syncEditorsToVsCodeFiles();
+                Path target = domain ? vsCodeDomainFile : vsCodeProblemFile;
+                if (!launchVsCode(target)) {
+                    JOptionPane.showMessageDialog(this,
+                            "Unable to launch VS Code automatically.\n"
+                                    + "Install VS Code and ensure 'code' is available in PATH.",
+                            "VS Code Launch Error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this,
+                        "Unable to launch VS Code. Ensure 'code' is in PATH.\n\n" + e.getMessage(),
+                        "VS Code Launch Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private boolean launchVsCode(Path target) {
+            String targetPath = target.toAbsolutePath().toString();
+            String folderPath = vsCodeIntegrationDir == null
+                    ? target.getParent().toAbsolutePath().toString()
+                    : vsCodeIntegrationDir.toAbsolutePath().toString();
+            List<List<String>> commands = new ArrayList<>();
+            commands.add(Arrays.asList("code", folderPath, "-g", targetPath));
+            String os = System.getProperty("os.name", "").toLowerCase();
+            if (os.contains("mac")) {
+                commands.add(Arrays.asList("open", "-a", "Visual Studio Code", folderPath));
+            } else if (os.contains("win")) {
+                commands.add(Arrays.asList("cmd", "/c", "code", folderPath, "-g", targetPath));
+            }
+            for (List<String> cmd : commands) {
+                try {
+                    Process p = new ProcessBuilder(cmd).start();
+                    if (p.isAlive() || p.exitValue() == 0) {
+                        return true;
+                    }
+                } catch (IllegalThreadStateException okStillRunning) {
+                    return true;
+                } catch (IOException ignored) {
+                }
+            }
+            return false;
         }
 
         private void zoomEditors(int delta) {
@@ -450,23 +1042,203 @@ public class PlanningWorkbench {
             PlannerCliOptions updated = dialog.showDialog();
             if (updated != null) {
                 plannerOptions = updated;
-                if (plannerOptions.search != null && !plannerOptions.search.isBlank()) {
-                    searchField.setText(plannerOptions.search);
+            }
+        }
+
+        private void openLastSjrTreeInBrowser() {
+            Path p = lastSearchJsonPath;
+            if (p == null || !Files.exists(p)) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "No -sjr search tree file available yet.\nRun planning with '-sjr' enabled in Planner Options first.",
+                        "ENHSPTree",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+                return;
+            }
+            String url = buildEnhspTreeUrlWithAutoFile(p);
+            openUrlInBrowser(url);
+            try {
+                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(p.toAbsolutePath().toString()), null);
+            } catch (Exception ignored) {
+            }
+            JOptionPane.showMessageDialog(
+                    this,
+                    "ENHSPTree opened in browser.\nAttempted auto-load via URL parameter.\n"
+                            + "If the site does not auto-load, use its 'Load sp.log' control.\n"
+                            + "File path copied to clipboard:\n" + p.toAbsolutePath(),
+                    "ENHSPTree",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        }
+
+        private String buildEnhspTreeUrlWithAutoFile(Path spLogFile) {
+            String base = "https://clementchamayou.github.io/enhsptree/";
+            try {
+                String localUrl = startOrUpdateSjrFileServer(spLogFile);
+                String encoded = URLEncoder.encode(localUrl, StandardCharsets.UTF_8);
+                return base + "?url=" + encoded;
+            } catch (Exception ignored) {
+                return base;
+            }
+        }
+
+        private String startOrUpdateSjrFileServer(Path spLogFile) throws IOException {
+            sjrServedPath = spLogFile.toAbsolutePath();
+            if (sjrFileServer != null && sjrFileServerPort > 0) {
+                return "http://127.0.0.1:" + sjrFileServerPort + "/last.sp_log";
+            }
+            sjrFileServer = HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+            sjrFileServer.createContext("/last.sp_log", this::serveLastSpLog);
+            sjrFileServer.setExecutor(null);
+            sjrFileServer.start();
+            sjrFileServerPort = sjrFileServer.getAddress().getPort();
+            return "http://127.0.0.1:" + sjrFileServerPort + "/last.sp_log";
+        }
+
+        private void serveLastSpLog(HttpExchange exchange) throws IOException {
+            try {
+                Path p = sjrServedPath;
+                if (p == null || !Files.exists(p)) {
+                    byte[] msg = "No sp_log available".getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(404, msg.length);
+                    exchange.getResponseBody().write(msg);
+                    return;
                 }
-                if (plannerOptions.heuristic != null && !plannerOptions.heuristic.isBlank()) {
-                    heuristicField.setText(plannerOptions.heuristic);
+                byte[] bytes = Files.readAllBytes(p);
+                exchange.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
+                exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                exchange.sendResponseHeaders(200, bytes.length);
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.close();
+            }
+        }
+
+        private void openAiAssistant() {
+            String apiKey = OpenAiApiKeyStore.resolveApiKey();
+            if (apiKey == null || apiKey.isBlank()) {
+                boolean configured = promptAiIntegrationSetup();
+                if (!configured) {
+                    return;
                 }
             }
+            if (aiAssistantDialog == null) {
+                aiAssistantDialog = new AiAssistantDialog(this, domainArea, problemArea);
+            }
+            aiAssistantDialog.setVisible(true);
+            aiAssistantDialog.toFront();
+        }
+
+        private boolean promptAiIntegrationSetup() {
+            JTextField keyField = new JTextField(40);
+            JPanel panel = new JPanel(new BorderLayout(8, 8));
+            panel.add(new JLabel("Insert OpenAI API key (saved locally for next runs):"), BorderLayout.NORTH);
+            panel.add(keyField, BorderLayout.CENTER);
+            JButton openKeysPage = new JButton("Open API Keys Page");
+            openKeysPage.addActionListener(e -> openUrlInBrowser("https://platform.openai.com/api-keys"));
+            JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            south.add(openKeysPage);
+            panel.add(south, BorderLayout.SOUTH);
+
+            int res = JOptionPane.showConfirmDialog(
+                    this,
+                    panel,
+                    "Enable AI Integration",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+            if (res != JOptionPane.OK_OPTION) {
+                return false;
+            }
+            String key = keyField.getText() == null ? "" : keyField.getText().trim();
+            if (key.isBlank()) {
+                int fallback = JOptionPane.showConfirmDialog(
+                        this,
+                        "No API key provided.\nOpen ChatGPT instead?",
+                        "AI Integration",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+                if (fallback == JOptionPane.YES_OPTION) {
+                    openChatGptInBrowser();
+                }
+                return false;
+            }
+            OpenAiApiKeyStore.saveApiKey(key);
+            return true;
+        }
+
+        private void openChatGptInBrowser() {
+            openUrlInBrowser("https://chatgpt.com");
+        }
+
+        private void openUrlInBrowser(String url) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().browse(URI.create(url));
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+            String os = System.getProperty("os.name", "").toLowerCase();
+            List<List<String>> commands = new ArrayList<>();
+            if (os.contains("mac")) {
+                commands.add(Arrays.asList("open", url));
+            } else if (os.contains("win")) {
+                commands.add(Arrays.asList("cmd", "/c", "start", url));
+            } else {
+                commands.add(Arrays.asList("xdg-open", url));
+            }
+            for (List<String> cmd : commands) {
+                try {
+                    new ProcessBuilder(cmd).start();
+                    return;
+                } catch (IOException ignored) {
+                }
+            }
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Unable to open browser automatically.\nOpen this URL manually: " + url,
+                    "Open URL",
+                    JOptionPane.WARNING_MESSAGE
+            );
         }
 
         private void runPlanning() {
             if (currentWorker != null) {
                 return;
             }
-            final boolean debugMode = debugModeCheck.isSelected();
+            final boolean debugMode = debugModeEnabled;
+            final String timeoutOverride;
+            String quickTimeout = quickTimeoutField.getText() == null ? "" : quickTimeoutField.getText().trim();
+            if (quickTimeout.isEmpty()) {
+                timeoutOverride = "";
+            } else {
+                try {
+                    long v = Long.parseLong(quickTimeout);
+                    if (v <= 0) {
+                        throw new NumberFormatException("timeout must be > 0");
+                    }
+                    timeoutOverride = Long.toString(v);
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(this,
+                            "Timeout must be a positive integer number of seconds.\nLeave empty for infinity.",
+                            "Invalid Timeout",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+            }
             final String domainTextForPlanning;
             final String problemTextForPlanning;
             try {
+                if (vsCodeIntegrationEnabled) {
+                    if (hasLocalUnsyncedEditorChanges()) {
+                        syncEditorsToVsCodeFiles();
+                    } else {
+                        syncFromVsCodeFilesIntoEditors();
+                    }
+                }
                 String d = domainArea.getText();
                 String p = problemArea.getText();
                 d = ApproxPddlTranslator.transpile(d, true);
@@ -498,14 +1270,15 @@ public class PlanningWorkbench {
                 liveStatsBuffer.setLength(0);
             }
             executionController = new PlannerExecutionController();
+            final boolean searchTreeForThisRun = showSearchTree;
+            final boolean liveSearchTreeForThisRun = showSearchTree && liveSearchTree;
             if (showSearchTree) {
                 LazySearchTreeWindow treeWindow = ensureSearchTreeWindow();
                 treeWindow.reset();
+                 treeWindow.setLiveJsonMode(liveSearchTreeForThisRun);
                 treeWindow.showWindow();
-                executionController.setSearchTreeWindow(treeWindow);
-            } else {
-                executionController.setSearchTreeWindow(null);
             }
+            executionController.setSearchTreeWindow(liveSearchTreeForThisRun ? searchTreeWindow : null);
 
             SwingWorker<PlanningResult, Void> worker = new SwingWorker<>() {
                 @Override
@@ -532,9 +1305,12 @@ public class PlanningWorkbench {
                             args.add(domainPath.toAbsolutePath().toString());
                             args.add("-f");
                             args.add(problemPath.toAbsolutePath().toString());
-                            plannerOptions.search = searchField.getText().trim().isEmpty() ? "gbfs" : searchField.getText().trim();
-                            plannerOptions.heuristic = heuristicField.getText().trim().isEmpty() ? "hadd" : heuristicField.getText().trim();
-                            plannerOptions.appendArgs(args);
+                            PlannerCliOptions effectivePlannerOptions = plannerOptions.copy();
+                            effectivePlannerOptions.timeout = timeoutOverride;
+                            if (searchTreeForThisRun) {
+                                effectivePlannerOptions.saveSearchJson = true;
+                            }
+                            effectivePlannerOptions.appendArgs(args);
 
                             ENHSP planner = new ENHSP(false);
                             injectExternalLogger(planner, executionController);
@@ -551,6 +1327,7 @@ public class PlanningWorkbench {
                             if (solution != null && solution.lastNode() != null) {
                                 executionController.markSolutionNode(solution.lastNode());
                             }
+                            persistLatestSearchJsonIfPresent(tmpDir);
                             executionController.checkStopped();
                             return formatSolution(solution, planner.getProblem(), debugMode ? domainTextForPlanning : null, debugMode ? problemTextForPlanning : null);
                         }
@@ -600,6 +1377,9 @@ public class PlanningWorkbench {
                             setPlanResult(result);
                             statsArea.setText(result.statsText + "\n\nLive search trace:\n" + getLiveStatsSnapshot());
                             viewStateButton.setEnabled(result.hasTrace());
+                            if (searchTreeForThisRun) {
+                                loadLatestSearchTreeJsonIfPresent();
+                            }
                         }
                     } catch (Exception e) {
                         latestPlanningResult = null;
@@ -619,6 +1399,43 @@ public class PlanningWorkbench {
             };
             currentWorker = worker;
             worker.execute();
+        }
+
+        private void persistLatestSearchJsonIfPresent(Path tmpDir) {
+            if (tmpDir == null) {
+                return;
+            }
+            try {
+                Path found = null;
+                try (var stream = Files.list(tmpDir)) {
+                    found = stream
+                            .filter(p -> {
+                                String name = p.getFileName().toString();
+                                return name.endsWith(".sp_log") || name.endsWith(".json");
+                            })
+                            .findFirst()
+                            .orElse(null);
+                }
+                if (found == null) {
+                    return;
+                }
+                Path targetDir = Path.of(System.getProperty("user.home"), ".jpddlplus_gui");
+                Files.createDirectories(targetDir);
+                Path target = targetDir.resolve("last_search_tree.sp_log");
+                Files.copy(found, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                lastSearchJsonPath = target;
+            } catch (Exception ignored) {
+            }
+        }
+
+        private void loadLatestSearchTreeJsonIfPresent() {
+            Path p = lastSearchJsonPath;
+            if (p == null || !Files.exists(p)) {
+                return;
+            }
+            LazySearchTreeWindow treeWindow = ensureSearchTreeWindow();
+            treeWindow.showWindow();
+            treeWindow.loadJsonTree(p);
         }
 
         private boolean previewGeneratedPddlAndConfirm(String generatedDomain, String generatedProblem) {
@@ -693,6 +1510,9 @@ public class PlanningWorkbench {
             if (line.startsWith("f(n) =")) {
                 return line;
             }
+            if (line.startsWith("g(n)=") && line.contains("h(n)=")) {
+                return line;
+            }
             if (line.startsWith("Plan-Length:")
                     || line.startsWith("Metric (Search):")
                     || line.startsWith("Planning Time (msec):")
@@ -740,6 +1560,12 @@ public class PlanningWorkbench {
             fullArea.setText("Action: " + action + "\n\nState before:\n" + before + "\n\nState after:\n" + after);
             tabs.add("Full States", new JScrollPane(fullArea));
 
+            JTextArea varsArea = new JTextArea();
+            varsArea.setEditable(false);
+            varsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+            varsArea.setText("Action: " + action + "\n\n" + buildVariableValuesView(before, after));
+            tabs.add("Variables", new JScrollPane(varsArea));
+
             tabs.setPreferredSize(new Dimension(950, 620));
             JOptionPane.showMessageDialog(this, tabs, "State Trace - Step " + actionStepIndex, JOptionPane.INFORMATION_MESSAGE);
         }
@@ -768,16 +1594,51 @@ public class PlanningWorkbench {
             return sb.toString();
         }
 
+        private String buildVariableValuesView(String before, String after) {
+            java.util.Map<String, String> b = parseStateAssignments(before);
+            java.util.Map<String, String> a = parseStateAssignments(after);
+            java.util.Set<String> keys = new java.util.TreeSet<>();
+            keys.addAll(b.keySet());
+            keys.addAll(a.keySet());
+            if (keys.isEmpty()) {
+                return "No explicit variable values parsed from state text.";
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("Before -> After\n");
+            sb.append("----------------\n");
+            for (String k : keys) {
+                String bv = b.get(k);
+                String av = a.get(k);
+                sb.append(k)
+                  .append(": ")
+                  .append(bv == null ? "<unset>" : bv)
+                  .append(" -> ")
+                  .append(av == null ? "<unset>" : av);
+                if (!java.util.Objects.equals(bv, av)) {
+                    sb.append("   *");
+                }
+                sb.append('\n');
+            }
+            return sb.toString();
+        }
+
         private java.util.Map<String, String> parseStateAssignments(String stateText) {
             java.util.Map<String, String> map = new java.util.HashMap<>();
             if (stateText == null) {
                 return map;
             }
-            java.util.regex.Matcher matcher = java.util.regex.Pattern
+            java.util.regex.Matcher valueMatcher = java.util.regex.Pattern
                     .compile("(\\([^\\)]*\\)|[^\\s=]+)=([^\\s]+)")
                     .matcher(stateText);
-            while (matcher.find()) {
-                map.put(matcher.group(1), matcher.group(2));
+            while (valueMatcher.find()) {
+                map.put(valueMatcher.group(1), valueMatcher.group(2));
+            }
+            java.util.regex.Matcher atomMatcher = java.util.regex.Pattern
+                    .compile("(\\([^\\)]*\\))")
+                    .matcher(stateText);
+            while (atomMatcher.find()) {
+                String atom = atomMatcher.group(1);
+                map.putIfAbsent(atom, "true");
             }
             return map;
         }
@@ -842,6 +1703,7 @@ public class PlanningWorkbench {
             statsBuilder.append("Duplicates: ").append(solution.stats().duplicates()).append('\n');
             List<ActionDisplayEntry> entries = new ArrayList<>();
             List<Integer> rawStepToActionIndex = new ArrayList<>();
+            boolean hasNonActionTransitions = false;
             int stepIndex = 0;
             int actionIndex = 0;
             for (ImmutablePair<BigDecimal, com.hstairs.ppmajal.transition.TransitionGround> planStep : solution.rawPlan()) {
@@ -849,6 +1711,9 @@ public class PlanningWorkbench {
                 String timeKey = normalizeTimeKey(planStep.getLeft(), stepIndex);
                 boolean isAction = planStep.getRight() != null
                         && planStep.getRight().getSemantics().equals(com.hstairs.ppmajal.transition.Transition.Semantics.ACTION);
+                if (!isAction) {
+                    hasNonActionTransitions = true;
+                }
                 int mappedActionIndex = -1;
                 if (isAction) {
                     mappedActionIndex = actionIndex;
@@ -860,29 +1725,63 @@ public class PlanningWorkbench {
                 stepIndex++;
             }
 
-            int pos = 0;
-            while (pos < entries.size()) {
-                String currentTime = entries.get(pos).timeKey;
-                List<ActionDisplayEntry> group = new ArrayList<>();
-                while (pos < entries.size() && entries.get(pos).timeKey.equals(currentTime)) {
-                    group.add(entries.get(pos));
-                    pos++;
-                }
-
-                displayLines.add("t = " + currentTime);
-                displayToActionStep.add(-1);
-                int waitingCount = 0;
-                for (ActionDisplayEntry e : group) {
-                    if (isWaitingActionText(e.action)) {
-                        waitingCount++;
+            if (!hasNonActionTransitions) {
+                int index = 0;
+                for (ActionDisplayEntry e : entries) {
+                    if (e.actionIndex < 0 || isWaitingActionText(e.action)) {
                         continue;
                     }
-                    displayLines.add("  - " + e.action);
+                    displayLines.add(index + ": " + e.action);
                     displayToActionStep.add(e.actionIndex);
+                    index++;
                 }
-                if (waitingCount > 0) {
-                    displayLines.add("  - [waiting x" + waitingCount + "]");
-                    displayToActionStep.add(-1);
+            } else {
+                int pos = 0;
+                List<TimeGroup> groups = new ArrayList<>();
+                while (pos < entries.size()) {
+                    String currentTime = entries.get(pos).timeKey;
+                    List<ActionDisplayEntry> group = new ArrayList<>();
+                    while (pos < entries.size() && entries.get(pos).timeKey.equals(currentTime)) {
+                        group.add(entries.get(pos));
+                        pos++;
+                    }
+
+                    int waitingCount = 0;
+                    List<ActionDisplayEntry> nonWaiting = new ArrayList<>();
+                    for (ActionDisplayEntry e : group) {
+                        if (isWaitingActionText(e.action)) {
+                            waitingCount++;
+                            continue;
+                        }
+                        nonWaiting.add(e);
+                    }
+                    groups.add(new TimeGroup(currentTime, nonWaiting, waitingCount));
+                }
+
+                for (int i = 0; i < groups.size(); i++) {
+                    TimeGroup g = groups.get(i);
+                    if (g.nonWaitingActions.isEmpty()) {
+                        continue;
+                    }
+                    for (ActionDisplayEntry e : g.nonWaitingActions) {
+                        displayLines.add(g.timeKey + ": " + e.action);
+                        displayToActionStep.add(e.actionIndex);
+                    }
+
+                    String nextActionTime = null;
+                    int waitingBetween = 0;
+                    for (int j = i + 1; j < groups.size(); j++) {
+                        TimeGroup next = groups.get(j);
+                        waitingBetween += next.waitingCount;
+                        if (!next.nonWaitingActions.isEmpty()) {
+                            nextActionTime = next.timeKey;
+                            break;
+                        }
+                    }
+                    if (waitingBetween > 0 && nextActionTime != null) {
+                        displayLines.add(g.timeKey + ": -----waiting---- [" + nextActionTime + "]");
+                        displayToActionStep.add(-1);
+                    }
                 }
             }
 
@@ -942,8 +1841,8 @@ public class PlanningWorkbench {
         }
 
         private static String defaultDomain() {
-            return "; ~PDDL sample: simple numeric counter\n"
-                    + "(define (domain numeric-counter-approx)\n"
+            return "; PDDL sample: simple numeric counter\n"
+                    + "(define (domain numeric-counter)\n"
                     + "  (:requirements :strips :fluents)\n"
                     + "  (:predicates (ready))\n"
                     + "  (:functions (x) (step) (limit))\n"
@@ -952,27 +1851,27 @@ public class PlanningWorkbench {
                     + "    :parameters ()\n"
                     + "    :precondition (and\n"
                     + "      (ready)\n"
-                    + "      (x() + step() <= limit())\n"
+                    + "      (<= (+ (x) (step)) (limit))\n"
                     + "    )\n"
                     + "    :effect (and\n"
-                    + "      (x() = x() + step())\n"
+                    + "      (increase (x) (step))\n"
                     + "    )\n"
                     + "  )\n"
                     + ")";
         }
 
         private static String defaultProblem() {
-            return "; ~PDDL numeric goal with infix expression\n"
-                    + "(define (problem numeric-counter-approx-p1)\n"
-                    + "  (:domain numeric-counter-approx)\n"
+            return "; PDDL numeric goal with prefix expressions\n"
+                    + "(define (problem numeric-counter-p1)\n"
+                    + "  (:domain numeric-counter)\n"
                     + "  (:init\n"
                     + "    (ready)\n"
-                    + "    (x() = 0)\n"
-                    + "    (step() = 2)\n"
-                    + "    (limit() = 10)\n"
+                    + "    (= (x) 0)\n"
+                    + "    (= (step) 2)\n"
+                    + "    (= (limit) 10)\n"
                     + "  )\n"
                     + "  (:goal (and\n"
-                    + "    (x() >= 6)\n"
+                    + "    (>= (x) 6)\n"
                     + "  ))\n"
                     + ")";
         }
@@ -981,6 +1880,241 @@ public class PlanningWorkbench {
     private enum EditorKind {
         DOMAIN,
         PROBLEM
+    }
+
+    private static final class AiAssistantDialog extends JDialog {
+        private final JTextArea conversationArea;
+        private final JTextArea inputArea;
+        private final JTextField modelField;
+        private final JCheckBox includeEditorsCheck;
+        private final JButton sendButton;
+        private final JButton clearButton;
+        private final JTextPane domainEditor;
+        private final JTextPane problemEditor;
+        private final OpenAiChatClient client;
+        private final List<ChatTurn> history = new ArrayList<>();
+
+        AiAssistantDialog(Window owner, JTextPane domainEditor, JTextPane problemEditor) {
+            super(owner, "AI Assistant", ModalityType.MODELESS);
+            this.domainEditor = domainEditor;
+            this.problemEditor = problemEditor;
+            this.client = new OpenAiChatClient();
+
+            setSize(760, 560);
+            setLocationRelativeTo(owner);
+            setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
+
+            JPanel root = new JPanel(new BorderLayout(8, 8));
+            root.setBorder(new EmptyBorder(10, 10, 10, 10));
+            setContentPane(root);
+
+            JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+            top.add(new JLabel("Model:"));
+            modelField = new JTextField("gpt-4.1-mini", 14);
+            top.add(modelField);
+            includeEditorsCheck = new JCheckBox("Include current domain/problem context", true);
+            top.add(includeEditorsCheck);
+            root.add(top, BorderLayout.NORTH);
+
+            conversationArea = new JTextArea();
+            conversationArea.setEditable(false);
+            conversationArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+            root.add(new JScrollPane(conversationArea), BorderLayout.CENTER);
+
+            JPanel bottom = new JPanel(new BorderLayout(6, 6));
+            inputArea = new JTextArea(5, 40);
+            inputArea.setLineWrap(true);
+            inputArea.setWrapStyleWord(true);
+            bottom.add(new JScrollPane(inputArea), BorderLayout.CENTER);
+
+            JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+            clearButton = new JButton("Clear");
+            clearButton.addActionListener(e -> clearConversation());
+            sendButton = new JButton("Send");
+            sendButton.addActionListener(e -> sendMessage());
+            actions.add(clearButton);
+            actions.add(sendButton);
+            bottom.add(actions, BorderLayout.SOUTH);
+
+            root.add(bottom, BorderLayout.SOUTH);
+        }
+
+        private void clearConversation() {
+            history.clear();
+            conversationArea.setText("");
+        }
+
+        private void sendMessage() {
+            String user = inputArea.getText() == null ? "" : inputArea.getText().trim();
+            if (user.isEmpty()) {
+                return;
+            }
+            String apiKey = OpenAiApiKeyStore.resolveApiKey();
+            if (apiKey == null || apiKey.isBlank()) {
+                JOptionPane.showMessageDialog(this,
+                        "Missing OpenAI API key.\nUse AI Assistant button to configure integration.",
+                        "AI Assistant",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            String model = modelField.getText() == null ? "" : modelField.getText().trim();
+            if (model.isEmpty()) {
+                model = "gpt-4.1-mini";
+            }
+            final String selectedModel = model;
+
+            appendMessage("You", user);
+            inputArea.setText("");
+            sendButton.setEnabled(false);
+
+            final String contextBlock;
+            if (includeEditorsCheck.isSelected()) {
+                contextBlock = "Current Domain:\n" + domainEditor.getText() + "\n\nCurrent Problem:\n" + problemEditor.getText();
+            } else {
+                contextBlock = null;
+            }
+
+            SwingWorker<String, Void> worker = new SwingWorker<>() {
+                @Override
+                protected String doInBackground() throws Exception {
+                    return client.chat(apiKey, selectedModel, history, user, contextBlock);
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        String answer = get();
+                        history.add(new ChatTurn("user", user));
+                        history.add(new ChatTurn("assistant", answer));
+                        appendMessage("Assistant", answer);
+                    } catch (Exception e) {
+                        appendMessage("Assistant", "Error: " + e.getMessage());
+                    } finally {
+                        sendButton.setEnabled(true);
+                    }
+                }
+            };
+            worker.execute();
+        }
+
+        private void appendMessage(String role, String text) {
+            conversationArea.append(role + ":\n" + text + "\n\n");
+            conversationArea.setCaretPosition(conversationArea.getDocument().getLength());
+        }
+    }
+
+    private record ChatTurn(String role, String text) {}
+
+    private static final class OpenAiApiKeyStore {
+        private static final String PREF_NODE = "com.hstairs.enhspgui.ai";
+        private static final String PREF_KEY = "openai_api_key";
+
+        static String resolveApiKey() {
+            String env = System.getenv("OPENAI_API_KEY");
+            if (env != null && !env.isBlank()) {
+                return env.trim();
+            }
+            Preferences prefs = Preferences.userRoot().node(PREF_NODE);
+            String stored = prefs.get(PREF_KEY, "");
+            return stored == null || stored.isBlank() ? null : stored.trim();
+        }
+
+        static void saveApiKey(String key) {
+            Preferences prefs = Preferences.userRoot().node(PREF_NODE);
+            prefs.put(PREF_KEY, key.trim());
+        }
+    }
+
+    private static final class OpenAiChatClient {
+        private static final String RESPONSES_API = "https://api.openai.com/v1/responses";
+        private final HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(20))
+                .build();
+
+        String chat(String apiKey, String model, List<ChatTurn> history, String userMessage, String contextBlock) throws Exception {
+            JSONObject body = new JSONObject();
+            body.put("model", model);
+
+            JSONArray input = new JSONArray();
+            input.add(toInputMessage("system",
+                    "You are a coding assistant inside ENHSP GUI. Be concise and practical."));
+            for (ChatTurn turn : history) {
+                input.add(toInputMessage(turn.role(), turn.text()));
+            }
+            if (contextBlock != null && !contextBlock.isBlank()) {
+                input.add(toInputMessage("system", contextBlock));
+            }
+            input.add(toInputMessage("user", userMessage));
+            body.put("input", input);
+            body.put("temperature", 0.2);
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(RESPONSES_API))
+                    .timeout(Duration.ofSeconds(90))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toJSONString(), StandardCharsets.UTF_8))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IOException("OpenAI API error " + response.statusCode() + ": " + response.body());
+            }
+            return extractText(response.body());
+        }
+
+        private static JSONObject toInputMessage(String role, String text) {
+            JSONObject msg = new JSONObject();
+            msg.put("role", role);
+            JSONArray content = new JSONArray();
+            JSONObject part = new JSONObject();
+            part.put("type", "input_text");
+            part.put("text", text == null ? "" : text);
+            content.add(part);
+            msg.put("content", content);
+            return msg;
+        }
+
+        private static String extractText(String json) throws Exception {
+            Object parsed = new JSONParser().parse(json);
+            if (!(parsed instanceof JSONObject obj)) {
+                return "No response content.";
+            }
+
+            Object outputText = obj.get("output_text");
+            if (outputText instanceof String s && !s.isBlank()) {
+                return s;
+            }
+
+            Object outputObj = obj.get("output");
+            if (outputObj instanceof JSONArray outputArray) {
+                StringBuilder sb = new StringBuilder();
+                for (Object item : outputArray) {
+                    if (!(item instanceof JSONObject out)) {
+                        continue;
+                    }
+                    Object contentObj = out.get("content");
+                    if (!(contentObj instanceof JSONArray contentArray)) {
+                        continue;
+                    }
+                    for (Object c : contentArray) {
+                        if (!(c instanceof JSONObject part)) {
+                            continue;
+                        }
+                        Object type = part.get("type");
+                        Object text = part.get("text");
+                        if ("output_text".equals(type) && text instanceof String t) {
+                            if (!sb.isEmpty()) {
+                                sb.append('\n');
+                            }
+                            sb.append(t);
+                        }
+                    }
+                }
+                if (!sb.isEmpty()) {
+                    return sb.toString();
+                }
+            }
+            return "No textual response.";
+        }
     }
 
     private static final class SyntaxReport {
@@ -1048,6 +2182,18 @@ public class PlanningWorkbench {
         }
     }
 
+    private static final class TimeGroup {
+        final String timeKey;
+        final List<ActionDisplayEntry> nonWaitingActions;
+        final int waitingCount;
+
+        TimeGroup(String timeKey, List<ActionDisplayEntry> nonWaitingActions, int waitingCount) {
+            this.timeKey = timeKey;
+            this.nonWaitingActions = nonWaitingActions;
+            this.waitingCount = waitingCount;
+        }
+    }
+
     private static final class PlanningStoppedException extends RuntimeException {
         PlanningStoppedException() {
             super("Planning stopped");
@@ -1078,6 +2224,7 @@ public class PlanningWorkbench {
         String savePlan = "";
         String posthocLogger = "";
         String effectAbstraction = "";
+        String customArgs = "";
 
         boolean helpfulActions;
         boolean helpfulTransitions;
@@ -1128,6 +2275,7 @@ public class PlanningWorkbench {
             c.savePlan = savePlan;
             c.posthocLogger = posthocLogger;
             c.effectAbstraction = effectAbstraction;
+            c.customArgs = customArgs;
 
             c.helpfulActions = helpfulActions;
             c.helpfulTransitions = helpfulTransitions;
@@ -1195,6 +2343,9 @@ public class PlanningWorkbench {
             addPlainFlag(args, "-bbqs", bucketBasedQueueSearch);
             addPlainFlag(args, "-tun", tunnelling);
             addPlainFlag(args, "-sjr", saveSearchJson);
+
+            // Must be appended last so custom args override presets/UI fields.
+            args.addAll(tokenizeCliArgs(customArgs));
         }
 
         private static void addPlainFlag(List<String> args, String flag, boolean enabled) {
@@ -1215,6 +2366,49 @@ public class PlanningWorkbench {
                 args.add(flag);
                 args.add(value.trim());
             }
+        }
+
+        private static List<String> tokenizeCliArgs(String raw) {
+            List<String> out = new ArrayList<>();
+            if (raw == null || raw.isBlank()) {
+                return out;
+            }
+            StringBuilder current = new StringBuilder();
+            boolean inSingle = false;
+            boolean inDouble = false;
+            boolean escaped = false;
+            for (int i = 0; i < raw.length(); i++) {
+                char c = raw.charAt(i);
+                if (escaped) {
+                    current.append(c);
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\') {
+                    escaped = true;
+                    continue;
+                }
+                if (c == '\'' && !inDouble) {
+                    inSingle = !inSingle;
+                    continue;
+                }
+                if (c == '"' && !inSingle) {
+                    inDouble = !inDouble;
+                    continue;
+                }
+                if (Character.isWhitespace(c) && !inSingle && !inDouble) {
+                    if (current.length() > 0) {
+                        out.add(current.toString());
+                        current.setLength(0);
+                    }
+                    continue;
+                }
+                current.append(c);
+            }
+            if (current.length() > 0) {
+                out.add(current.toString());
+            }
+            return out;
         }
     }
 
@@ -1245,6 +2439,7 @@ public class PlanningWorkbench {
         private final JTextField savePlan;
         private final JTextField posthoc;
         private final JTextField ea;
+        private final JTextArea customArgs;
 
         private final JCheckBox ha;
         private final JCheckBox ht;
@@ -1293,6 +2488,9 @@ public class PlanningWorkbench {
             savePlan = new JTextField();
             posthoc = new JTextField();
             ea = new JTextField();
+            customArgs = new JTextArea(4, 24);
+            customArgs.setLineWrap(true);
+            customArgs.setWrapStyleWord(true);
 
             ha = new JCheckBox("Helpful actions");
             ht = new JCheckBox("Helpful transitions");
@@ -1386,6 +2584,7 @@ public class PlanningWorkbench {
             addField(p, "Save plan path", savePlan);
             addField(p, "Posthoc logger file", posthoc);
             addField(p, "Effect abstraction (ea)", ea);
+            addField(p, "Custom CLI args (override)", new JScrollPane(customArgs));
             return wrappedPanel(p);
         }
 
@@ -1449,6 +2648,7 @@ public class PlanningWorkbench {
             savePlan.setText(safe(o.savePlan));
             posthoc.setText(safe(o.posthocLogger));
             ea.setText(safe(o.effectAbstraction));
+            customArgs.setText(safe(o.customArgs));
 
             ha.setSelected(o.helpfulActions);
             ht.setSelected(o.helpfulTransitions);
@@ -1496,6 +2696,7 @@ public class PlanningWorkbench {
             o.savePlan = savePlan.getText().trim();
             o.posthocLogger = posthoc.getText().trim();
             o.effectAbstraction = ea.getText().trim();
+            o.customArgs = customArgs.getText().trim();
 
             o.helpfulActions = ha.isSelected();
             o.helpfulTransitions = ht.isSelected();
@@ -1530,537 +2731,6 @@ public class PlanningWorkbench {
 
         private static String safeOr(String v, String def) {
             return (v == null || v.isBlank()) ? def : v;
-        }
-    }
-
-    private static final class SearchTreeWindow {
-        private final JFrame frame;
-        private final GraphCanvas canvas;
-        private final JTextArea info;
-        private final java.util.Map<String, GraphNode> nodes = new java.util.LinkedHashMap<>();
-        private final java.util.Map<String, GraphEdge> edges = new java.util.LinkedHashMap<>();
-        private final java.util.Map<String, List<GraphEdge>> outgoingEdges = new java.util.HashMap<>();
-        private final java.util.Map<Integer, List<GraphNode>> nodesByDepth = new java.util.HashMap<>();
-        private final Timer renderTimer;
-        private final java.util.Queue<LogEvent> pendingLogEvents = new ArrayDeque<>();
-        private int activeNodeLimit = 10;
-        private String rootKey = null;
-        private String selectedKey = null;
-        private int generated = 0;
-        private int expanded = 0;
-        private int closed = 0;
-        private boolean refreshScheduled = false;
-        private boolean infoDirty = false;
-        private boolean visibleDirty = true;
-        private boolean logDrainScheduled = false;
-        private Set<String> visibleCache = Set.of();
-        private static final int X_GAP = 240;
-        private static final int Y_GAP = 160;
-
-        SearchTreeWindow() {
-            frame = new JFrame("Search Tree");
-            frame.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
-            frame.setSize(980, 760);
-            frame.setLocationByPlatform(true);
-
-            canvas = new GraphCanvas();
-
-            info = new JTextArea();
-            info.setEditable(false);
-            info.setRows(4);
-            info.setText("Generated: 0\nExpanded: 0\nExpanded/Closed: 0");
-
-            renderTimer = new Timer(33, e -> {
-                refreshScheduled = false;
-                if (infoDirty) {
-                    updateInfoNow();
-                    infoDirty = false;
-                }
-                canvas.repaint();
-            });
-            renderTimer.setRepeats(false);
-
-            JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(canvas), new JScrollPane(info));
-            split.setResizeWeight(0.88);
-            frame.setContentPane(split);
-        }
-
-        void showWindow() {
-            SwingUtilities.invokeLater(() -> frame.setVisible(true));
-        }
-
-        void hideWindow() {
-            SwingUtilities.invokeLater(() -> frame.setVisible(false));
-        }
-
-        void setFontSize(int size) {
-            SwingUtilities.invokeLater(() -> {
-                Font f = new Font(Font.MONOSPACED, Font.PLAIN, size);
-                canvas.setFont(f);
-                info.setFont(f);
-            });
-        }
-
-        void reset() {
-            SwingUtilities.invokeLater(() -> {
-                nodes.clear();
-                edges.clear();
-                outgoingEdges.clear();
-                nodesByDepth.clear();
-                pendingLogEvents.clear();
-                rootKey = null;
-                selectedKey = null;
-                generated = expanded = closed = 0;
-                logDrainScheduled = false;
-                markVisibleDirty();
-                scheduleRefresh(true);
-            });
-        }
-
-        void onSearchStart() {
-            reset();
-        }
-
-        void onSearchEnd() {
-            SwingUtilities.invokeLater(() -> info.append("\nSearch completed."));
-        }
-
-        void setActiveNodeLimit(int activeNodeLimit) {
-            this.activeNodeLimit = Math.max(3, activeNodeLimit);
-            markVisibleDirty();
-            scheduleRefresh(true);
-        }
-
-        int getActiveNodeLimit() {
-            return activeNodeLimit;
-        }
-
-        void onLogEvent(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node, ExternalLoggerLogType type, boolean isGoal) {
-            synchronized (pendingLogEvents) {
-                pendingLogEvents.add(new LogEvent(node, type, isGoal));
-                if (logDrainScheduled) {
-                    return;
-                }
-                logDrainScheduled = true;
-            }
-            SwingUtilities.invokeLater(this::drainPendingLogEvents);
-        }
-
-        void markSolutionNode(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node) {
-            SwingUtilities.invokeLater(() -> {
-                GraphNode n = ensureNode(node);
-                n.isSolution = true;
-                selectedKey = n.key;
-                markVisibleDirty();
-                scheduleRefresh(true);
-            });
-        }
-
-        private GraphNode ensureNode(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node) {
-            String k = nodeKey(node);
-            GraphNode existing = nodes.get(k);
-            if (existing != null) {
-                return existing;
-            }
-            GraphNode parent = null;
-            int depth = 0;
-            if (node.father != null) {
-                parent = ensureNode(node.father);
-                depth = parent.depth + 1;
-            } else if (rootKey == null) {
-                rootKey = k;
-            }
-            GraphNode created = new GraphNode(k, formatNode(node, null), actionText(node), depth, node.gValue);
-            if (node instanceof com.hstairs.ppmajal.search.searchnodes.SearchNode sn) {
-                created.fValue = sn.f;
-            }
-            created.parent = parent;
-            if (created.parent == null) {
-                created.expanded = true;
-                created.isStart = true;
-            }
-            nodes.put(k, created);
-            nodesByDepth.computeIfAbsent(created.depth, ignored -> new ArrayList<>()).add(created);
-            layoutDepth(created.depth);
-            markVisibleDirty();
-            return created;
-        }
-
-        private void layoutDepth(int depth) {
-            List<GraphNode> layer = nodesByDepth.getOrDefault(depth, List.of());
-            int count = layer.size();
-            int startX = -((count - 1) * X_GAP) / 2;
-            for (int i = 0; i < count; i++) {
-                GraphNode n = layer.get(i);
-                n.x = startX + i * X_GAP;
-                n.y = depth * Y_GAP;
-            }
-        }
-
-        private void updateInfoNow() {
-            int visible = computeVisibleNodeKeys().size();
-            info.setText("Generated: " + generated +
-                    "\nExpanded: " + expanded +
-                    "\nExpanded/Closed: " + closed +
-                    "\nNodes: " + nodes.size() + "  Visible: " + visible + "  Limit: " + activeNodeLimit);
-        }
-
-        private void markVisibleDirty() {
-            visibleDirty = true;
-        }
-
-        private void scheduleRefresh(boolean withInfo) {
-            infoDirty = infoDirty || withInfo;
-            if (!refreshScheduled) {
-                refreshScheduled = true;
-                renderTimer.restart();
-            }
-        }
-
-        private String nodeKey(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode n) {
-            if (n.id != null) {
-                return n.id.toString();
-            }
-            return Integer.toHexString(System.identityHashCode(n));
-        }
-
-        private String formatNode(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode n, ExternalLoggerLogType type) {
-            String action = n.transition == null ? "init/wait" : n.transition.toString();
-            String tag = type == null ? "" : "[" + statusLabel(type) + "] ";
-            String g = "g=" + n.gValue;
-            String f = "";
-            if (n instanceof com.hstairs.ppmajal.search.searchnodes.SearchNode sn) {
-                f = " f=" + sn.f;
-            }
-            return tag + action + " " + g + f;
-        }
-
-        private String statusLabel(ExternalLoggerLogType type) {
-            return switch (type) {
-                case Generating -> "generated";
-                case Expanding -> "expanded";
-                case Closing -> "expanded/closed";
-            };
-        }
-
-        private String actionText(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode n) {
-            return n.transition == null ? "init/wait" : n.transition.toString();
-        }
-
-        private void drainPendingLogEvents() {
-            int processed = 0;
-            while (processed < 2000) {
-                LogEvent ev;
-                synchronized (pendingLogEvents) {
-                    ev = pendingLogEvents.poll();
-                    if (ev == null) {
-                        logDrainScheduled = false;
-                        break;
-                    }
-                }
-                processLogEvent(ev);
-                processed++;
-            }
-            scheduleRefresh(true);
-            synchronized (pendingLogEvents) {
-                if (!pendingLogEvents.isEmpty()) {
-                    SwingUtilities.invokeLater(this::drainPendingLogEvents);
-                } else {
-                    logDrainScheduled = false;
-                }
-            }
-        }
-
-        private void processLogEvent(LogEvent ev) {
-            com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node = ev.node;
-            ExternalLoggerLogType type = ev.type;
-            GraphNode n = ensureNode(node);
-            n.status = type;
-            n.label = formatNode(node, type);
-            n.gValue = node.gValue;
-            n.isGoal = n.isGoal || ev.isGoal;
-            if (node instanceof com.hstairs.ppmajal.search.searchnodes.SearchNode sn) {
-                n.fValue = sn.f;
-            }
-
-            if (node.father != null) {
-                GraphNode p = ensureNode(node.father);
-                String ek = p.key + "->" + n.key;
-                GraphEdge edge = edges.computeIfAbsent(ek, k -> {
-                    GraphEdge created = new GraphEdge(p, n, n.action);
-                    outgoingEdges.computeIfAbsent(p.key, ignored -> new ArrayList<>()).add(created);
-                    return created;
-                });
-                if (type == ExternalLoggerLogType.Expanding || type == ExternalLoggerLogType.Closing) {
-                    edge.status = EdgeStatus.CHOSEN;
-                    if (!p.expanded) {
-                        p.expanded = true;
-                        markVisibleDirty();
-                    }
-                } else if (edge.status == EdgeStatus.UNKNOWN) {
-                    edge.status = EdgeStatus.TRIED;
-                }
-            }
-
-            if (type == ExternalLoggerLogType.Generating) generated++;
-            else if (type == ExternalLoggerLogType.Expanding) expanded++;
-            else if (type == ExternalLoggerLogType.Closing) closed++;
-        }
-
-        private enum EdgeStatus { UNKNOWN, TRIED, CHOSEN }
-
-        private static final class GraphNode {
-            final String key;
-            String label;
-            final String action;
-            final int depth;
-            float gValue;
-            float fValue = Float.NaN;
-            ExternalLoggerLogType status;
-            GraphNode parent;
-            int x;
-            int y;
-            boolean expanded;
-            boolean isStart;
-            boolean isGoal;
-            boolean isSolution;
-            GraphNode(String key, String label, String action, int depth, float gValue) {
-                this.key = key;
-                this.label = label;
-                this.action = action;
-                this.depth = depth;
-                this.gValue = gValue;
-                this.expanded = false;
-                this.isStart = false;
-                this.isGoal = false;
-                this.isSolution = false;
-            }
-        }
-
-        private static final class GraphEdge {
-            final GraphNode from;
-            final GraphNode to;
-            final String label;
-            EdgeStatus status = EdgeStatus.UNKNOWN;
-            GraphEdge(GraphNode from, GraphNode to, String label) {
-                this.from = from;
-                this.to = to;
-                this.label = label;
-            }
-        }
-
-        private static final class LogEvent {
-            final com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node;
-            final ExternalLoggerLogType type;
-            final boolean isGoal;
-
-            LogEvent(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node, ExternalLoggerLogType type, boolean isGoal) {
-                this.node = node;
-                this.type = type;
-                this.isGoal = isGoal;
-            }
-        }
-
-        private final class GraphCanvas extends JPanel {
-            private double zoom = 1.0;
-            private double panX = 0;
-            private double panY = 40;
-            private Point dragStart;
-
-            GraphCanvas() {
-                setPreferredSize(new Dimension(1800, 1400));
-                setBackground(new Color(250, 252, 255));
-                MouseAdapter mouse = new MouseAdapter() {
-                    @Override
-                    public void mousePressed(MouseEvent e) {
-                        if (e.getButton() == MouseEvent.BUTTON1) {
-                            GraphNode hit = findNodeAt(e.getPoint());
-                            if (hit != null) {
-                                selectedKey = hit.key;
-                                markVisibleDirty();
-                                if (e.getClickCount() >= 2) {
-                                    hit.expanded = !hit.expanded;
-                                    markVisibleDirty();
-                                }
-                                scheduleRefresh(true);
-                                return;
-                            }
-                        }
-                        dragStart = e.getPoint();
-                    }
-
-                    @Override
-                    public void mouseDragged(MouseEvent e) {
-                        if (dragStart != null) {
-                            panX += (e.getX() - dragStart.x);
-                            panY += (e.getY() - dragStart.y);
-                            dragStart = e.getPoint();
-                            repaint();
-                        }
-                    }
-
-                    @Override
-                    public void mouseWheelMoved(MouseWheelEvent e) {
-                        double factor = e.getPreciseWheelRotation() < 0 ? 1.1 : 0.9;
-                        zoom = Math.max(0.25, Math.min(3.0, zoom * factor));
-                        repaint();
-                    }
-                };
-                addMouseListener(mouse);
-                addMouseMotionListener(mouse);
-                addMouseWheelListener(mouse);
-            }
-
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                AffineTransform old = g2.getTransform();
-                g2.translate(getWidth() / 2.0 + panX, panY);
-                g2.scale(zoom, zoom);
-
-                Set<String> visible = computeVisibleNodeKeys();
-                for (String key : visible) {
-                    List<GraphEdge> outs = outgoingEdges.get(key);
-                    if (outs == null) {
-                        continue;
-                    }
-                    for (GraphEdge e : outs) {
-                        if (visible.contains(e.to.key)) {
-                            drawEdge(g2, e);
-                        }
-                    }
-                }
-                for (String key : visible) {
-                    GraphNode n = nodes.get(key);
-                    if (n != null) {
-                        drawNode(g2, n);
-                    }
-                }
-                g2.setTransform(old);
-                g2.dispose();
-            }
-
-            private void drawEdge(Graphics2D g2, GraphEdge e) {
-                int x1 = e.from.x;
-                int y1 = e.from.y + 42;
-                int x2 = e.to.x;
-                int y2 = e.to.y - 42;
-                Color c = switch (e.status) {
-                    case CHOSEN -> new Color(22, 142, 78);
-                    case TRIED -> new Color(70, 120, 180);
-                    default -> new Color(160, 160, 160);
-                };
-                g2.setColor(c);
-                g2.setStroke(new BasicStroke(e.status == EdgeStatus.CHOSEN ? 2.4f : 1.4f));
-                g2.draw(new Line2D.Double(x1, y1, x2, y2));
-            }
-
-            private void drawNode(Graphics2D g2, GraphNode n) {
-                int w = 220;
-                int h = 84;
-                int x = n.x - w / 2;
-                int y = n.y - h / 2;
-                Color fill;
-                if (n.isSolution) {
-                    fill = new Color(255, 236, 179);
-                } else if (n.isGoal) {
-                    fill = new Color(206, 241, 210);
-                } else if (n.isStart) {
-                    fill = new Color(209, 228, 255);
-                } else {
-                    fill = switch (n.status == null ? ExternalLoggerLogType.Generating : n.status) {
-                        case Generating -> new Color(232, 240, 255);
-                        case Expanding -> new Color(225, 247, 232);
-                        case Closing -> new Color(243, 243, 243);
-                    };
-                }
-                RoundRectangle2D rr = new RoundRectangle2D.Double(x, y, w, h, 20, 20);
-                g2.setColor(fill);
-                g2.fill(rr);
-                boolean selected = n.key.equals(selectedKey);
-                g2.setColor(selected ? new Color(20, 20, 20) : new Color(70, 70, 70));
-                g2.setStroke(new BasicStroke(selected ? 2.2f : 1.2f));
-                g2.draw(rr);
-
-                g2.setColor(new Color(30, 30, 30));
-                String idShort = n.key.length() > 8 ? n.key.substring(0, 8) : n.key;
-                String marker = n.expanded ? "[-]" : "[+]";
-                String semantic = n.isSolution ? "solution" : (n.isGoal ? "goal" : (n.isStart ? "start" : ""));
-                String status = n.status == null ? "" : statusLabel(n.status);
-                String head = marker + " " + idShort + " " + (status.isBlank() ? semantic : status + (semantic.isBlank() ? "" : ", " + semantic));
-                g2.drawString(head, x + 10, y + 20);
-                String action = n.action.length() > 28 ? n.action.substring(0, 28) + "..." : n.action;
-                g2.drawString(action, x + 10, y + 40);
-                String gf = "g=" + n.gValue + (Float.isNaN(n.fValue) ? "" : ("  f=" + n.fValue));
-                g2.drawString(gf, x + 10, y + 60);
-            }
-
-            private GraphNode findNodeAt(Point pScreen) {
-                double wx = (pScreen.x - (getWidth() / 2.0 + panX)) / zoom;
-                double wy = (pScreen.y - panY) / zoom;
-                Set<String> visible = computeVisibleNodeKeys();
-                for (String key : visible) {
-                    GraphNode n = nodes.get(key);
-                    if (n == null) {
-                        continue;
-                    }
-                    int w = 220;
-                    int h = 84;
-                    int x = n.x - w / 2;
-                    int y = n.y - h / 2;
-                    if (wx >= x && wx <= x + w && wy >= y && wy <= y + h) {
-                        return n;
-                    }
-                }
-                return null;
-            }
-        }
-
-        private Set<String> computeVisibleNodeKeys() {
-            if (!visibleDirty) {
-                return visibleCache;
-            }
-            Set<String> visible = new java.util.LinkedHashSet<>();
-            if (nodes.isEmpty()) {
-                visibleCache = visible;
-                visibleDirty = false;
-                return visible;
-            }
-            String start = selectedKey != null && nodes.containsKey(selectedKey) ? selectedKey : rootKey;
-            if (start == null) {
-                start = nodes.keySet().iterator().next();
-            }
-            java.util.ArrayDeque<String> q = new java.util.ArrayDeque<>();
-            q.add(start);
-            while (!q.isEmpty() && visible.size() < activeNodeLimit) {
-                String k = q.poll();
-                if (!visible.add(k)) {
-                    continue;
-                }
-                GraphNode n = nodes.get(k);
-                if (n == null) {
-                    continue;
-                }
-                if (n.parent != null && visible.size() < activeNodeLimit) {
-                    q.add(n.parent.key);
-                }
-                if (n.expanded || n.parent == null) {
-                    List<GraphEdge> outs = outgoingEdges.get(k);
-                    if (outs == null) {
-                        continue;
-                    }
-                    for (GraphEdge e : outs) {
-                        if (visible.size() < activeNodeLimit) {
-                            q.add(e.to.key);
-                        }
-                    }
-                }
-            }
-            visibleCache = visible;
-            visibleDirty = false;
-            return visibleCache;
         }
     }
 
@@ -2279,6 +2949,9 @@ public class PlanningWorkbench {
 
     private static final class LispSyntaxTextPane extends JTextPane {
         private static final Set<String> KEYWORDS = new HashSet<>();
+        private static final List<AutocompleteItem> COMMON_COMPLETIONS = new ArrayList<>();
+        private static final List<AutocompleteItem> DOMAIN_COMPLETIONS = new ArrayList<>();
+        private static final List<AutocompleteItem> PROBLEM_COMPLETIONS = new ArrayList<>();
 
         static {
             String[] words = {
@@ -2289,12 +2962,57 @@ public class PlanningWorkbench {
             for (String w : words) {
                 KEYWORDS.add(w);
             }
+
+            addCompletion(COMMON_COMPLETIONS, "(define ...)", "(define |)");
+            addCompletion(COMMON_COMPLETIONS, "(and ...)", "(and |)");
+            addCompletion(COMMON_COMPLETIONS, "(or ...)", "(or |)");
+            addCompletion(COMMON_COMPLETIONS, "(not ...)", "(not |)");
+            addCompletion(COMMON_COMPLETIONS, "(when ...)", "(when |)");
+            addCompletion(COMMON_COMPLETIONS, "(forall ...)", "(forall (|) )");
+            addCompletion(COMMON_COMPLETIONS, "(exists ...)", "(exists (|) )");
+            addCompletion(COMMON_COMPLETIONS, ":requirements", ":requirements |");
+            addCompletion(COMMON_COMPLETIONS, ":types", ":types |");
+            addCompletion(COMMON_COMPLETIONS, ":predicates", ":predicates (|)");
+            addCompletion(COMMON_COMPLETIONS, ":functions", ":functions (|)");
+            addCompletion(COMMON_COMPLETIONS, ":action", "(:action ACTION_NAME\n :parameters (|)\n :precondition (and )\n :effect (and ))");
+            addCompletion(COMMON_COMPLETIONS, ":parameters", ":parameters (|)");
+            addCompletion(COMMON_COMPLETIONS, ":precondition", ":precondition (and |)");
+            addCompletion(COMMON_COMPLETIONS, ":effect", ":effect (and |)");
+            addCompletion(COMMON_COMPLETIONS, ":objects", ":objects |");
+            addCompletion(COMMON_COMPLETIONS, ":init", ":init (|)");
+            addCompletion(COMMON_COMPLETIONS, ":goal", ":goal (and |)");
+            addCompletion(COMMON_COMPLETIONS, ":metric", ":metric minimize (|)");
+            addCompletion(COMMON_COMPLETIONS, "(increase ...)", "(increase |)");
+            addCompletion(COMMON_COMPLETIONS, "(decrease ...)", "(decrease |)");
+            addCompletion(COMMON_COMPLETIONS, "(assign ...)", "(assign |)");
+            addCompletion(COMMON_COMPLETIONS, "(scale-up ...)", "(scale-up |)");
+            addCompletion(COMMON_COMPLETIONS, "(scale-down ...)", "(scale-down |)");
+
+            addCompletion(DOMAIN_COMPLETIONS, "domain skeleton",
+                    "(define (domain DOMAIN_NAME)\n  (:requirements :strips :typing)\n  (:predicates\n    (p)\n  )\n  |\n)\n");
+            addCompletion(DOMAIN_COMPLETIONS, "action skeleton",
+                    "(:action ACTION_NAME\n :parameters (|)\n :precondition (and )\n :effect (and ))");
+            addCompletion(DOMAIN_COMPLETIONS, "(domain ...)", "(domain |)");
+            addCompletion(DOMAIN_COMPLETIONS, ":requirements", ":requirements |");
+            addCompletion(DOMAIN_COMPLETIONS, ":predicates", ":predicates (|)");
+            addCompletion(DOMAIN_COMPLETIONS, ":functions", ":functions (|)");
+
+            addCompletion(PROBLEM_COMPLETIONS, "problem skeleton",
+                    "(define (problem PROBLEM_NAME)\n  (:domain DOMAIN_NAME)\n  (:objects |)\n  (:init )\n  (:goal (and ))\n)\n");
+            addCompletion(PROBLEM_COMPLETIONS, "(problem ...)", "(problem |)");
+            addCompletion(PROBLEM_COMPLETIONS, "(:domain ...)", "(:domain |)");
+            addCompletion(PROBLEM_COMPLETIONS, ":objects", ":objects |");
+            addCompletion(PROBLEM_COMPLETIONS, ":init", ":init (|)");
+            addCompletion(PROBLEM_COMPLETIONS, ":goal", ":goal (and |)");
+            addCompletion(PROBLEM_COMPLETIONS, ":metric", ":metric minimize (|)");
         }
 
         private final EditorKind kind;
         private final Consumer<SyntaxReport> reportConsumer;
         private final Timer repaintTimer;
         private final UndoManager undoManager = new UndoManager();
+        private final JPopupMenu autocompletePopup = new JPopupMenu();
+        private final JList<AutocompleteItem> autocompleteList = new JList<>();
 
         private final SimpleAttributeSet normalStyle = style(new Color(30, 30, 30), false, false, null);
         private final SimpleAttributeSet keywordStyle = style(new Color(10, 70, 180), true, false, null);
@@ -2305,12 +3023,15 @@ public class PlanningWorkbench {
         private final SimpleAttributeSet errorStyle = style(new Color(170, 0, 0), true, false, new Color(255, 220, 220));
 
         private boolean applyingStyles = false;
+        private boolean applyingCompletion = false;
+        private boolean autocompleteEnabled = false;
 
         LispSyntaxTextPane(EditorKind kind, String initialText, Consumer<SyntaxReport> reportConsumer) {
             this.kind = kind;
             this.reportConsumer = reportConsumer;
             setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
             setText(initialText);
+            initAutocompleteUi();
             installEditorActions();
             getDocument().addUndoableEditListener(e -> {
                 if (!applyingStyles) {
@@ -2339,6 +3060,9 @@ public class PlanningWorkbench {
 
                 private void schedule() {
                     if (!applyingStyles) {
+                        if (!applyingCompletion && autocompleteEnabled) {
+                            SwingUtilities.invokeLater(() -> autocompletePopup.setVisible(false));
+                        }
                         repaintTimer.restart();
                     }
                 }
@@ -2349,23 +3073,87 @@ public class PlanningWorkbench {
 
         private void installEditorActions() {
             InputMap inputMap = getInputMap();
+            InputMap ancestorInputMap = getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
             ActionMap actionMap = getActionMap();
 
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "lisp-auto-indent-enter");
+            ancestorInputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "lisp-auto-indent-enter");
             actionMap.put("lisp-auto-indent-enter", new AbstractAction() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
+                    if (acceptAutocompleteFromKeyboard()) {
+                        return;
+                    }
                     insertAutoIndentedNewline();
                 }
             });
 
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), "lisp-format-buffer");
+            ancestorInputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), "lisp-format-buffer");
             inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F,
                     Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx() | KeyEvent.SHIFT_DOWN_MASK), "lisp-format-buffer");
             actionMap.put("lisp-format-buffer", new AbstractAction() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
+                    if (acceptSelectedAutocomplete()) {
+                        return;
+                    }
                     formatDocument();
+                }
+            });
+
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,
+                    Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()), "lisp-autocomplete-show");
+            actionMap.put("lisp-autocomplete-show", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (!autocompleteEnabled) {
+                        return;
+                    }
+                    showAutocomplete(true);
+                }
+            });
+
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "lisp-autocomplete-next");
+            ancestorInputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "lisp-autocomplete-next");
+            actionMap.put("lisp-autocomplete-next", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (autocompletePopup.isVisible()) {
+                        moveAutocompleteSelection(1);
+                        return;
+                    }
+                    Action delegate = getActionMap().get(DefaultEditorKit.downAction);
+                    if (delegate != null) {
+                        delegate.actionPerformed(e);
+                    }
+                }
+            });
+
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "lisp-autocomplete-prev");
+            ancestorInputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "lisp-autocomplete-prev");
+            actionMap.put("lisp-autocomplete-prev", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (autocompletePopup.isVisible()) {
+                        moveAutocompleteSelection(-1);
+                        return;
+                    }
+                    Action delegate = getActionMap().get(DefaultEditorKit.upAction);
+                    if (delegate != null) {
+                        delegate.actionPerformed(e);
+                    }
+                }
+            });
+
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "lisp-autocomplete-hide");
+            ancestorInputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "lisp-autocomplete-hide");
+            actionMap.put("lisp-autocomplete-hide", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (autocompletePopup.isVisible()) {
+                        autocompletePopup.setVisible(false);
+                    }
                 }
             });
 
@@ -2396,6 +3184,239 @@ public class PlanningWorkbench {
                     }
                 }
             });
+        }
+
+        private void initAutocompleteUi() {
+            autocompleteList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            autocompleteList.setVisibleRowCount(8);
+            autocompleteList.setFont(getFont());
+            autocompleteList.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "accept-completion");
+            autocompleteList.getActionMap().put("accept-completion", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    acceptSelectedAutocomplete();
+                }
+            });
+            autocompleteList.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() == 2) {
+                        acceptSelectedAutocomplete();
+                    }
+                }
+            });
+
+            JScrollPane scrollPane = new JScrollPane(autocompleteList);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
+            scrollPane.setPreferredSize(new Dimension(340, 160));
+            autocompletePopup.setBorder(BorderFactory.createLineBorder(new Color(180, 190, 210)));
+            autocompletePopup.add(scrollPane);
+        }
+
+        private static void addCompletions(List<AutocompleteItem> target, String... values) {
+            for (String value : values) {
+                target.add(new AutocompleteItem(value, value));
+            }
+        }
+
+        private static void addCompletion(List<AutocompleteItem> target, String label, String insertion) {
+            target.add(new AutocompleteItem(label, insertion));
+        }
+
+        private void showAutocomplete(boolean forced) {
+            if (!autocompleteEnabled) {
+                autocompletePopup.setVisible(false);
+                return;
+            }
+            if (!isFocusOwner()) {
+                autocompletePopup.setVisible(false);
+                return;
+            }
+
+            String prefix = currentTokenPrefix();
+            if (!forced && prefix.isBlank()) {
+                autocompletePopup.setVisible(false);
+                return;
+            }
+
+            List<AutocompleteItem> suggestions = collectCompletions(prefix, forced);
+            if (suggestions.isEmpty()) {
+                autocompletePopup.setVisible(false);
+                return;
+            }
+
+            autocompleteList.setListData(suggestions.toArray(new AutocompleteItem[0]));
+            autocompleteList.setSelectedIndex(0);
+
+            try {
+                Rectangle r = modelToView(getCaretPosition());
+                int x = (r != null) ? r.x : 0;
+                int y = (r != null) ? (r.y + r.height + 2) : 0;
+                autocompletePopup.show(this, x, y);
+            } catch (BadLocationException ex) {
+                autocompletePopup.setVisible(false);
+            }
+        }
+
+        private List<AutocompleteItem> collectCompletions(String prefix, boolean forced) {
+            String p = prefix.toLowerCase();
+            List<AutocompleteItem> source = new ArrayList<>(COMMON_COMPLETIONS.size() + 16);
+            source.addAll(COMMON_COMPLETIONS);
+            if (kind == EditorKind.DOMAIN) {
+                source.addAll(DOMAIN_COMPLETIONS);
+            } else {
+                source.addAll(PROBLEM_COMPLETIONS);
+            }
+
+            List<AutocompleteItem> filtered = new ArrayList<>();
+            for (AutocompleteItem item : source) {
+                String key = item.label.toLowerCase();
+                String normalizedKey = normalizeCompletionKey(item.label);
+                String normalizedPrefix = normalizeCompletionKey(prefix);
+                if (p.isBlank()) {
+                    if (forced) {
+                        filtered.add(item);
+                    }
+                    continue;
+                }
+                if (key.startsWith(p) || key.contains(p)
+                        || normalizedKey.startsWith(normalizedPrefix)
+                        || normalizedKey.contains(normalizedPrefix)) {
+                    filtered.add(item);
+                }
+            }
+
+            filtered.sort(Comparator
+                    .comparing((AutocompleteItem i) -> !i.label.toLowerCase().startsWith(p))
+                    .thenComparingInt(i -> i.label.length())
+                    .thenComparing(i -> i.label));
+            if (filtered.size() > 30) {
+                return filtered.subList(0, 30);
+            }
+            return filtered;
+        }
+
+        private static String normalizeCompletionKey(String value) {
+            return value.toLowerCase()
+                    .replace("(", "")
+                    .replace(")", "")
+                    .replace(":", "")
+                    .replace("...", "")
+                    .trim();
+        }
+
+        private boolean acceptAutocompleteFromKeyboard() {
+            if (!autocompleteEnabled) {
+                return false;
+            }
+            if (autocompletePopup.isVisible()) {
+                return acceptSelectedAutocomplete();
+            }
+
+            String prefix = currentTokenPrefix();
+            if (prefix.isBlank()) {
+                return false;
+            }
+
+            List<AutocompleteItem> suggestions = collectCompletions(prefix, false);
+            if (suggestions.isEmpty()) {
+                return false;
+            }
+            return acceptAutocompleteItem(suggestions.get(0));
+        }
+
+        private boolean acceptSelectedAutocomplete() {
+            if (!autocompleteEnabled) {
+                return false;
+            }
+            if (!autocompletePopup.isVisible()) {
+                return false;
+            }
+
+            AutocompleteItem selected = autocompleteList.getSelectedValue();
+            if (selected == null) {
+                if (autocompleteList.getModel().getSize() > 0) {
+                    selected = autocompleteList.getModel().getElementAt(0);
+                } else {
+                    autocompletePopup.setVisible(false);
+                    return false;
+                }
+            }
+
+            return acceptAutocompleteItem(selected);
+        }
+
+        private boolean acceptAutocompleteItem(AutocompleteItem selected) {
+            int caret = getCaretPosition();
+            String text = getText();
+            int tokenStart = tokenStartOffset(text, caret);
+            int replacementStart = tokenStart;
+            if (replacementStart > 0
+                    && text.charAt(replacementStart - 1) == '('
+                    && selected.insertion.startsWith("(")) {
+                replacementStart--;
+            }
+            String insertion = selected.insertion;
+            int marker = insertion.indexOf('|');
+            if (marker >= 0) {
+                insertion = insertion.substring(0, marker) + insertion.substring(marker + 1);
+            }
+
+            applyingCompletion = true;
+            try {
+                getDocument().remove(replacementStart, caret - replacementStart);
+                getDocument().insertString(replacementStart, insertion, null);
+            } catch (BadLocationException ignored) {
+                autocompletePopup.setVisible(false);
+                return false;
+            } finally {
+                applyingCompletion = false;
+            }
+
+            int newCaret = replacementStart + ((marker >= 0) ? marker : insertion.length());
+            setCaretPosition(Math.max(0, Math.min(newCaret, getDocument().getLength())));
+            autocompletePopup.setVisible(false);
+            return true;
+        }
+
+        void setAutocompleteEnabled(boolean enabled) {
+            autocompleteEnabled = enabled;
+            if (!enabled) {
+                autocompletePopup.setVisible(false);
+            }
+        }
+
+        private void moveAutocompleteSelection(int delta) {
+            int size = autocompleteList.getModel().getSize();
+            if (size <= 0) {
+                return;
+            }
+            int current = Math.max(0, autocompleteList.getSelectedIndex());
+            int next = (current + delta + size) % size;
+            autocompleteList.setSelectedIndex(next);
+            autocompleteList.ensureIndexIsVisible(next);
+        }
+
+        private String currentTokenPrefix() {
+            int caret = getCaretPosition();
+            String text = getText();
+            int start = tokenStartOffset(text, caret);
+            if (start >= caret || start < 0 || caret > text.length()) {
+                return "";
+            }
+            return text.substring(start, caret).trim();
+        }
+
+        private static int tokenStartOffset(String text, int caret) {
+            int i = Math.max(0, Math.min(caret, text.length()));
+            while (i > 0 && isTokenChar(text.charAt(i - 1))) {
+                i--;
+            }
+            return i;
+        }
+
+        private static boolean isTokenChar(char c) {
+            return !Character.isWhitespace(c) && c != '(' && c != ')' && c != '"' && c != ';';
         }
 
         private void insertAutoIndentedNewline() {
@@ -2757,6 +3778,21 @@ public class PlanningWorkbench {
                 }
             }
             return "line " + line + ", col " + col;
+        }
+
+        private static final class AutocompleteItem {
+            private final String label;
+            private final String insertion;
+
+            private AutocompleteItem(String label, String insertion) {
+                this.label = label;
+                this.insertion = insertion;
+            }
+
+            @Override
+            public String toString() {
+                return label;
+            }
         }
     }
 }
