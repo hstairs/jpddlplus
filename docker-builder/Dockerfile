@@ -30,4 +30,7 @@ RUN jlink \
 
 RUN rm -rf /jpddlplus
 
+ENTRYPOINT ["/java-runtime/bin/java", "-jar", "/jpddlplus-dist/enhsp25.jar"]
+CMD ["-h"]
+
 LABEL Author="Enrico Scala enricos83@gmail.com"
