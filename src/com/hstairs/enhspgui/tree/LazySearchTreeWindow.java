@@ -19,7 +19,6 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Line2D;
-import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -49,9 +48,23 @@ public final class LazySearchTreeWindow {
     private static final int H_GAP = 120;
     private static final int V_GAP = 28;
     private static final int MARGIN = 24;
+    private static final int DEFAULT_CANVAS_W = 1200;
+    private static final int DEFAULT_CANVAS_H = 900;
+    private static final int MAX_EVENTS_PER_DRAIN = 3000;
     private static final double MIN_ZOOM = 0.2;
     private static final double MAX_ZOOM = 2.5;
     private static final double DEFAULT_ZOOM = 1.0;
+    private static final Color EDGE_COLOR = new Color(100, 130, 170);
+    private static final Color EDGE_FADED_COLOR = new Color(190, 200, 214);
+    private static final Color EDGE_PATH_COLOR = new Color(22, 163, 74);
+    private static final Color EDGE_PATH_GLOW_COLOR = new Color(16, 120, 54, 170);
+    private static final Color NODE_LABEL_COLOR = new Color(20, 20, 20);
+    private static final Color NODE_LABEL_FADED_COLOR = new Color(135, 144, 158);
+    private static final Color NODE_BORDER_SELECTED = new Color(20, 20, 20);
+    private static final Color NODE_BORDER_PATH = new Color(14, 110, 44);
+    private static final Color NODE_BORDER_CORE = new Color(30, 90, 45);
+    private static final Color NODE_BORDER_DEFAULT = new Color(95, 95, 95);
+    private static final Color NODE_BORDER_FADED = new Color(170, 178, 191);
 
     private final JFrame frame;
     private final GraphCanvas canvas;
@@ -67,9 +80,13 @@ public final class LazySearchTreeWindow {
     private boolean visibleDirty = true;
 
     private final Map<String, GraphNode> nodes = new LinkedHashMap<>();
+    private final Map<Integer, Integer> storedNodesByDepth = new HashMap<>();
+    private final Map<Integer, LinkedHashSet<String>> nodeKeysByDepth = new HashMap<>();
+    private final Map<String, Integer> compactedHiddenByParent = new HashMap<>();
 
     private Set<String> visibleCache = Set.of();
-    private int activeNodeLimit = 120;
+    // Temporarily disabled: keep as unlimited until width-limiting is stabilized.
+    private int activeNodeLimit = Integer.MAX_VALUE;
     private String rootKey = null;
     private String selectedKey = null;
     private String hoveredKey = null;
@@ -413,7 +430,8 @@ public final class LazySearchTreeWindow {
     }
 
     public void setActiveNodeLimit(int activeNodeLimit) {
-        this.activeNodeLimit = Math.max(10, activeNodeLimit);
+        // Feature temporarily disabled.
+        this.activeNodeLimit = Integer.MAX_VALUE;
         this.showAllNodes = false;
         markVisibleDirty();
         scheduleRefresh(true);
@@ -424,7 +442,20 @@ public final class LazySearchTreeWindow {
     }
 
     public int getActiveNodeLimit() {
-        return activeNodeLimit;
+        return Integer.MAX_VALUE;
+    }
+
+    private void trimStoredNodesToCurrentLimit() {
+        if (activeNodeLimit == Integer.MAX_VALUE) {
+            return;
+        }
+        for (Integer depth : new ArrayList<>(storedNodesByDepth.keySet())) {
+            while (storedNodesByDepth.getOrDefault(depth, 0) > activeNodeLimit) {
+                if (!evictOneGeneratedAtDepth(depth)) {
+                    break;
+                }
+            }
+        }
     }
 
     public void onLogEvent(SimpleSearchNode node, ExternalLoggerLogType type, boolean isGoal) {
@@ -478,10 +509,14 @@ public final class LazySearchTreeWindow {
 
     public void markSolutionNode(SimpleSearchNode node) {
         SwingUtilities.invokeLater(() -> {
-            GraphNode n = ensureNode(node);
+            GraphNode n = ensureNode(node, ExternalLoggerLogType.Closing);
+            if (n == null) {
+                return;
+            }
             n.isSolution = true;
             selectedKey = n.key;
-            applyPathHighlightFromNode(n, true);
+            // Keep automatic solution focus lightweight; do not force "show all".
+            applyPathHighlightFromNode(n, false);
         });
     }
 
@@ -586,7 +621,7 @@ public final class LazySearchTreeWindow {
 
     private void drainPendingLogEvents() {
         int processed = 0;
-        while (processed < 3000) {
+        while (processed < MAX_EVENTS_PER_DRAIN) {
             LogEvent ev;
             synchronized (pendingLogEvents) {
                 ev = pendingLogEvents.poll();
@@ -612,7 +647,10 @@ public final class LazySearchTreeWindow {
         if (ev.epoch != epoch) {
             return;
         }
-        GraphNode n = ensureNode(ev.node);
+        GraphNode n = ensureNode(ev.node, ev.type);
+        if (n == null) {
+            return;
+        }
         n.status = ev.type;
         n.isGoal = n.isGoal || ev.isGoal;
         n.gValue = ev.node.gValue;
@@ -636,7 +674,7 @@ public final class LazySearchTreeWindow {
         markVisibleDirty();
     }
 
-    private GraphNode ensureNode(SimpleSearchNode node) {
+    private GraphNode ensureNode(SimpleSearchNode node, ExternalLoggerLogType eventType) {
         String key = nodeKey(node);
         GraphNode existing = nodes.get(key);
         if (existing != null) {
@@ -646,7 +684,10 @@ public final class LazySearchTreeWindow {
         GraphNode parent = null;
         int depth = 0;
         if (node.father != null) {
-            parent = ensureNode(node.father);
+            parent = ensureNode(node.father, eventType);
+            if (parent == null) {
+                return null;
+            }
             depth = parent.depth + 1;
         } else if (rootKey == null) {
             rootKey = key;
@@ -661,11 +702,95 @@ public final class LazySearchTreeWindow {
             created.isStart = true;
             created.expanded = true;
         } else {
+            if (!admitNodeForWidthLimit(created, eventType)) {
+                compactedHiddenByParent.merge(parent.key, 1, Integer::sum);
+                return null;
+            }
             parent.children.add(created);
         }
 
         nodes.put(key, created);
+        registerNodeDepth(created);
         return created;
+    }
+
+    private boolean admitNodeForWidthLimit(GraphNode node, ExternalLoggerLogType eventType) {
+        if (node == null) {
+            return false;
+        }
+        int depth = node.depth;
+        int atDepth = storedNodesByDepth.getOrDefault(depth, 0);
+        if (atDepth < activeNodeLimit) {
+            return true;
+        }
+        // Under pressure: keep expanded/closed updates by replacing generated leaves first.
+        if (eventType == ExternalLoggerLogType.Generating) {
+            return false;
+        }
+        return evictOneGeneratedAtDepth(depth);
+    }
+
+    private boolean evictOneGeneratedAtDepth(int depth) {
+        LinkedHashSet<String> keys = nodeKeysByDepth.get(depth);
+        if (keys == null || keys.isEmpty()) {
+            return false;
+        }
+        for (String key : new ArrayList<>(keys)) {
+            GraphNode candidate = nodes.get(key);
+            if (!isEvictableGeneratedLeaf(candidate)) {
+                continue;
+            }
+            GraphNode parent = candidate.parent;
+            if (parent != null) {
+                parent.children.remove(candidate);
+                compactedHiddenByParent.merge(parent.key, 1, Integer::sum);
+            }
+            unregisterNodeDepth(candidate);
+            nodes.remove(candidate.key);
+            if (selectedKey != null && selectedKey.equals(candidate.key)) {
+                selectedKey = parent == null ? null : parent.key;
+            }
+            if (hoveredKey != null && hoveredKey.equals(candidate.key)) {
+                hoveredKey = null;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isEvictableGeneratedLeaf(GraphNode n) {
+        return n != null
+                && n.parent != null
+                && n.children.isEmpty()
+                && n.status == ExternalLoggerLogType.Generating
+                && !n.expanded
+                && !n.isGoal
+                && !n.isSolution
+                && !highlightedPathKeys.contains(n.key)
+                && !n.key.equals(selectedKey);
+    }
+
+    private void registerNodeDepth(GraphNode node) {
+        storedNodesByDepth.merge(node.depth, 1, Integer::sum);
+        nodeKeysByDepth.computeIfAbsent(node.depth, ignored -> new LinkedHashSet<>()).add(node.key);
+    }
+
+    private void unregisterNodeDepth(GraphNode node) {
+        Integer current = storedNodesByDepth.get(node.depth);
+        if (current != null) {
+            if (current <= 1) {
+                storedNodesByDepth.remove(node.depth);
+            } else {
+                storedNodesByDepth.put(node.depth, current - 1);
+            }
+        }
+        LinkedHashSet<String> keys = nodeKeysByDepth.get(node.depth);
+        if (keys != null) {
+            keys.remove(node.key);
+            if (keys.isEmpty()) {
+                nodeKeysByDepth.remove(node.depth);
+            }
+        }
     }
 
     private void markVisibleDirty() {
@@ -690,13 +815,23 @@ public final class LazySearchTreeWindow {
             return cacheVisibleNodes(visible);
         }
         if (showAllNodes) {
-            visible.addAll(nodes.keySet());
+            for (GraphNode n : nodes.values()) {
+                if (n == null) {
+                    continue;
+                }
+                if (!showGeneratedNodes && isGeneratedForCompaction(n)) {
+                    continue;
+                }
+                visible.add(n.key);
+            }
             return cacheVisibleNodes(visible);
         }
 
         GraphNode rootNode = resolveRootNode();
-        addAnchoredNodesToVisible(visible, rootNode);
-        bfsExpandVisibleNodes(visible, rootNode);
+        Set<String> goalPathKeys = computeGoalPathKeys();
+        LinkedHashSet<String> protectedKeys = collectProtectedKeys(rootNode, goalPathKeys);
+        LinkedHashSet<String> candidates = collectCandidateVisibleKeys(rootNode, protectedKeys);
+        visible.addAll(applyPerDepthWidthLimit(candidates, protectedKeys, goalPathKeys));
         return cacheVisibleNodes(visible);
     }
 
@@ -705,44 +840,114 @@ public final class LazySearchTreeWindow {
         return nodes.get(root);
     }
 
-    private void addAnchoredNodesToVisible(Set<String> visible, GraphNode rootNode) {
+    private LinkedHashSet<String> collectProtectedKeys(GraphNode rootNode, Set<String> goalPathKeys) {
+        LinkedHashSet<String> protectedKeys = new LinkedHashSet<>();
         if (rootNode != null) {
-            visible.add(rootNode.key);
+            protectedKeys.add(rootNode.key);
         }
         if (selectedKey != null && nodes.containsKey(selectedKey)) {
             GraphNode cur = nodes.get(selectedKey);
             while (cur != null) {
-                visible.add(cur.key);
+                protectedKeys.add(cur.key);
                 cur = cur.parent;
             }
         }
-        visible.addAll(highlightedPathKeys);
+        protectedKeys.addAll(highlightedPathKeys);
+        protectedKeys.addAll(goalPathKeys);
+        return protectedKeys;
     }
 
-    private void bfsExpandVisibleNodes(Set<String> visible, GraphNode rootNode) {
-        if (rootNode == null || visible.size() >= activeNodeLimit) {
-            return;
+    private LinkedHashSet<String> collectCandidateVisibleKeys(GraphNode rootNode, Set<String> protectedKeys) {
+        LinkedHashSet<String> candidates = new LinkedHashSet<>();
+        candidates.addAll(protectedKeys);
+        if (rootNode == null) {
+            return candidates;
         }
         ArrayDeque<GraphNode> q = new ArrayDeque<>();
         q.add(rootNode);
+        candidates.add(rootNode.key);
 
-        while (!q.isEmpty() && visible.size() < activeNodeLimit) {
+        while (!q.isEmpty()) {
             GraphNode node = q.poll();
-            if (!shouldExpandNode(node)) {
+            if (!shouldExpandNode(node) && !protectedKeys.contains(node.key)) {
                 continue;
             }
             for (GraphNode child : node.children) {
-                if (visible.size() >= activeNodeLimit) {
-                    break;
-                }
-                if (isHiddenGeneratedLeaf(child)) {
+                if (isHiddenGeneratedLeaf(child) && !protectedKeys.contains(child.key)) {
                     continue;
                 }
-                if (visible.add(child.key)) {
+                if (candidates.add(child.key)) {
                     q.add(child);
                 }
             }
         }
+        return candidates;
+    }
+
+    private Set<String> applyPerDepthWidthLimit(Set<String> candidates, Set<String> protectedKeys, Set<String> goalPathKeys) {
+        Map<Integer, List<GraphNode>> byDepth = new LinkedHashMap<>();
+        for (String key : candidates) {
+            GraphNode n = nodes.get(key);
+            if (n != null) {
+                byDepth.computeIfAbsent(n.depth, ignored -> new ArrayList<>()).add(n);
+            }
+        }
+
+        LinkedHashSet<String> kept = new LinkedHashSet<>();
+        for (List<GraphNode> layer : byDepth.values()) {
+            layer.sort((a, b) -> {
+                int pa = visibilityPriority(a, protectedKeys, goalPathKeys);
+                int pb = visibilityPriority(b, protectedKeys, goalPathKeys);
+                if (pa != pb) {
+                    return Integer.compare(pa, pb);
+                }
+                return Integer.compare(a.index, b.index);
+            });
+
+            int protectedCount = 0;
+            for (GraphNode n : layer) {
+                if (protectedKeys.contains(n.key)) {
+                    protectedCount++;
+                }
+            }
+            int layerCap = Math.max(activeNodeLimit, protectedCount);
+            int added = 0;
+            for (GraphNode n : layer) {
+                if (added >= layerCap) {
+                    break;
+                }
+                kept.add(n.key);
+                added++;
+            }
+        }
+        return kept;
+    }
+
+    private int visibilityPriority(GraphNode node, Set<String> protectedKeys, Set<String> goalPathKeys) {
+        if (protectedKeys.contains(node.key)) {
+            return 0;
+        }
+        if (isGeneratedForCompaction(node)) {
+            return 30;
+        }
+        if (isExpandedOutsideGoalPath(node, goalPathKeys)) {
+            return 20;
+        }
+        return 10;
+    }
+
+    private Set<String> computeGoalPathKeys() {
+        GraphNode target = pickGlobalPathTarget();
+        if (target == null) {
+            return Set.of();
+        }
+        LinkedHashSet<String> path = new LinkedHashSet<>();
+        GraphNode cur = target;
+        while (cur != null) {
+            path.add(cur.key);
+            cur = cur.parent;
+        }
+        return path;
     }
 
     private boolean shouldExpandNode(GraphNode node) {
@@ -755,6 +960,26 @@ public final class LazySearchTreeWindow {
                 && !node.expanded
                 && !highlightedPathKeys.contains(node.key)
                 && !node.key.equals(selectedKey);
+    }
+
+    private boolean isGeneratedForCompaction(GraphNode node) {
+        return node != null
+                && node.status == ExternalLoggerLogType.Generating
+                && !node.expanded
+                && !node.isGoal
+                && !node.isSolution;
+    }
+
+    private boolean isExpandedOutsideGoalPath(GraphNode node, Set<String> goalPathKeys) {
+        if (node == null || node.isStart || node.isGoal || node.isSolution) {
+            return false;
+        }
+        if (goalPathKeys.contains(node.key) || highlightedPathKeys.contains(node.key)) {
+            return false;
+        }
+        return node.status == ExternalLoggerLogType.Expanding
+                || node.status == ExternalLoggerLogType.Closing
+                || node.expanded;
     }
 
     private Set<String> cacheVisibleNodes(Set<String> visible) {
@@ -803,7 +1028,7 @@ public final class LazySearchTreeWindow {
 
     private void updateInfoNow() {
         Set<String> visible = computeVisibleNodeKeys();
-        int aggregatedGenerated = countAggregatedGenerated(visible);
+        int compactedChildren = countCompactedChildren(visible);
         String focusKey = hoveredKey != null && nodes.containsKey(hoveredKey) ? hoveredKey : selectedKey;
         StringBuilder sb = new StringBuilder();
         sb.append("Generated: ").append(generated)
@@ -811,8 +1036,8 @@ public final class LazySearchTreeWindow {
           .append("\nExpanded/Closed: ").append(closed)
           .append("\nNodes: ").append(nodes.size())
           .append("  Visible: ").append(visible.size())
-          .append("  Limit: ").append(showAllNodes ? "all" : activeNodeLimit)
-          .append("\nGenerated clustered: ").append(aggregatedGenerated);
+          .append("  Width limit/depth: ").append(showAllNodes ? "all" : activeNodeLimit)
+          .append("\nCompacted children: ").append(compactedChildren);
         if (jsonSourcePath != null) {
             sb.append("\nSource JSON: ").append(jsonSourcePath);
         }
@@ -837,6 +1062,9 @@ public final class LazySearchTreeWindow {
     private void resetNow() {
         epoch++;
         nodes.clear();
+        storedNodesByDepth.clear();
+        nodeKeysByDepth.clear();
+        compactedHiddenByParent.clear();
         synchronized (pendingLogEvents) {
             pendingLogEvents.clear();
         }
@@ -860,7 +1088,7 @@ public final class LazySearchTreeWindow {
         visibleDirty = true;
         visibleCache = Set.of();
 
-        canvas.setPreferredSize(new Dimension(1200, 900));
+        canvas.setPreferredSize(new Dimension(DEFAULT_CANVAS_W, DEFAULT_CANVAS_H));
         canvas.setZoom(DEFAULT_ZOOM);
         canvas.revalidate();
         canvas.repaint();
@@ -1079,47 +1307,48 @@ public final class LazySearchTreeWindow {
     }
 
     private RenderData buildRenderData(Set<String> visible) {
-        LinkedHashSet<String> renderNodes = new LinkedHashSet<>();
-        HashMap<String, Integer> aggregatedByParent = new HashMap<>();
+        LinkedHashSet<String> renderNodes = new LinkedHashSet<>(visible);
+        HashMap<String, Integer> compactedByParent = new HashMap<>(compactedHiddenByParent);
+        Set<String> goalPath = computeGoalPathKeys();
         for (String key : visible) {
-            GraphNode n = nodes.get(key);
-            if (n == null) {
+            GraphNode parent = nodes.get(key);
+            if (parent == null) {
                 continue;
             }
-            if (isAggregatableGenerated(n)) {
-                if (n.parent != null) {
-                    aggregatedByParent.merge(n.parent.key, 1, Integer::sum);
+            for (GraphNode child : parent.children) {
+                if (child == null || visible.contains(child.key)) {
+                    continue;
                 }
-                continue;
+                if (isCompactableHiddenNode(child, goalPath)) {
+                    compactedByParent.merge(parent.key, 1, Integer::sum);
+                }
             }
-            renderNodes.add(key);
         }
-        return new RenderData(renderNodes, aggregatedByParent);
+        return new RenderData(renderNodes, compactedByParent);
     }
 
-    private int countAggregatedGenerated(Set<String> visible) {
+    private int countCompactedChildren(Set<String> visible) {
+        RenderData data = buildRenderData(visible);
         int count = 0;
-        for (String key : visible) {
-            GraphNode n = nodes.get(key);
-            if (n != null && isAggregatableGenerated(n)) {
-                count++;
+        for (Integer v : data.aggregatedGeneratedByParent.values()) {
+            if (v != null) {
+                count += v;
             }
         }
         return count;
     }
 
-    private boolean isAggregatableGenerated(GraphNode n) {
-        if (showGeneratedNodes) {
+    private boolean isCompactableHiddenNode(GraphNode node, Set<String> goalPath) {
+        if (node == null || node.parent == null) {
             return false;
         }
-        return n != null
-                && n.parent != null
-                && n.status == ExternalLoggerLogType.Generating
-                && !n.expanded
-                && !n.isGoal
-                && !n.isSolution
-                && !highlightedPathKeys.contains(n.key)
-                && !n.key.equals(selectedKey);
+        if (highlightedPathKeys.contains(node.key) || node.key.equals(selectedKey) || node.isGoal || node.isSolution) {
+            return false;
+        }
+        if (isGeneratedForCompaction(node)) {
+            return true;
+        }
+        return isExpandedOutsideGoalPath(node, goalPath);
     }
 
     private static final class RenderData {
@@ -1179,11 +1408,11 @@ public final class LazySearchTreeWindow {
 
     private final class GraphCanvas extends JPanel {
         private double zoom = DEFAULT_ZOOM;
-        private int logicalWidth = 1200;
-        private int logicalHeight = 900;
+        private int logicalWidth = DEFAULT_CANVAS_W;
+        private int logicalHeight = DEFAULT_CANVAS_H;
 
         GraphCanvas() {
-            setPreferredSize(new Dimension(1200, 900));
+            setPreferredSize(new Dimension(DEFAULT_CANVAS_W, DEFAULT_CANVAS_H));
             setBackground(new Color(250, 252, 255));
 
             MouseAdapter mouse = new MouseAdapter() {
@@ -1310,8 +1539,8 @@ public final class LazySearchTreeWindow {
                     }
                 }
             }
-            int wantedW = Math.max(1200, maxX + MARGIN);
-            int wantedH = Math.max(900, maxY + MARGIN);
+            int wantedW = Math.max(DEFAULT_CANVAS_W, maxX + MARGIN);
+            int wantedH = Math.max(DEFAULT_CANVAS_H, maxY + MARGIN);
             logicalWidth = wantedW;
             logicalHeight = wantedH;
             int scaledW = Math.max(1, (int) Math.ceil(logicalWidth * zoom));
@@ -1379,15 +1608,15 @@ public final class LazySearchTreeWindow {
 
             boolean onPath = highlightedPathEdgeKeys.contains(edgeKey(from, to));
             boolean pathMode = !highlightedPathKeys.isEmpty();
-            g2.setColor(onPath ? new Color(22, 163, 74) : (pathMode ? new Color(190, 200, 214) : new Color(100, 130, 170)));
+            g2.setColor(onPath ? EDGE_PATH_COLOR : (pathMode ? EDGE_FADED_COLOR : EDGE_COLOR));
             g2.setStroke(new BasicStroke(onPath ? 4.2f : 1.1f));
             g2.draw(new Line2D.Double(x1, y1, x2, y2));
 
             if (onPath) {
-                g2.setColor(new Color(16, 120, 54, 170));
+                g2.setColor(EDGE_PATH_GLOW_COLOR);
                 g2.setStroke(new BasicStroke(7.0f));
                 g2.draw(new Line2D.Double(x1, y1, x2, y2));
-                g2.setColor(new Color(22, 163, 74));
+                g2.setColor(EDGE_PATH_COLOR);
                 g2.setStroke(new BasicStroke(3.4f));
                 g2.draw(new Line2D.Double(x1, y1, x2, y2));
             }
@@ -1457,10 +1686,10 @@ public final class LazySearchTreeWindow {
             boolean hovered = n.key.equals(hoveredKey);
             boolean isCoreSearchNode = n.status == ExternalLoggerLogType.Expanding || n.status == ExternalLoggerLogType.Closing || n.isStart || n.isGoal || n.isSolution;
             g2.setColor(selected
-                    ? new Color(20, 20, 20)
+                    ? NODE_BORDER_SELECTED
                     : (onPath
-                    ? new Color(14, 110, 44)
-                    : (pathMode ? new Color(170, 178, 191) : (isCoreSearchNode ? new Color(30, 90, 45) : new Color(95, 95, 95)))));
+                    ? NODE_BORDER_PATH
+                    : (pathMode ? NODE_BORDER_FADED : (isCoreSearchNode ? NODE_BORDER_CORE : NODE_BORDER_DEFAULT))));
             g2.setStroke(new BasicStroke(selected ? 2.4f : (hovered ? 2.0f : (onPath ? 2.8f : (isCoreSearchNode ? 1.6f : 0.9f)))));
             g2.draw(shape);
 
@@ -1478,7 +1707,7 @@ public final class LazySearchTreeWindow {
             FontMetrics fm = g2.getFontMetrics();
             int lx = n.x + (NODE_D - fm.stringWidth(label)) / 2;
             int ly = n.y + ((NODE_D - fm.getHeight()) / 2) + fm.getAscent();
-            g2.setColor(pathMode && !onPath ? new Color(135, 144, 158) : new Color(20, 20, 20));
+            g2.setColor(pathMode && !onPath ? NODE_LABEL_FADED_COLOR : NODE_LABEL_COLOR);
             g2.drawString(label, lx, ly);
             g2.setFont(oldFont);
 

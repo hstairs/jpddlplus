@@ -21,7 +21,8 @@ public final class ApproxPddlTranslator {
         String[] lines = text.split("\\R", -1);
         StringBuilder out = new StringBuilder(text.length() + 128);
         Section section = Section.NONE;
-        for (String line : lines) {
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
             String trimmed = line.trim().toLowerCase();
             if (startsSection(trimmed, "precondition")) {
                 section = Section.PRECONDITION;
@@ -34,9 +35,105 @@ public final class ApproxPddlTranslator {
             } else if (startsSection(trimmed, "action")) {
                 section = Section.NONE;
             }
-            out.append(rewriteLine(line, section)).append('\n');
+
+            String rewrittenLine = rewriteLine(line, section);
+            if (looksLikeMultilineComparisonStart(line, section)) {
+                int balance = parenBalanceDelta(line);
+                int j = i;
+                StringBuilder block = new StringBuilder(line);
+                while (balance > 0 && j + 1 < lines.length) {
+                    j++;
+                    String next = lines[j];
+                    block.append('\n').append(next);
+                    balance += parenBalanceDelta(next);
+                }
+                String rewrittenBlock = rewriteMultilineClause(block.toString(), section);
+                if (!rewrittenBlock.equals(block.toString())) {
+                    rewrittenLine = rewrittenBlock;
+                    i = j;
+                }
+            }
+
+            out.append(rewrittenLine);
+            if (i < lines.length - 1) {
+                out.append('\n');
+            }
         }
         return out.toString();
+    }
+
+    private static int parenBalanceDelta(String line) {
+        int depth = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+        }
+        return depth;
+    }
+
+    private static boolean looksLikeMultilineComparisonStart(String line, Section section) {
+        if (section == Section.NONE) {
+            return false;
+        }
+        String noComment = stripComment(line).trim();
+        if (noComment.isEmpty()) {
+            return false;
+        }
+        if (!noComment.startsWith("(")) {
+            return false;
+        }
+        if (findTopLevelComparison(noComment) != null) {
+            return false;
+        }
+        if (parenBalanceDelta(noComment) <= 0) {
+            return false;
+        }
+        String inner = noComment.substring(1).trim().toLowerCase();
+        if (inner.isEmpty()) {
+            return false;
+        }
+        if (inner.startsWith(":")) {
+            return false;
+        }
+        if (isAlreadyPddlClause(inner)) {
+            return false;
+        }
+        // Start capturing likely multiline infix comparisons such as:
+        // (x()
+        //  + step()
+        //  >= limit())
+        return true;
+    }
+
+    private static String stripComment(String line) {
+        int commentIdx = line.indexOf(';');
+        return commentIdx >= 0 ? line.substring(0, commentIdx) : line;
+    }
+
+    private static String rewriteMultilineClause(String multi, Section section) {
+        String trimmed = multi.trim();
+        if (!trimmed.startsWith("(") || !trimmed.endsWith(")")) {
+            return multi;
+        }
+        String inner = trimmed.substring(1, trimmed.length() - 1).trim();
+        ComparisonSplit cmp = findTopLevelComparison(inner);
+        if (cmp == null) {
+            return multi;
+        }
+        String converted = convertClause(inner, section);
+        if (converted == null) {
+            return multi;
+        }
+        return preserveLeadingWhitespace(multi, converted);
+    }
+
+    private static String preserveLeadingWhitespace(String original, String rewritten) {
+        int i = 0;
+        while (i < original.length() && Character.isWhitespace(original.charAt(i)) && original.charAt(i) != '\n') {
+            i++;
+        }
+        return original.substring(0, i) + rewritten;
     }
 
     private static boolean startsSection(String trimmedLowerLine, String sectionName) {
@@ -149,6 +246,22 @@ public final class ApproxPddlTranslator {
         ComparisonSplit cmp = findTopLevelComparison(inner);
         if (cmp == null) {
             return null;
+        }
+        if ("+=".equals(cmp.op)) {
+            String lhs = toPddlExpression(cmp.left);
+            String rhs = toPddlExpression(cmp.right);
+            if (lhs == null || rhs == null) {
+                return null;
+            }
+            return "(increase " + ensureFunctionLike(lhs) + " " + rhs + ")";
+        }
+        if ("-=".equals(cmp.op)) {
+            String lhs = toPddlExpression(cmp.left);
+            String rhs = toPddlExpression(cmp.right);
+            if (lhs == null || rhs == null) {
+                return null;
+            }
+            return "(decrease " + ensureFunctionLike(lhs) + " " + rhs + ")";
         }
         String lhs = toPddlExpression(cmp.left);
         String rhs = toPddlExpression(cmp.right);
@@ -272,7 +385,7 @@ public final class ApproxPddlTranslator {
             if (depth != 0) continue;
             if (i + 1 < s.length()) {
                 String two = s.substring(i, i + 2);
-                if ("<=".equals(two) || ">=".equals(two)) {
+                if ("<=".equals(two) || ">=".equals(two) || "+=".equals(two) || "-=".equals(two)) {
                     return new ComparisonSplit(s.substring(0, i), two, s.substring(i + 2));
                 }
             }

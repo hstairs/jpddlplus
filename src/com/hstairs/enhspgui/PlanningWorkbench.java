@@ -6,6 +6,7 @@ import com.hstairs.ppmajal.PDDLProblem.PDDLSolution;
 import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import enhsp2.ENHSP;
+import enhsp2.Planner;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import javax.swing.*;
@@ -66,6 +67,9 @@ public class PlanningWorkbench {
 
     private static final class PlanningFrame extends JFrame {
         private static final Object STDOUT_REDIRECT_LOCK = new Object();
+        private static final String VSCODE_INTEGRATION_TITLE = "VS Code Integration";
+        private static final String VSCODE_ENABLE_MESSAGE =
+                "Enable 'Edit > VS Code External Editing (Experimental)' first.";
         private final LispSyntaxTextPane domainArea;
         private final LispSyntaxTextPane problemArea;
         private final DefaultListModel<String> planListModel;
@@ -76,9 +80,16 @@ public class PlanningWorkbench {
         private final JButton runButton;
         private final JButton pauseButton;
         private final JButton stopButton;
+        private JMenuItem editDomainInVsCodeMenuItem;
+        private JMenuItem editProblemInVsCodeMenuItem;
+        private JMenuItem reloadFromVsCodeMenuItem;
+        private JMenuItem setTreeWidthLimitMenuItem;
+        private JCheckBoxMenuItem autocompleteToggleMenuItem;
+        private JCheckBoxMenuItem vsCodeToggleMenuItem;
+        private JCheckBoxMenuItem vsCodeAutoReloadToggleMenuItem;
         private boolean autocompleteEnabled = false;
-        private boolean vsCodeIntegrationEnabled = true;
-        private boolean vsCodeAutoReloadEnabled = true;
+        private boolean vsCodeIntegrationEnabled = false;
+        private boolean vsCodeAutoReloadEnabled = false;
         private final Timer vsCodeReloadTimer;
         private final Timer vsCodePushTimer;
         private Path vsCodeIntegrationDir;
@@ -231,16 +242,6 @@ public class PlanningWorkbench {
             JMenuItem saveProblemAs = new JMenuItem("Save Problem As...");
             saveProblemAs.addActionListener(e -> saveProblemFileAs());
             fileMenu.add(saveProblemAs);
-            fileMenu.addSeparator();
-            JMenuItem editDomainInVsCode = new JMenuItem("Edit Domain in VS Code");
-            editDomainInVsCode.addActionListener(e -> openDomainInVsCode());
-            fileMenu.add(editDomainInVsCode);
-            JMenuItem editProblemInVsCode = new JMenuItem("Edit Problem in VS Code");
-            editProblemInVsCode.addActionListener(e -> openProblemInVsCode());
-            fileMenu.add(editProblemInVsCode);
-            JMenuItem reloadFromVsCode = new JMenuItem("Reload From VS Code Files");
-            reloadFromVsCode.addActionListener(e -> reloadFromVsCodeFiles());
-            fileMenu.add(reloadFromVsCode);
             bar.add(fileMenu);
 
             JMenu editMenu = new JMenu("Edit");
@@ -251,15 +252,44 @@ public class PlanningWorkbench {
             formatProblem.addActionListener(e -> formatProblemEditor());
             editMenu.add(formatProblem);
             editMenu.addSeparator();
-            JCheckBoxMenuItem autocompleteToggle = new JCheckBoxMenuItem("Auto-completion", autocompleteEnabled);
-            autocompleteToggle.addActionListener(e -> setAutocompleteEnabled(autocompleteToggle.isSelected()));
-            editMenu.add(autocompleteToggle);
-            JCheckBoxMenuItem vsCodeToggle = new JCheckBoxMenuItem("VS Code External Editing", vsCodeIntegrationEnabled);
-            vsCodeToggle.addActionListener(e -> setVsCodeIntegrationEnabled(vsCodeToggle.isSelected()));
-            editMenu.add(vsCodeToggle);
-            JCheckBoxMenuItem vsCodeAutoReloadToggle = new JCheckBoxMenuItem("VS Code Auto-reload", vsCodeAutoReloadEnabled);
-            vsCodeAutoReloadToggle.addActionListener(e -> vsCodeAutoReloadEnabled = vsCodeAutoReloadToggle.isSelected());
-            editMenu.add(vsCodeAutoReloadToggle);
+            editDomainInVsCodeMenuItem = new JMenuItem("Edit Domain in VS Code (Experimental)");
+            editDomainInVsCodeMenuItem.addActionListener(e -> openDomainInVsCode());
+            editMenu.add(editDomainInVsCodeMenuItem);
+            editProblemInVsCodeMenuItem = new JMenuItem("Edit Problem in VS Code (Experimental)");
+            editProblemInVsCodeMenuItem.addActionListener(e -> openProblemInVsCode());
+            editMenu.add(editProblemInVsCodeMenuItem);
+            reloadFromVsCodeMenuItem = new JMenuItem("Reload From VS Code Files (Experimental)");
+            reloadFromVsCodeMenuItem.addActionListener(e -> reloadFromVsCodeFiles());
+            editMenu.add(reloadFromVsCodeMenuItem);
+            editMenu.addSeparator();
+            autocompleteToggleMenuItem = new JCheckBoxMenuItem("Auto-completion (Experimental)", autocompleteEnabled);
+            autocompleteToggleMenuItem.addActionListener(e -> {
+                boolean enabled = autocompleteToggleMenuItem.isSelected();
+                if (enabled && vsCodeIntegrationEnabled) {
+                    setVsCodeIntegrationEnabled(false);
+                    if (vsCodeToggleMenuItem != null) {
+                        vsCodeToggleMenuItem.setSelected(false);
+                    }
+                }
+                setAutocompleteEnabled(enabled);
+            });
+            editMenu.add(autocompleteToggleMenuItem);
+            vsCodeToggleMenuItem = new JCheckBoxMenuItem("VS Code External Editing (Experimental)", vsCodeIntegrationEnabled);
+            vsCodeToggleMenuItem.addActionListener(e -> {
+                boolean enabled = vsCodeToggleMenuItem.isSelected();
+                if (enabled && autocompleteEnabled) {
+                    setAutocompleteEnabled(false);
+                    if (autocompleteToggleMenuItem != null) {
+                        autocompleteToggleMenuItem.setSelected(false);
+                    }
+                }
+                setVsCodeIntegrationEnabled(enabled);
+            });
+            editMenu.add(vsCodeToggleMenuItem);
+            vsCodeAutoReloadToggleMenuItem = new JCheckBoxMenuItem("VS Code Auto-reload (Experimental)", vsCodeAutoReloadEnabled);
+            vsCodeAutoReloadToggleMenuItem.addActionListener(e -> vsCodeAutoReloadEnabled = vsCodeAutoReloadToggleMenuItem.isSelected());
+            editMenu.add(vsCodeAutoReloadToggleMenuItem);
+            updateVsCodeMenuState();
             bar.add(editMenu);
 
             JMenu examplesMenu = new JMenu("Examples");
@@ -360,21 +390,17 @@ public class PlanningWorkbench {
                 }
             });
             configMenu.add(treeLiveView);
-            JMenuItem setActiveNodes = new JMenuItem("Set Active Nodes Limit...");
-            setActiveNodes.addActionListener(e -> {
-                LazySearchTreeWindow w = ensureSearchTreeWindow();
-                String input = JOptionPane.showInputDialog(this, "Active nodes limit:", String.valueOf(w.getActiveNodeLimit()));
-                if (input == null) {
-                    return;
-                }
-                try {
-                    int v = Integer.parseInt(input.trim());
-                    w.setActiveNodeLimit(v);
-                } catch (NumberFormatException ex) {
-                    JOptionPane.showMessageDialog(this, "Please insert a valid integer.", "Invalid number", JOptionPane.ERROR_MESSAGE);
-                }
+            setTreeWidthLimitMenuItem = new JMenuItem("Set Tree Width Limit... (Disabled)");
+            setTreeWidthLimitMenuItem.setEnabled(false);
+            setTreeWidthLimitMenuItem.addActionListener(e -> {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Tree width limit is temporarily disabled.",
+                        "Search Tree",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
             });
-            configMenu.add(setActiveNodes);
+            configMenu.add(setTreeWidthLimitMenuItem);
             JMenuItem openSjrInBrowser = new JMenuItem("Open Last -sjr Tree in ENHSPTree");
             openSjrInBrowser.addActionListener(e -> openLastSjrTreeInBrowser());
             configMenu.add(openSjrInBrowser);
@@ -394,59 +420,63 @@ public class PlanningWorkbench {
             area.setEditable(false);
             area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
             area.setText(
-                    "Guida Rapida: Modellare in PDDL\n" +
-                    "===============================\n\n" +
-                    "1) Struttura del DOMAIN\n" +
-                    "-----------------------\n" +
-                    "- (define (domain NOME))\n" +
+                    "Quick Guide: Modeling in PDDL\n" +
+                    "=============================\n\n" +
+                    "1) DOMAIN structure\n" +
+                    "-------------------\n" +
+                    "- (define (domain DOMAIN_NAME))\n" +
                     "- (:requirements ...)\n" +
                     "- (:predicates ...)\n" +
-                    "- (:functions ...)   ; se usi variabili numeriche\n" +
+                    "- (:functions ...)   ; if you use numeric fluents\n" +
                     "- (:action ...)\n" +
                     "  :parameters (...)\n" +
                     "  :precondition (and ...)\n" +
                     "  :effect (and ...)\n\n" +
-                    "2) Struttura del PROBLEM\n" +
-                    "------------------------\n" +
-                    "- (define (problem NOME-PROBLEM))\n" +
-                    "- (:domain NOME-DOMAIN)\n" +
+                    "2) PROBLEM structure\n" +
+                    "--------------------\n" +
+                    "- (define (problem PROBLEM_NAME))\n" +
+                    "- (:domain DOMAIN_NAME)\n" +
                     "- (:objects ...)\n" +
                     "- (:init ...)\n" +
                     "- (:goal (and ...))\n" +
-                    "- (:metric minimize|maximize (...))   ; opzionale\n\n" +
-                    "3) Buone pratiche di modellazione\n" +
-                    "---------------------------------\n" +
-                    "- Tieni separati fatti booleani (:predicates) e quantità numeriche (:functions).\n" +
-                    "- Metti in :init tutti i fatti iniziali e i valori numerici con (= (f ...) val).\n" +
-                    "- Scrivi precondizioni il più possibile locali all'azione.\n" +
-                    "- In :goal usa condizioni verificabili sullo stato finale.\n\n" +
-                    "Sintassi Friendly (~PDDL) di questa GUI\n" +
-                    "=======================================\n" +
-                    "Questa GUI supporta una forma più naturale per le espressioni numeriche.\n" +
-                    "Puoi scrivere input ibrido PDDL / ~PDDL: la parte standard PDDL resta invariata,\n" +
-                    "la parte friendly viene tradotta automaticamente in PDDL puro.\n\n" +
-                    "Regole principali\n" +
-                    "-----------------\n" +
-                    "1) Espressioni infisse\n" +
+                    "- (:metric minimize|maximize (...))   ; optional\n\n" +
+                    "3) Modeling best practices\n" +
+                    "--------------------------\n" +
+                    "- What goes in DOMAIN: reusable world dynamics (actions/processes/events),\n" +
+                    "  predicates/functions, and constraints shared across instances.\n" +
+                    "- What goes in PROBLEM: concrete objects, initial state, goals, and metric\n" +
+                    "  for the specific instance you want to solve.\n" +
+                    "- Keep boolean facts (:predicates) separate from numeric quantities (:functions).\n" +
+                    "- Put all initial facts and numeric assignments in :init using (= (f ...) val).\n" +
+                    "- Keep preconditions as local as possible to each action.\n" +
+                    "- In :goal, use conditions that are checkable in the final state.\n\n" +
+                    "Friendly syntax (~PDDL) in this GUI\n" +
+                    "===================================\n" +
+                    "This GUI supports a more natural notation for numeric expressions.\n" +
+                    "You can write hybrid PDDL / ~PDDL input: standard PDDL remains unchanged,\n" +
+                    "while friendly fragments are automatically translated into pure PDDL.\n\n" +
+                    "Main rules\n" +
+                    "----------\n" +
+                    "1) Infix expressions\n" +
                     "   (x + y * 2), (a - b), (n / d)\n" +
-                    "   -> convertite in forma prefissa PDDL.\n\n" +
-                    "2) Chiamate funzione naturali\n" +
+                    "   -> translated to prefix PDDL form.\n\n" +
+                    "2) Natural function calls\n" +
                     "   fuel()     -> (fuel)\n" +
                     "   weight(a)  -> (weight a)\n" +
                     "   dist(x,y)  -> (dist x y)\n\n" +
-                    "3) Confronti infissi\n" +
+                    "3) Infix comparisons\n" +
                     "   (weight(a) <= grip-limit()) -> (<= (weight a) (grip-limit))\n" +
                     "   (fuel() > 0)                -> (> (fuel) 0)\n\n" +
-                    "4) Assegnamenti in :effect\n" +
+                    "4) Assignments in :effect\n" +
                     "   (fuel() = fuel() + 2) -> (increase (fuel) 2)\n" +
                     "   (fuel() = fuel() - 1) -> (decrease (fuel) 1)\n" +
                     "   (x() = y())           -> (assign (x) (y))\n\n" +
-                    "5) Assegnamenti booleani\n" +
+                    "5) Boolean assignments\n" +
                     "   (ready() = T) -> (ready)\n" +
                     "   (ready() = F) -> (not (ready))\n\n" +
-                    "Nota\n" +
+                    "Note\n" +
                     "----\n" +
-                    "Per casi complessi/annidati conviene usare direttamente la forma PDDL standard.\n"
+                    "For complex or deeply nested cases, prefer standard PDDL directly.\n"
             );
             JScrollPane sp = new JScrollPane(area);
             sp.setPreferredSize(new Dimension(820, 560));
@@ -804,17 +834,39 @@ public class PlanningWorkbench {
         }
 
         private void setAutocompleteEnabled(boolean enabled) {
+            if (enabled && vsCodeIntegrationEnabled) {
+                setVsCodeIntegrationEnabled(false);
+                if (vsCodeToggleMenuItem != null) {
+                    vsCodeToggleMenuItem.setSelected(false);
+                }
+            }
             autocompleteEnabled = enabled;
             domainArea.setAutocompleteEnabled(enabled);
             problemArea.setAutocompleteEnabled(enabled);
+            if (autocompleteToggleMenuItem != null && autocompleteToggleMenuItem.isSelected() != enabled) {
+                autocompleteToggleMenuItem.setSelected(enabled);
+            }
         }
 
         private void setVsCodeIntegrationEnabled(boolean enabled) {
+            if (enabled && autocompleteEnabled) {
+                autocompleteEnabled = false;
+                domainArea.setAutocompleteEnabled(false);
+                problemArea.setAutocompleteEnabled(false);
+                if (autocompleteToggleMenuItem != null) {
+                    autocompleteToggleMenuItem.setSelected(false);
+                }
+            }
             vsCodeIntegrationEnabled = enabled;
             if (!enabled) {
+                vsCodeAutoReloadEnabled = false;
+                if (vsCodeAutoReloadToggleMenuItem != null) {
+                    vsCodeAutoReloadToggleMenuItem.setSelected(false);
+                }
                 if (vsCodePushTimer.isRunning()) {
                     vsCodePushTimer.stop();
                 }
+                updateVsCodeMenuState();
                 return;
             }
             try {
@@ -822,10 +874,34 @@ public class PlanningWorkbench {
                 syncEditorsToVsCodeFiles();
             } catch (IOException e) {
                 vsCodeIntegrationEnabled = false;
+                vsCodeAutoReloadEnabled = false;
+                if (vsCodeAutoReloadToggleMenuItem != null) {
+                    vsCodeAutoReloadToggleMenuItem.setSelected(false);
+                }
                 JOptionPane.showMessageDialog(this,
                         "Cannot enable VS Code integration:\n" + e.getMessage(),
                         "VS Code Integration Error",
                         JOptionPane.ERROR_MESSAGE);
+            }
+            if (vsCodeToggleMenuItem != null && vsCodeToggleMenuItem.isSelected() != vsCodeIntegrationEnabled) {
+                vsCodeToggleMenuItem.setSelected(vsCodeIntegrationEnabled);
+            }
+            updateVsCodeMenuState();
+        }
+
+        private void updateVsCodeMenuState() {
+            boolean enabled = vsCodeIntegrationEnabled;
+            if (editDomainInVsCodeMenuItem != null) {
+                editDomainInVsCodeMenuItem.setEnabled(enabled);
+            }
+            if (editProblemInVsCodeMenuItem != null) {
+                editProblemInVsCodeMenuItem.setEnabled(enabled);
+            }
+            if (reloadFromVsCodeMenuItem != null) {
+                reloadFromVsCodeMenuItem.setEnabled(enabled);
+            }
+            if (vsCodeAutoReloadToggleMenuItem != null) {
+                vsCodeAutoReloadToggleMenuItem.setEnabled(enabled);
             }
         }
 
@@ -934,10 +1010,7 @@ public class PlanningWorkbench {
 
         private void reloadFromVsCodeFiles() {
             if (!vsCodeIntegrationEnabled) {
-                JOptionPane.showMessageDialog(this,
-                        "Enable 'Edit > VS Code External Editing' first.",
-                        "VS Code Integration",
-                        JOptionPane.INFORMATION_MESSAGE);
+                showVsCodeIntegrationDisabledMessage();
                 return;
             }
             try {
@@ -964,10 +1037,7 @@ public class PlanningWorkbench {
 
         private void openInVsCode(boolean domain) {
             if (!vsCodeIntegrationEnabled) {
-                JOptionPane.showMessageDialog(this,
-                        "Enable 'Edit > VS Code External Editing' first.",
-                        "VS Code Integration",
-                        JOptionPane.INFORMATION_MESSAGE);
+                showVsCodeIntegrationDisabledMessage();
                 return;
             }
             try {
@@ -986,6 +1056,15 @@ public class PlanningWorkbench {
                         "VS Code Launch Error",
                         JOptionPane.ERROR_MESSAGE);
             }
+        }
+
+        private void showVsCodeIntegrationDisabledMessage() {
+            JOptionPane.showMessageDialog(
+                    this,
+                    VSCODE_ENABLE_MESSAGE,
+                    VSCODE_INTEGRATION_TITLE,
+                    JOptionPane.INFORMATION_MESSAGE
+            );
         }
 
         private boolean launchVsCode(Path target) {
@@ -2415,6 +2494,10 @@ public class PlanningWorkbench {
     private static final class PlannerOptionsDialog extends JDialog {
         private PlannerCliOptions result;
         private final PlannerCliOptions working;
+        private final List<JComponent> presetOverriddenComponents = new ArrayList<>();
+        private final List<JLabel> presetOverriddenLabels = new ArrayList<>();
+        private final List<JCheckBox> presetOverriddenFlags = new ArrayList<>();
+        private final JLabel plannerPresetInfo;
 
         private final JComboBox<String> planner;
         private final JComboBox<String> heuristic;
@@ -2465,7 +2548,7 @@ public class PlanningWorkbench {
             super(owner, "Planner Options", ModalityType.APPLICATION_MODAL);
             this.working = current.copy();
 
-            planner = combo("", "sat-hmrp", "sat-hmrph", "sat-hmrphj", "sat-hmrpff", "sat-hadd", "sat-aibr", "sat-hradd", "opt-hmax", "opt-hlm", "opt-hlmrd", "opt-hrmax", "opt-blind");
+            planner = combo(plannerPresetValues());
             heuristic = combo("hadd", "blind", "hmax", "hmrp", "aibr", "hradd", "hrmax", "hlm-lp");
             search = combo("gbfs", "wastar", "ehs", "ida", "lazygbfs", "lazywastar");
             novelty = combo("", "aqb", "aw", "iqb", "iw");
@@ -2511,6 +2594,7 @@ public class PlanningWorkbench {
             bbqs = new JCheckBox("Bucket-based queue search");
             tun = new JCheckBox("Tunnelling");
             sjr = new JCheckBox("Save search JSON");
+            plannerPresetInfo = new JLabel(" ");
 
             loadFromWorking();
             buildUi();
@@ -2552,18 +2636,22 @@ public class PlanningWorkbench {
             actions.add(cancel);
             actions.add(ok);
             root.add(actions, BorderLayout.SOUTH);
+
+            planner.addActionListener(e -> updatePresetOverrideVisuals());
+            updatePresetOverrideVisuals();
         }
 
         private JPanel buildCorePanel() {
             JPanel p = new JPanel(new GridLayout(0, 2, 8, 6));
             addField(p, "Planner preset", planner);
-            addField(p, "Heuristic (-h)", heuristic);
-            addField(p, "Search (-s)", search);
-            addField(p, "Tie-breaking", ties);
+            addField(p, "Preset info", plannerPresetInfo);
+            markPresetOverridden(addField(p, "Heuristic (-h)", heuristic), heuristic);
+            markPresetOverridden(addField(p, "Search (-s)", search), search);
+            markPresetOverridden(addField(p, "Tie-breaking", ties), ties);
             addField(p, "Novelty", novelty);
             addField(p, "k-novelty", kNov);
             addField(p, "Helpful weight (wh)", wh);
-            addField(p, "Redundant constraints", red);
+            markPresetOverridden(addField(p, "Redundant constraints", red), red);
             addField(p, "Grounding", grounding);
             addField(p, "SDAC", sdac);
             return wrappedPanel(p);
@@ -2590,9 +2678,10 @@ public class PlanningWorkbench {
 
         private JPanel buildFlagsPanel() {
             JPanel p = new JPanel(new GridLayout(0, 2, 8, 4));
-            p.add(ha); p.add(ht);
+            markPresetOverridden(ha); p.add(ha);
+            markPresetOverridden(ht); p.add(ht);
             p.add(pe); p.add(pt);
-            p.add(im); p.add(dap);
+            p.add(im); markPresetOverridden(dap); p.add(dap);
             p.add(stopgro); p.add(ival);
             p.add(onlyplan); p.add(printActions);
             p.add(silent); p.add(autoanytime);
@@ -2611,13 +2700,25 @@ public class PlanningWorkbench {
             return wrapper;
         }
 
-        private static void addField(JPanel panel, String label, JComponent comp) {
-            panel.add(new JLabel(label));
+        private static JLabel addField(JPanel panel, String label, JComponent comp) {
+            JLabel jLabel = new JLabel(label);
+            panel.add(jLabel);
             panel.add(comp);
+            return jLabel;
         }
 
         private static JComboBox<String> combo(String... values) {
             return new JComboBox<>(values);
+        }
+
+        private static String[] plannerPresetValues() {
+            String[] values = new String[Planner.values().length + 1];
+            values[0] = "";
+            int i = 1;
+            for (Planner p : Planner.values()) {
+                values[i++] = p.name().toLowerCase().replace('_', '-');
+            }
+            return values;
         }
 
         private void loadFromWorking() {
@@ -2669,6 +2770,7 @@ public class PlanningWorkbench {
             bbqs.setSelected(o.bucketBasedQueueSearch);
             tun.setSelected(o.tunnelling);
             sjr.setSelected(o.saveSearchJson);
+            updatePresetOverrideVisuals();
         }
 
         private PlannerCliOptions readFromFields() {
@@ -2731,6 +2833,79 @@ public class PlanningWorkbench {
 
         private static String safeOr(String v, String def) {
             return (v == null || v.isBlank()) ? def : v;
+        }
+
+        private void markPresetOverridden(JLabel label, JComponent component) {
+            presetOverriddenLabels.add(label);
+            presetOverriddenComponents.add(component);
+        }
+
+        private void markPresetOverridden(JCheckBox checkBox) {
+            presetOverriddenFlags.add(checkBox);
+        }
+
+        private void updatePresetOverrideVisuals() {
+            boolean presetActive = !selected(planner).isBlank();
+            Color activeColor = UIManager.getColor("Label.foreground");
+            Color dimColor = UIManager.getColor("Label.disabledForeground");
+            if (activeColor == null) {
+                activeColor = Color.BLACK;
+            }
+            if (dimColor == null) {
+                dimColor = Color.GRAY;
+            }
+            Color overriddenColor = darken(activeColor, 0.42f);
+            String tooltip = presetActive ? "Sovrascritto dal planner preset selezionato" : null;
+            plannerPresetInfo.setText(selectedPlannerDescription(selected(planner)));
+            plannerPresetInfo.setToolTipText(selectedPlannerTooltip(selected(planner)));
+            for (int i = 0; i < presetOverriddenComponents.size(); i++) {
+                JComponent component = presetOverriddenComponents.get(i);
+                JLabel label = presetOverriddenLabels.get(i);
+                component.setEnabled(!presetActive);
+                component.setToolTipText(tooltip);
+                component.setForeground(presetActive ? overriddenColor : activeColor);
+                label.setForeground(presetActive ? overriddenColor : activeColor);
+                label.setToolTipText(tooltip);
+            }
+            for (JCheckBox checkBox : presetOverriddenFlags) {
+                checkBox.setEnabled(!presetActive);
+                checkBox.setForeground(presetActive ? overriddenColor : activeColor);
+                checkBox.setToolTipText(tooltip);
+            }
+            plannerPresetInfo.setForeground(presetActive ? activeColor : dimColor);
+        }
+
+        private static String selectedPlannerDescription(String plannerValue) {
+            if (plannerValue == null || plannerValue.isBlank()) {
+                return "Nessun preset: campi manuali attivi";
+            }
+            try {
+                Planner preset = Planner.valueOf(plannerValue.toUpperCase().replace('-', '_'));
+                String desc = preset.getDescription();
+                return (desc == null || desc.isBlank()) ? "Preset attivo" : desc;
+            } catch (IllegalArgumentException ex) {
+                return "Preset non riconosciuto";
+            }
+        }
+
+        private static String selectedPlannerTooltip(String plannerValue) {
+            if (plannerValue == null || plannerValue.isBlank()) {
+                return null;
+            }
+            String description = selectedPlannerDescription(plannerValue);
+            return plannerValue + " - " + description;
+        }
+
+        private static Color darken(Color c, float factor) {
+            if (c == null) {
+                return Color.DARK_GRAY;
+            }
+            float f = Math.max(0f, Math.min(factor, 1f));
+            return new Color(
+                    Math.max(0, Math.round(c.getRed() * (1f - f))),
+                    Math.max(0, Math.round(c.getGreen() * (1f - f))),
+                    Math.max(0, Math.round(c.getBlue() * (1f - f)))
+            );
         }
     }
 

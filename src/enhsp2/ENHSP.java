@@ -55,6 +55,24 @@ import java.util.logging.Logger;
  *
  */
 public class ENHSP {
+    private static final String MODELING_HELP =
+            "Modeling quick guide (PDDL)\n" +
+            "---------------------------\n" +
+            "Domain file (-o): describe the planning language of your task.\n" +
+            "- :requirements used by the model\n" +
+            "- :types (optional but recommended)\n" +
+            "- :predicates for boolean facts\n" +
+            "- :functions for numeric fluents\n" +
+            "- :action / :process / :event with parameters, preconditions, effects\n" +
+            "\n" +
+            "Problem file (-f): describe one concrete instance of that domain.\n" +
+            "- (:domain NAME) must match the domain\n" +
+            "- :objects (the instance objects)\n" +
+            "- :init (initial facts and numeric values)\n" +
+            "- :goal (target conditions)\n" +
+            "- :metric (optional optimization objective)\n" +
+            "\n" +
+            "Rule of thumb: put reusable dynamics in DOMAIN, put instance data in PROBLEM.\n";
 
     String domainFile;
     String problemFile;
@@ -209,6 +227,8 @@ public class ENHSP {
         try {
             printStats();
             setHeuristic();
+            final long deadline = timeOut == Long.MAX_VALUE ? Long.MAX_VALUE : (overallStart + timeOut);
+            PDDLSolution bestSolution = null;
             if (autoAnytime){
                 System.out.println("Auto Anytime Modality");
                 conf.add(new AnytimeConfigurations("lazygbfs","hmrp", true, "4"));
@@ -222,6 +242,10 @@ public class ENHSP {
             int i = 0;
             PDDLSolution lastSol;
             do {
+                if (deadline != Long.MAX_VALUE && System.currentTimeMillis() >= deadline) {
+                    System.out.println("Timeout reached.");
+                    return bestSolution;
+                }
                 if (autoAnytime){
                     if ( conf.size() > i ) {
                         AnytimeConfigurations anytimeConfigurations = conf.get(i);
@@ -231,7 +255,13 @@ public class ENHSP {
                         wh = anytimeConfigurations.wh;
                     }
                 }
-                lastSol = search();
+                long remainingSearchTime = deadline == Long.MAX_VALUE
+                        ? Long.MAX_VALUE
+                        : Math.max(1L, deadline - System.currentTimeMillis());
+                lastSol = search(remainingSearchTime);
+                if (lastSol == null) {
+                    return bestSolution;
+                }
                 LinkedList sp = lastSol.rawPlan();
                 if (printTrace) {
                     String fileName = getProblem().getPddlFileReference() + "_search_" + searchEngineString + "_h_" + heuristic + "_break_ties_" + tieBreaking + ".npt";
@@ -239,8 +269,9 @@ public class ENHSP {
                     System.out.println("Numeric Plan Trace saved to " + fileName);
                 }
                 if (sp == null) {
-                    return null;
+                    return bestSolution;
                 }else {
+                    bestSolution = lastSol;
                     depthLimit = endGValue;
                     if (anyTime) {
                         System.out.println("NEW COST ==================================================================================>" + depthLimit);
@@ -251,7 +282,7 @@ public class ENHSP {
                 }
             } while (anyTime);
 
-            return lastSol;
+            return bestSolution;
         } catch (Exception ex) {
             Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -265,8 +296,9 @@ public class ENHSP {
 
     private Options buildOptions(){
         Options options = new Options();
-        options.addRequiredOption("o", "domain", true, "PDDL domain file");
-        options.addRequiredOption("f", "problem", true, "PDDL problem file");
+        options.addRequiredOption("o", "domain", true, "PDDL domain file (operators, predicates/functions, transition model)");
+        options.addRequiredOption("f", "problem", true, "PDDL problem file (objects, initial state, goals, optional metric)");
+        options.addOption("help", false, "Show help and modeling instructions");
         options.addOption("planner", true, "Fast Preconfgured Planner. This overrides all other parameters but domain and problem specs.\n" + Planner.getHelp() + "\n");
         options.addOption("h", true, "allows to select heuristic (default is hadd). " + PDDLHeuristic.getHelpString() + "\n");
         options.addOption("s", true, "allows to select search strategy (default is WAStar):\n" + PDDLPlanner.getHelpString() + "\n");
@@ -298,7 +330,7 @@ public class ENHSP {
         options.addOption("dl", true, "bound on plan-cost: float (Experimental)");
         options.addOption("k", true, "maximal number of subdomains. This works in combination with haddabs: integer");
         options.addOption("anytime", false, "Run in anytime modality. Incrementally tries to find a lower bound. Does not stop until the user decides so");
-        options.addOption("timeout", true, "Timeout for anytime modality");
+        options.addOption("timeout", true, "Overall planning timeout (seconds).");
         options.addOption("stopgro", false, "Stop After Grounding");
         options.addOption("ival", false, "Internal Validation");
         options.addOption("sdac", true, "Activate State Dependent Action Cost (Very Experimental!). Options are: disabled, rhs, condition");
@@ -324,6 +356,12 @@ public class ENHSP {
 
     public void parseInput(String[] args) {
         Options options = buildOptions();
+        for (String arg : args) {
+            if ("--help".equals(arg) || "-help".equals(arg) || "-?".equals(arg)) {
+                printHelp(options);
+                System.exit(0);
+            }
+        }
 
         CommandLineParser parser = new DefaultParser();
         try {
@@ -477,11 +515,16 @@ public class ENHSP {
         } catch (ParseException exp) {
 //            Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
             System.err.println("Parsing failed.  Reason: " + exp.getMessage());
-            HelpFormatter formatter = new HelpFormatter();
-            formatter.setWidth(120);
-            formatter.printHelp("enhsp", options);
+            printHelp(options);
             System.exit(-1);
         }
+    }
+
+    private static void printHelp(Options options) {
+        System.out.println(MODELING_HELP);
+        HelpFormatter formatter = new HelpFormatter();
+        formatter.setWidth(120);
+        formatter.printHelp("enhsp", options);
     }
 
     /**
@@ -538,7 +581,7 @@ public class ENHSP {
         }
     }
 
-    private PDDLSolution search() throws Exception {
+    private PDDLSolution search(long timeoutMs) throws Exception {
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
                 redundantConstraints,
                 helpfulActions,
@@ -547,7 +590,7 @@ public class ENHSP {
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
                 tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
-                bucketBasedQueueSearch, tunnelling, this.externalLogger);
+                bucketBasedQueueSearch, tunnelling, this.externalLogger, timeoutMs);
 
         if (savingSearchSpaceJson) {
             Runtime.getRuntime().addShutdownHook(new Thread() {//this is to save json also when the planner is interrupted

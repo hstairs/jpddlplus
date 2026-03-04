@@ -127,6 +127,11 @@ public class WAStar extends SearchEngine {
         previous = 0;
         int number = 0;
         while (!frontier.isEmpty()) {
+            if (shouldStop(timeAtStart)) {
+                totalTime = (System.currentTimeMillis() - timeAtStart);
+                out.println("Search interrupted: timeout reached.");
+                return null;
+            }
             number++;
             if(number==100){
                 int debugger = 10;
@@ -150,6 +155,11 @@ public class WAStar extends SearchEngine {
                         nodesExpanded,nodesEvaluated,frontier,currentNode);
                 final Object[] actionsToSearch = getActionsToSearch(currentNode, problem, h);
                 for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext();) {
+                    if (shouldStop(timeAtStart)) {
+                        totalTime = (System.currentTimeMillis() - timeAtStart);
+                        out.println("Search interrupted: timeout reached.");
+                        return null;
+                    }
                     final Pair<State, Object> next = it.next();
                     final State successorState = next.getFirst();
                     final Object act = next.getSecond();
