@@ -44,7 +44,11 @@ public class PDDLPlanner {
         {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
         {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"},
             {"pwastar", "PWAStar", "Parallel Weighted A* Search"},
-            {"pgbfs", "PGBFS", "Parallel Greedy Best-First Search"}
+            {"pgbfs", "PGBFS", "Parallel Greedy Best-First Search"},
+            {"awwastar", "AWWAStar", "adaptive width Weighted A* Search"},
+            {"awbfs", "AWBFS", "adaptive width Greedy Best-First Search"},
+            {"kwastar", "KWAStar", "K-Way Weighted A* Search"},
+            {"kbfs", "KBFS", "K-Way Greedy Best-First Search"}
     };
 
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
@@ -55,7 +59,11 @@ public class PDDLPlanner {
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
             Map.entry(SE_INFOS[6][0], (planner, tb) -> new PWAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
-            Map.entry(SE_INFOS[7][0], (planner, tb) -> new PWAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch))
+            Map.entry(SE_INFOS[7][0], (planner, tb) -> new PWAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
+            Map.entry(SE_INFOS[8][0], (planner, tb) -> new AWWAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch, 10)),
+            Map.entry(SE_INFOS[9][0], (planner, tb) -> new AWWAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch, 10)),
+            Map.entry(SE_INFOS[10][0], (planner, tb) -> new KWAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch, 10)),
+            Map.entry(SE_INFOS[11][0], (planner, tb) -> new KWAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch, 10))
     );
 
     final private boolean bucketBasedQueueSearch;
