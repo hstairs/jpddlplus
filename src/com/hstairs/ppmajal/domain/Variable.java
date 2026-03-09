@@ -61,8 +61,8 @@ public class Variable implements ActionParameter {
         final PDDLObject o = substitution.get(this);
 
         if (o == null) {
-            System.out.println("Substitution Failed for " + o.toString());
-            System.exit(-1);
+            System.out.println("Substitution Failed for " + this);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
 
         return o;

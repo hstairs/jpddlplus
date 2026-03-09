@@ -1136,7 +1136,7 @@ public class PDDLProblem implements SearchProblem {
                 Type t = linkedDomain.getTypeByName(typeName);
                 if (t == null) {
                     System.out.println(c.getChild(i).getChild(0).getText() + " not found");
-                    System.exit(-1);
+                    throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                 }
                 this.getObjects().add(PDDLObject.object(c.getChild(i).getText(), t));
             } else {

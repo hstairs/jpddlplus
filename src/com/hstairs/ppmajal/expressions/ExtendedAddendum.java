@@ -54,7 +54,7 @@ public class ExtendedAddendum {
         } else {
             if (ret.bin != null) {
                 System.out.println("There is a problem when cloning the following addendum:" + ret);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             }
             if (this.f != null) {
                 ret.f = (NumFluent) this.f.clone();

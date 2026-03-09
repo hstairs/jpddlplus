@@ -5,6 +5,7 @@ import com.hstairs.enhspgui.tree.LazySearchTreeWindow;
 import com.hstairs.ppmajal.PDDLProblem.PDDLSolution;
 import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
+import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import enhsp2.ENHSP;
 import enhsp2.Planner;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -65,11 +66,12 @@ public class PlanningWorkbench {
         });
     }
 
-    private static final class PlanningFrame extends JFrame {
-        private static final Object STDOUT_REDIRECT_LOCK = new Object();
-        private static final String VSCODE_INTEGRATION_TITLE = "VS Code Integration";
-        private static final String VSCODE_ENABLE_MESSAGE =
-                "Enable 'Edit > VS Code External Editing (Experimental)' first.";
+        private static final class PlanningFrame extends JFrame {
+            private static final Object STDOUT_REDIRECT_LOCK = new Object();
+            private static final int MAX_RAW_OUTPUT_CHARS = 500_000;
+            private static final String VSCODE_INTEGRATION_TITLE = "VS Code Integration";
+            private static final String VSCODE_ENABLE_MESSAGE =
+                    "Enable 'Edit > VS Code External Editing (Experimental)' first.";
         private final LispSyntaxTextPane domainArea;
         private final LispSyntaxTextPane problemArea;
         private final DefaultListModel<String> planListModel;
@@ -113,6 +115,7 @@ public class PlanningWorkbench {
         private boolean pauseRequested;
         private int editorFontSize = 13;
         private final StringBuilder liveStatsBuffer = new StringBuilder();
+        private final StringBuilder rawOutputBuffer = new StringBuilder();
         private PlannerCliOptions plannerOptions = PlannerCliOptions.defaults();
         private PlanningResult latestPlanningResult;
         private LazySearchTreeWindow searchTreeWindow;
@@ -204,7 +207,7 @@ public class PlanningWorkbench {
             JSplitPane resultSplit = new JSplitPane(
                     JSplitPane.HORIZONTAL_SPLIT,
                     wrapped("Plan", planPanel, null),
-                    wrapped("Statistics", new JScrollPane(statsArea), null)
+                    wrapped("Statistics and raw output", new JScrollPane(statsArea), null)
             );
             resultSplit.setResizeWeight(0.7);
             styleSplitPane(resultSplit);
@@ -1344,9 +1347,12 @@ public class PlanningWorkbench {
             pauseButton.setText("Pause");
             latestPlanningResult = null;
             setPlanMessages("Planning in progress...");
-            statsArea.setText("Planning in progress...\n\nLive search trace:\n");
+            statsArea.setText("Planning in progress...\n\nRaw output:\n");
             synchronized (liveStatsBuffer) {
                 liveStatsBuffer.setLength(0);
+            }
+            synchronized (rawOutputBuffer) {
+                rawOutputBuffer.setLength(0);
             }
             executionController = new PlannerExecutionController();
             final boolean searchTreeForThisRun = showSearchTree;
@@ -1364,14 +1370,19 @@ public class PlanningWorkbench {
                 protected PlanningResult doInBackground() {
                     Path tmpDir = null;
                     PrintStream originalOut = null;
+                    PrintStream originalErr = null;
                     PrintStream redirectedOut = null;
+                    PrintStream redirectedErr = null;
                     try {
                         planningThread = Thread.currentThread();
                         synchronized (STDOUT_REDIRECT_LOCK) {
                             originalOut = System.out;
-                            LineCaptureOutputStream liveParser = new LineCaptureOutputStream(PlanningFrame.this::handleStdoutLine);
-                            redirectedOut = new PrintStream(new TeeOutputStream(originalOut, liveParser), true, StandardCharsets.UTF_8);
+                            originalErr = System.err;
+                            LineCaptureOutputStream lineParser = new LineCaptureOutputStream(PlanningFrame.this::handlePlannerOutputLine);
+                            redirectedOut = new PrintStream(new TeeOutputStream(originalOut, lineParser), true, StandardCharsets.UTF_8);
+                            redirectedErr = new PrintStream(new TeeOutputStream(originalErr, lineParser), true, StandardCharsets.UTF_8);
                             System.setOut(redirectedOut);
+                            System.setErr(redirectedErr);
 
                             tmpDir = Files.createTempDirectory("jpddlplus_gui_");
                             Path domainPath = tmpDir.resolve("domain.pddl");
@@ -1412,6 +1423,12 @@ public class PlanningWorkbench {
                         }
                     } catch (PlanningStoppedException e) {
                         return PlanningResult.error("Planning stopped by user.", null, null);
+                    } catch (PlannerExitException e) {
+                        if (executionController != null && executionController.isStopped()) {
+                            return PlanningResult.error("Planning stopped by user.", null, null);
+                        }
+                        String message = e.getMessage() == null ? "Planner terminated unexpectedly." : e.getMessage();
+                        return PlanningResult.error("Planning aborted by planner (exit code " + e.exitCode() + "):\n" + message, null, null);
                     } catch (Throwable t) {
                         if (executionController != null && executionController.isStopped()) {
                             return PlanningResult.error("Planning stopped by user.", null, null);
@@ -1419,9 +1436,16 @@ public class PlanningWorkbench {
                         return PlanningResult.error("Planning failed:\n" + t, null, null);
                     } finally {
                         planningThread = null;
+                        if (redirectedErr != null) {
+                            redirectedErr.flush();
+                            redirectedErr.close();
+                        }
                         if (redirectedOut != null) {
                             redirectedOut.flush();
                             redirectedOut.close();
+                        }
+                        if (originalErr != null) {
+                            System.setErr(originalErr);
                         }
                         if (originalOut != null) {
                             System.setOut(originalOut);
@@ -1448,13 +1472,13 @@ public class PlanningWorkbench {
                         if (isCancelled()) {
                             latestPlanningResult = null;
                             setPlanMessages("Planning stopped by user.");
-                            statsArea.setText("Planning stopped by user.\n\nLive search trace:\n" + getLiveStatsSnapshot());
+                            statsArea.setText(buildStatsAndRawOutputText("Planning stopped by user."));
                             viewStateButton.setEnabled(false);
                         } else {
                             PlanningResult result = get();
                             latestPlanningResult = result;
                             setPlanResult(result);
-                            statsArea.setText(result.statsText + "\n\nLive search trace:\n" + getLiveStatsSnapshot());
+                            statsArea.setText(buildStatsAndRawOutputText(result.statsText));
                             viewStateButton.setEnabled(result.hasTrace());
                             if (searchTreeForThisRun) {
                                 loadLatestSearchTreeJsonIfPresent();
@@ -1463,7 +1487,7 @@ public class PlanningWorkbench {
                     } catch (Exception e) {
                         latestPlanningResult = null;
                         setPlanMessages("Planning failed:", String.valueOf(e));
-                        statsArea.setText("Planning failed:\n" + e);
+                        statsArea.setText(buildStatsAndRawOutputText("Planning failed:\n" + e));
                         viewStateButton.setEnabled(false);
                     } finally {
                         runButton.setEnabled(true);
@@ -1562,17 +1586,52 @@ public class PlanningWorkbench {
             }
         }
 
-        private void handleStdoutLine(String line) {
-            String interesting = extractInterestingLiveStat(line);
-            if (interesting == null) {
-                return;
+        private String getRawOutputSnapshot() {
+            synchronized (rawOutputBuffer) {
+                return rawOutputBuffer.toString();
             }
-            synchronized (liveStatsBuffer) {
-                liveStatsBuffer.append(interesting).append('\n');
+        }
+
+        private String buildStatsAndRawOutputText(String statsText) {
+            StringBuilder builder = new StringBuilder();
+            if (statsText != null && !statsText.isBlank()) {
+                builder.append(statsText);
+            }
+            String raw = getRawOutputSnapshot();
+            if (!raw.isBlank()) {
+                if (!builder.isEmpty()) {
+                    builder.append("\n\n");
+                }
+                builder.append("Raw output:\n").append(raw);
+            }
+            return builder.toString();
+        }
+
+        private void appendRawOutputLine(String line) {
+            synchronized (rawOutputBuffer) {
+                rawOutputBuffer.append(line).append('\n');
+                if (rawOutputBuffer.length() > MAX_RAW_OUTPUT_CHARS) {
+                    int overflow = rawOutputBuffer.length() - MAX_RAW_OUTPUT_CHARS;
+                    int cut = rawOutputBuffer.indexOf("\n", overflow);
+                    if (cut < 0) {
+                        cut = overflow;
+                    }
+                    rawOutputBuffer.delete(0, Math.min(cut + 1, rawOutputBuffer.length()));
+                }
+            }
+        }
+
+        private void handlePlannerOutputLine(String line) {
+            appendRawOutputLine(line);
+            String interesting = extractInterestingLiveStat(line);
+            if (interesting != null) {
+                synchronized (liveStatsBuffer) {
+                    liveStatsBuffer.append(interesting).append('\n');
+                }
             }
             SwingUtilities.invokeLater(() -> {
                 if (currentWorker != null) {
-                    statsArea.append(interesting + "\n");
+                    statsArea.append(line + "\n");
                     statsArea.setCaretPosition(statsArea.getDocument().getLength());
                 }
             });

@@ -59,7 +59,7 @@ public class FactoryConditions {
         if (t.getType() == PddlParser.NAME) {
 
             System.out.println("Error in parsing variable terms");
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
 
         } else {
 
@@ -318,7 +318,7 @@ public class FactoryConditions {
                         } else {
 //                        System.out.println("t.type: " + t.getChild(i).getText());
                             System.out.println("NumFluent: Variable " + v + " not involved in the action model");
-                            System.exit(-1);
+                            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                         }
                     }
                 }
@@ -375,7 +375,7 @@ public class FactoryConditions {
                         forall.add(ret_val);
                     } else {
                         System.out.println("Something fishy here.." + child);
-                        System.exit(-1);
+                        throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                     }
                     break;
 

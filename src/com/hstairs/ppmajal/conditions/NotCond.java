@@ -189,7 +189,7 @@ public class NotCond extends Terminal implements PostCondition {
             ret_val = ret_val.concat(c.pddlPrintWithExtraObject());
         } else {
             System.out.println("Error in pddlPrint:" + this);
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
         ret_val = ret_val.concat(")");
         return ret_val;
@@ -243,7 +243,7 @@ public class NotCond extends Terminal implements PostCondition {
 
     private void sonHasIncorrectType ( ) {
         System.out.println("Not " + son + " is not valid. Please revise your action model");
-        System.exit(-1);
+        throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
     }
 
     @Override

@@ -156,7 +156,7 @@ public class NumFluent extends Expression {
                 Variable t = (Variable) substitution.get(obj.getName());
                 if (t == null) {
                     System.out.println("Substitution Failed for " + o.toString());
-                    System.exit(-1);
+                    throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                 } else {
                     variables.add(t);
                 }

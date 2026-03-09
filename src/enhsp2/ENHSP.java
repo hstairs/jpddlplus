@@ -4,6 +4,7 @@ package enhsp2;
 import com.hstairs.ppmajal.PDDLProblem.*;
 import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.extraUtils.Utils;
+import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
@@ -181,9 +182,11 @@ public class ENHSP {
                 localProblem.printAllInfo();
             }
             if (stopAfterGrounding) {
-                System.exit(1);
+                throw new PlannerExitException(1, "Stopped after grounding as requested (-stopgro).");
             }
             return Pair.of(localDomain, localProblem);
+        } catch (PlannerExitException ex) {
+            throw ex;
         } catch (Exception ex) {
             Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -208,8 +211,11 @@ public class ENHSP {
             } else {
                 heuristicProblem = problem;
             }
+        } catch (PlannerExitException ex) {
+            throw ex;
         } catch (Exception ex) {
             ex.printStackTrace();
+            return false;
         }
         return true;
     }
@@ -283,6 +289,8 @@ public class ENHSP {
             } while (anyTime);
 
             return bestSolution;
+        } catch (PlannerExitException ex) {
+            throw ex;
         } catch (Exception ex) {
             Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -359,7 +367,7 @@ public class ENHSP {
         for (String arg : args) {
             if ("--help".equals(arg) || "-help".equals(arg) || "-?".equals(arg)) {
                 printHelp(options);
-                System.exit(0);
+                throw new PlannerExitException(0, "Help requested.");
             }
         }
 
@@ -516,7 +524,7 @@ public class ENHSP {
 //            Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
             System.err.println("Parsing failed.  Reason: " + exp.getMessage());
             printHelp(options);
-            System.exit(-1);
+            throw new PlannerExitException(-1, "Failed to parse command-line options.", exp);
         }
     }
 

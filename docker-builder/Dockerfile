@@ -32,7 +32,7 @@ RUN jlink \
     --no-man-pages \
     --compress=2 \
     --strip-java-debug-attributes \
-    --add-modules java.base \
+    --add-modules java.base,java.desktop,java.logging,java.net.http,java.prefs,jdk.httpserver,jdk.unsupported \
     --output /java-runtime
 
 RUN rm -rf /jpddlplus

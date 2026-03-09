@@ -365,7 +365,7 @@ public class Comparison extends Terminal {
             this.maxDist = num.floatValue();
         } else {
             System.out.println("Errore!!!");
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
 
     }

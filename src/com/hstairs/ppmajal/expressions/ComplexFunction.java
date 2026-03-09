@@ -73,7 +73,7 @@ public class ComplexFunction extends BinaryOp {
                 break;
             default:
                 System.out.println("Eval error in: " + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
         return arg_val;
     }
@@ -125,7 +125,7 @@ public class ComplexFunction extends BinaryOp {
                 break;
             default:
                 System.out.println("Eval error in: " + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
         return ret;
     }

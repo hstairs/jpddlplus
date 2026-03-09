@@ -143,7 +143,7 @@ public class AndCond extends ComplexCondition implements PostCondition {
                 ret_val = ret_val.concat(comp.pddlPrintWithExtraObject());
             } else if (o instanceof NumEffect) {
                 System.out.println("Error in pddlPrint:" + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             } else{
                 throw new RuntimeException("This is not supported in this condition"+o);
             }

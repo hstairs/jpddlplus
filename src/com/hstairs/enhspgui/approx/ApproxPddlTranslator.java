@@ -1,5 +1,7 @@
 package com.hstairs.enhspgui.approx;
 
+import com.hstairs.ppmajal.extraUtils.PlannerExitException;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -553,23 +555,27 @@ public final class ApproxPddlTranslator {
     }
 
     public static void main(String[] args) throws IOException {
-        if (args.length < 1 || args.length > 3) {
-            System.err.println("Usage:");
-            System.err.println("  java com.hstairs.enhspgui.approx.ApproxPddlTranslator <input.pddl> [output.pddl] [domain|problem]");
-            System.exit(2);
-        }
-        Path input = Path.of(args[0]);
-        Path output = args.length >= 2 ? Path.of(args[1]) : null;
-        boolean domainFile = true;
-        if (args.length == 3) {
-            domainFile = !"problem".equalsIgnoreCase(args[2]);
-        }
-        String in = Files.readString(input, StandardCharsets.UTF_8);
-        String out = transpile(in, domainFile);
-        if (output != null) {
-            Files.writeString(output, out, StandardCharsets.UTF_8);
-        } else {
-            System.out.print(out);
+        try {
+            if (args.length < 1 || args.length > 3) {
+                System.err.println("Usage:");
+                System.err.println("  java com.hstairs.enhspgui.approx.ApproxPddlTranslator <input.pddl> [output.pddl] [domain|problem]");
+                throw new PlannerExitException(2, "Invalid arguments for ApproxPddlTranslator.");
+            }
+            Path input = Path.of(args[0]);
+            Path output = args.length >= 2 ? Path.of(args[1]) : null;
+            boolean domainFile = true;
+            if (args.length == 3) {
+                domainFile = !"problem".equalsIgnoreCase(args[2]);
+            }
+            String in = Files.readString(input, StandardCharsets.UTF_8);
+            String out = transpile(in, domainFile);
+            if (output != null) {
+                Files.writeString(output, out, StandardCharsets.UTF_8);
+            } else {
+                System.out.print(out);
+            }
+        } catch (PlannerExitException ex) {
+            System.exit(ex.exitCode());
         }
     }
 }

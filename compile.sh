@@ -10,7 +10,7 @@ cli_jar="enhsp25.jar"
 
 # Compile Java source files
 echo "Compiling source files..."
-javac -d "$output_directory" -cp "jar_dependencies/*" $(find src -name '*.java')
+javac --release 16 -d "$output_directory" -cp "jar_dependencies/*" $(find src -name '*.java')
 
 # Create a temporary directory to extract JAR file dependencies
 mkdir -p "$tmp_extracted_jars"
