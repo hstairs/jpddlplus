@@ -40,8 +40,8 @@ public class PDDLStateWithCache extends PDDLState {
     
     private void initCompSat(){
         
-        if (Comparison.getComparisonDataBase()!= null){
-            compSat = new int[Comparison.getComparisonDataBase().values().size()];
+        if (Comparison.comparisonDataBase!= null){
+            compSat = new int[Comparison.comparisonDataBase.values().size()];
             Arrays.fill(compSat, -1);
         }
     }

@@ -34,7 +34,33 @@ import org.apache.commons.lang3.tuple.Triple;
  */
 public class Comparison extends Terminal {
 
-    private String comparator;
+    public enum Comparator {
+        LT("<",  true)  { public boolean test(double a,double b){ return Utils.doubleComparator(a,b) <  0; } },
+        LE("<=", false) { public boolean test(double a,double b){ return Utils.doubleComparator(a,b) <= 0; } },
+        GT(">",  true)  { public boolean test(double a,double b){ return Utils.doubleComparator(a,b) >  0; } },
+        GE(">=", false) { public boolean test(double a,double b){ return Utils.doubleComparator(a,b) >= 0; } },
+        EQ("=",  false) { public boolean test(double a,double b){ return Utils.doubleComparator(a,b) == 0; } };
+
+        private final String symbol;
+        private final boolean strict;
+
+        Comparator(String symbol, boolean strict) {
+            this.symbol = symbol;
+            this.strict = strict;
+        }
+
+        public String symbol() { return symbol; }
+        public boolean isStrict() { return strict; }
+
+        public abstract boolean test(double first, double second);
+
+        public static Comparator fromSymbol(String s) {
+            for (Comparator c : values()) if (c.symbol.equals(s)) return c;
+            throw new IllegalArgumentException("Comparator not supported: " + s);
+        }
+    }
+
+    private Comparator comparator;
     private Expression left;
     private Expression right;
     public final boolean isStrict;
@@ -44,49 +70,28 @@ public class Comparison extends Terminal {
     public Float maxDist;
     private String string_representation;
     private boolean linear;
-    
-    private static HashMap<Triple<String, String, String>, Comparison> comparisonDataBase;
 
-    public static HashMap<Triple<String, String, String>, Comparison> getComparisonDataBase() {
-        return comparisonDataBase;
-    }
-    
-    public static Comparison comparison(String comparator, Expression left, Expression right, boolean normalized) {
-        if (comparisonDataBase == null) {
-            comparisonDataBase = new HashMap();
-        }
-        Triple<String, String, String> t = Triple.of(comparator, left.toString(), right.toString());
-        Comparison comp = comparisonDataBase.get(t);
-        if (comp == null) {
-            comp = new Comparison(t.getLeft(), left, right,normalized);
-            comparisonDataBase.put(t, comp);
-        }
-        return comp;
+    public static final Map<Triple<Comparator, String, String>, Comparison>
+            comparisonDataBase = new HashMap<>();
+
+    public static Comparison comparison(
+            Comparator comparator,
+            Expression left,
+            Expression right,
+            boolean normalized
+    ) {
+        return comparisonDataBase.computeIfAbsent(
+                Triple.of(comparator, left.toString(), right.toString()),
+                k -> new Comparison(k.getLeft(), left, right, normalized)
+        );
     }
 
-    private Comparison(String comparator, Expression left, Expression right, int id) {
-        this(comparator, left, right,false);
-    }
-    
-    private Comparison(String comparator, Expression left, Expression right,boolean normalized) {
-        super();
-        this.comparator = comparator;
+    private Comparison(Comparator stringComparator, Expression left, Expression right, boolean normalized) {
+        this.comparator = stringComparator;
         this.left = left;
         this.right = right;
         this.normalized = normalized;
-        if (comparator.equals(">") || comparator.equals("<"))
-            this.isStrict = true;
-        else
-            this.isStrict = false;
-
-    }
-
-    public static int getNumberOfComparisons() {
-        if (Comparison.getComparisonDataBase() == null){
-            return 0;
-        }else{
-            return NotCond.notcondDB.values().size();
-        }
+        this.isStrict = this.comparator.isStrict();
     }
 
 
@@ -107,7 +112,7 @@ public class Comparison extends Terminal {
      * @return the bin_comp
      */
     public String getComparator ( ) {
-        return comparator;
+        return comparator.symbol;
     }
 
 
@@ -147,28 +152,43 @@ public class Comparison extends Terminal {
         return isSatisfied(first, second);
     }
 
-    public boolean isSatisfied(Double first, Double second){
-        if (this.isValid())
-            return true;
-        if ((first == null) || (second == null) ||
-            first.isNaN() || second.isNaN()) {
-            return false;//negation by failure.
-        }
-        if (this.getComparator().equals("<")) {
-            return Utils.doubleComparator(first, second) < 0;
-        } else if (this.getComparator().equals("<=")) {
-            return Utils.doubleComparator(first, second) <= 0;
-        } else if (this.getComparator().equals(">")) {
-            return Utils.doubleComparator(first, second) > 0;
-        } else if (this.getComparator().equals(">=")) {
-            return Utils.doubleComparator(first, second) >= 0;
-        } else if (this.getComparator().equals("=")) {
-            return Utils.doubleComparator(first, second) == 0;
-        } else {
-            System.out.println(this.getComparator() + "  is not supported");
+//    public boolean isSatisfied(Double first, Double second){
+//        if (this.isValid())
+//            return true;
+//        if ((first == null) || (second == null) ||
+//            first.isNaN() || second.isNaN()) {
+//            return false;//negation by failure.
+//        }
+//        if (this.getComparator().equals("<")) {
+//            return Utils.doubleComparator(first, second) < 0;
+//        } else if (this.getComparator().equals("<=")) {
+//            return Utils.doubleComparator(first, second) <= 0;
+//        } else if (this.getComparator().equals(">")) {
+//            return Utils.doubleComparator(first, second) > 0;
+//        } else if (this.getComparator().equals(">=")) {
+//            return Utils.doubleComparator(first, second) >= 0;
+//        } else if (this.getComparator().equals("=")) {
+//            return Utils.doubleComparator(first, second) == 0;
+//        } else {
+//            System.out.println(this.getComparator() + "  is not supported");
+//        }
+//
+//        return false;
+//    }
+
+    public boolean isSatisfied(Double first, Double second) {
+        if (this.isValid()) return true;
+
+        if (first == null || second == null || first.isNaN() || second.isNaN()) {
+            return false; // negation by failure
         }
 
-        return false;
+        try {
+            return this.comparator.test(first, second);
+        } catch (IllegalArgumentException e) {
+            System.out.println(this.getComparator() + " is not supported");
+            return false;
+        }
     }
     
     @Override
@@ -233,7 +253,7 @@ public class Comparison extends Terminal {
             this.linear = ((ExtendedNormExpression)this.left).linear && ((ExtendedNormExpression)this.right).linear;   
             return this;
         }
-        String comp = comparator;
+        Comparator comp = comparator;
 
         //System.out.println("Instanceof left: "+ret.left.getClass());
         ExtendedNormExpression leftExpr = (ExtendedNormExpression) this.left.normalize();
@@ -273,7 +293,7 @@ public class Comparison extends Terminal {
         }
         {
             //System.out.println("DEBUG");
-            if (this.comparator.equals("<") || this.comparator.equals("<=") || this.comparator.equals("=")) {
+            if (this.comparator == Comparator.LT || this.comparator == Comparator.LE || this.comparator == Comparator.EQ) {
                 leftExpr = rightExpr.minus(leftExpr);
                 rightExpr = new ExtendedNormExpression(0d);
 
@@ -282,11 +302,11 @@ public class Comparison extends Terminal {
                 rightExpr = new ExtendedNormExpression(0d);
             }
 
-            if (!this.comparator.equals("=")) {
-                if (this.comparator.contains("=")) {
-                    comp = ">=";
+            if (this.comparator != Comparator.EQ) {
+                if (this.comparator == Comparator.LE || this.comparator == Comparator.GE) {
+                    comp = Comparator.GE;
                 } else {
-                    comp = ">";
+                    comp = Comparator.GT;
                 }
             }
         }
@@ -345,7 +365,7 @@ public class Comparison extends Terminal {
             this.maxDist = num.floatValue();
         } else {
             System.out.println("Errore!!!");
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
 
     }
@@ -500,8 +520,8 @@ public class Comparison extends Terminal {
         final Comparison comp = this;
         if (comp.getComparator().equals("=")) {
             final Collection ret = new HashSet();
-            final Comparison dual = (Comparison) Comparison.comparison(">=", left, right,false).normalize();
-            final Comparison dual2 = (Comparison) Comparison.comparison("<=", left,right,false).normalize();
+            final Comparison dual = (Comparison) Comparison.comparison(Comparator.GE, left, right,false).normalize();
+            final Comparison dual2 = (Comparison) Comparison.comparison(Comparator.LE, left,right,false).normalize();
             ret.add(dual);
             ret.add(dual2);
             return new AndCond(ret);
@@ -664,30 +684,27 @@ public class Comparison extends Terminal {
         return this;
     }
 
-    Condition invertOperator ( ) {
-        if (this.getComparator().equals("=")) {
-            Collection a = new HashSet();
-            a.add(Comparison.comparison("<", left, right,false));
-            a.add(Comparison.comparison(">", left, right,false));
+
+
+    Condition invertOperator() {
+        Comparator c = this.comparator;
+
+        if (c == Comparator.EQ) {
+            Collection<Condition> a = new HashSet<>();
+            a.add(Comparison.comparison(Comparator.LT, left, right, false));
+            a.add(Comparison.comparison(Comparator.GT, left, right, false));
             return new OrCond(a);
-        } else {
-            String comp = null;
-            switch (this.getComparator()) {
-                case "<":
-                    comp = ">=";
-                    break;
-                case "<=":
-                    comp = ">";
-                    break;
-                case ">=":
-                    comp = "<";
-                    break;
-                case ">":
-                    comp = "<=";
-                    break;
-            }
-            return Comparison.comparison(comp, left, right,false).normalize();
         }
+
+        Comparator inverted = switch (c) {
+            case LT -> Comparator.GE;
+            case LE -> Comparator.GT;
+            case GE -> Comparator.LT;
+            case GT -> Comparator.LE;
+            default -> throw new UnsupportedOperationException("Comparator not supported: " + c);
+        };
+
+        return Comparison.comparison(inverted, left, right, false).normalize();
     }
 
     @Override

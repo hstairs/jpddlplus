@@ -28,6 +28,7 @@ public class PDDLPlanner {
     private final boolean tunnelling;
     private SearchEngine searchEngine;
     private IExternalLogger extenalLogger;
+    private final long timeoutInMs;
 
     // ---------------- Static Maps ---------------- //
     private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
@@ -61,13 +62,22 @@ public class PDDLPlanner {
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
                 "", false, Float.POSITIVE_INFINITY,false, false,
-                null);
+                null, Long.MAX_VALUE);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
                        boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, IExternalLogger extenalLogger) {
+        this(search, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t,
+                saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling, extenalLogger, Long.MAX_VALUE);
+    }
+
+    public PDDLPlanner(String search, String redundantConstraints,
+                       boolean helpfulActionPruning, boolean helpfulTransitions,
+                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling,
+                       IExternalLogger extenalLogger, long timeoutInMs) {
         this.search = search;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
@@ -81,6 +91,7 @@ public class PDDLPlanner {
         this.bucketBasedQueueSearch = bucketBasedQueueSearch;
         this.extenalLogger = extenalLogger;
         this.tunnelling = tunnelling;
+        this.timeoutInMs = timeoutInMs <= 0 ? Long.MAX_VALUE : timeoutInMs;
     }
 
     public SearchNode searchSpaceHandle;
@@ -95,6 +106,7 @@ public class PDDLPlanner {
                 .apply(this, tb);
 
         searchEngine.setExtenalLogger(this.extenalLogger);
+        searchEngine.setTimeoutInMs(timeoutInMs);
 
         searchEngine.beforeExecution();
         final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);

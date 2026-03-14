@@ -99,7 +99,7 @@ public class BucketPriorityQueue implements PriorityQueue<BucketPriorityQueueNod
             System.out.println(q.length);
             System.out.println(q.length*2);
             System.out.println(f);
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
     }
     @Override

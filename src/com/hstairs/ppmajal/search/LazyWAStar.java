@@ -89,6 +89,11 @@ public class LazyWAStar extends WAStar {
         float bestf = 0;
         previous = 0;
         while (!isEmpty(frontier)) {
+            if (shouldStop(timeAtStart)) {
+                totalTime = (System.currentTimeMillis() - timeAtStart);
+                out.println("Search interrupted: timeout reached.");
+                return null;
+            }
             final SearchNode currentNode = (SearchNode) dequeue(frontier);
             this.tryLog(currentNode, ExternalLoggerLogType.Expanding);
 
@@ -115,6 +120,11 @@ public class LazyWAStar extends WAStar {
 
                     Object[] actionsToSearch = getActionsToSearch(helpful,h, problem);
                     for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext(); ) {
+                        if (shouldStop(timeAtStart)) {
+                            totalTime = (System.currentTimeMillis() - timeAtStart);
+                            out.println("Search interrupted: timeout reached.");
+                            return null;
+                        }
 
                         final Pair<State, Object> next = it.next();
                         final State successorState = next.getFirst();

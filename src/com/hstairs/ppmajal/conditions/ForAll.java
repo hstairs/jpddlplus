@@ -184,7 +184,7 @@ public class ForAll extends ComplexCondition implements PostCondition {
 //                ret_val = ret_val.concat(comp.pddlPrint(typeInformation));
             } else {
                 System.out.println("Error in pddlPrint: " + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             }
         }
         if (sons.length > 1)

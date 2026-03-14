@@ -126,7 +126,7 @@ public final class PDDLDomain {
 
             if (parser.invalidGrammar()) {
                 System.out.println("Some Syntax Error");
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             }
 
 //        fc = new FactoryConditions(this.predicates, (LinkedHashSet<Type>) this.types,this.constants);

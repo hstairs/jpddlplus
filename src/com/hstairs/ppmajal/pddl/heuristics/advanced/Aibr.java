@@ -184,7 +184,7 @@ public final class Aibr implements SearchHeuristic {
         } else {
             left = effect.getRight();
         }
-        indirectPrecondition = (Comparison) Comparison.comparison(inequality, left, new PDDLNumber(0), false).normalize();
+        indirectPrecondition = (Comparison) Comparison.comparison(Comparison.Comparator.fromSymbol(inequality), left, new PDDLNumber(0), false).normalize();
         asymptoticPreconditionFunctionMap.put(idx, indirectPrecondition);
         NumEffect eff = new NumEffect("assign");
         eff.setFluentAffected(effect.getFluentAffected());

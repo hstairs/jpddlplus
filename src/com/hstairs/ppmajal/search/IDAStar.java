@@ -24,7 +24,6 @@ public class IDAStar extends SearchEngine {
     final private PrintStream out;
     private long startTime;
     private long previousTime;
-    private long timeout = Long.MAX_VALUE;
 
     public IDAStar(boolean helpfulActionsPruning, float hWeigth, boolean idaStarWithMemory, boolean checkAlongPrefix, boolean showExpansion, PrintStream out) {
         super(helpfulActionsPruning);
@@ -70,9 +69,11 @@ public class IDAStar extends SearchEngine {
         for (;;) {
             try {
                 res = boundedDepthFirstSearch(problem,h, bound,
-                        false, checkAlongPrefix, showExpansion, idaStarWithMemory, timeout);
+                        false, checkAlongPrefix, showExpansion, idaStarWithMemory, timeoutInMs);
             } catch (TimeoutException e) {
-                throw new RuntimeException(e);
+                totalTime = System.currentTimeMillis() - startTime;
+                out.println("Search interrupted: timeout reached.");
+                return null;
             }
             if (res == null || res.getFirst() != null) {
                 break;
@@ -102,6 +103,9 @@ public class IDAStar extends SearchEngine {
         while (!frontier.isEmpty()) {
             final IdaStarSearchNode node = frontier.pop();
             this.tryLog(node, ExternalLoggerLogType.Expanding);
+            if (Thread.currentThread().isInterrupted()) {
+                throw new TimeoutException("");
+            }
             long now = System.currentTimeMillis();
             if (now - this.startTime > timeout) {
                 throw new TimeoutException("");

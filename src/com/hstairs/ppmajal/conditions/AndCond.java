@@ -143,7 +143,7 @@ public class AndCond extends ComplexCondition implements PostCondition {
                 ret_val = ret_val.concat(comp.pddlPrintWithExtraObject());
             } else if (o instanceof NumEffect) {
                 System.out.println("Error in pddlPrint:" + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             } else{
                 throw new RuntimeException("This is not supported in this condition"+o);
             }
@@ -550,7 +550,7 @@ public class AndCond extends ComplexCondition implements PostCondition {
             new_comparator = a1.getComparator();
         }
 
-        Comparison newC = (Comparison) Comparison.comparison(new_comparator, expr.normalize(), new ExtendedNormExpression(0d), false).normalize();
+        Comparison newC = (Comparison) Comparison.comparison(Comparison.Comparator.fromSymbol(new_comparator), expr.normalize(), new ExtendedNormExpression(0d), false).normalize();
         if (newC == null) {
             return null;
         }

@@ -211,7 +211,7 @@ public abstract class ComplexCondition extends Condition {
 
     protected void sonHasIncorrectType (Object son) {
         System.out.println("Effect " + son + " is not valid. Its class is" + son.getClass() + ".  Please revise your action model.");
-        System.exit(-1);
+        throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
     }
 
     @Override

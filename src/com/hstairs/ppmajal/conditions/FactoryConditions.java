@@ -26,11 +26,9 @@ import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.parser.PddlParser;
 import com.hstairs.ppmajal.PDDLProblem.PDDLObjects;
 import com.hstairs.ppmajal.transition.ConditionalEffects;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
+
+import java.util.*;
+
 import org.antlr.runtime.tree.Tree;
 
 /**
@@ -61,7 +59,7 @@ public class FactoryConditions {
         if (t.getType() == PddlParser.NAME) {
 
             System.out.println("Error in parsing variable terms");
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
 
         } else {
 
@@ -127,9 +125,20 @@ public class FactoryConditions {
                 return not;
             //Crea un not e per ogni figlio di questo nodo invoca creaformula
             //gestendo il valore di ritorno come un attributo di not
-            case PddlParser.COMPARISON_GD:
-                return Comparison.comparison(tree.getChild(0).getText(), createExpression(tree.getChild(1), parTable), createExpression(tree.getChild(2), parTable),false);
-            //Create an equality structure for comparing Objects
+            case PddlParser.COMPARISON_GD: {
+                String sym = tree.getChild(0).getText();
+                try {
+                    Comparison.Comparator cmp = Comparison.Comparator.fromSymbol(sym);
+                    return Comparison.comparison(
+                            cmp,
+                            createExpression(tree.getChild(1), parTable),
+                            createExpression(tree.getChild(2), parTable),
+                            false
+                    );
+                } catch (IllegalArgumentException e) {
+                    throw new RuntimeException("Unsupported comparator in PDDL: " + sym, e);
+                }
+            }      //Create an equality structure for comparing Objects
             case PddlParser.EQUALITY_CON:
 //                PDDLObjectsEquality equality = new Predicate();
 //
@@ -271,6 +280,20 @@ public class FactoryConditions {
                 ret.setArg(createExpression(t.getChild(0), parTable));
                 return ret;
             }
+            case PddlParser.ASIN: {
+                TrigonometricFunction ret = new TrigonometricFunction();
+//                System.out.println(t.getChild(1));
+                ret.setOperator("asin");
+                ret.setArg(createExpression(t.getChild(0), parTable));
+                return ret;
+            }
+            case PddlParser.ACOS: {
+                TrigonometricFunction ret = new TrigonometricFunction();
+//                System.out.println(t.getChild(1));
+                ret.setOperator("acos");
+                ret.setArg(createExpression(t.getChild(0), parTable));
+                return ret;
+            }
             case PddlParser.NUMBER: {
                 PDDLNumber ret = new PDDLNumber(Float.parseFloat(t.getText()));
                 return ret;
@@ -295,7 +318,7 @@ public class FactoryConditions {
                         } else {
 //                        System.out.println("t.type: " + t.getChild(i).getText());
                             System.out.println("NumFluent: Variable " + v + " not involved in the action model");
-                            System.exit(-1);
+                            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                         }
                     }
                 }
@@ -352,7 +375,7 @@ public class FactoryConditions {
                         forall.add(ret_val);
                     } else {
                         System.out.println("Something fishy here.." + child);
-                        System.exit(-1);
+                        throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                     }
                     break;
 
@@ -447,9 +470,14 @@ public class FactoryConditions {
             //gestendo il valore di ritorno come un attributo di not
         } else if (infoAction.getType() == PddlParser.COMPARISON_GD) {
             //System.out.println("Comparison:" + infoAction.getText());
-            Collection ret = new HashSet();
-            ret.add(Comparison.comparison(infoAction.getChild(0).getText(), createExpression(infoAction.getChild(1)), createExpression(infoAction.getChild(2)),false));
-            return new AndCond(ret);
+            return new AndCond(Set.of(
+                    Comparison.comparison(
+                            Comparison.Comparator.fromSymbol(infoAction.getChild(0).getText()),
+                            createExpression(infoAction.getChild(1)),
+                            createExpression(infoAction.getChild(2)),
+                            false
+                    )
+            ));
             //Crea un not e per ogni figlio di questo nodo invoca creaformula
             //gestendo il valore di ritorno come un attributo di not
         } else if (infoAction.getType() == PddlParser.ONEOF) {

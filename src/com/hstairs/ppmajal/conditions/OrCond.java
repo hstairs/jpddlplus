@@ -339,7 +339,7 @@ public class OrCond extends ComplexCondition {
                 ret_val = ret_val.concat(comp.pddlPrintWithExtraObject());
             } else {
                 System.out.println("Error in pddlPrint:" + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             }
         }
         ret_val = ret_val.concat(")");
@@ -368,7 +368,7 @@ public class OrCond extends ComplexCondition {
                 c.pddlPrint(typeInformation, bui);
             } else {
                 System.out.println("Error in pddlPrint:" + this);
-                System.exit(-1);
+                throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
             }
         }
         bui.append(")");

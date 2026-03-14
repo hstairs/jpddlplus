@@ -43,6 +43,11 @@ public class EHS extends SearchEngine {
         visited = new Object2BooleanLinkedOpenHashMap();
         ((Object2BooleanMap<State>) visited).put(current.s, true);
         while (true) {
+            if (shouldStop(startTime)) {
+                totalTime = System.currentTimeMillis()-startTime;
+                out.println("Search interrupted: timeout reached.");
+                return null;
+            }
             final Boolean b = p.goalSatisfied(current.s);
             if (b == null) {
                 break;

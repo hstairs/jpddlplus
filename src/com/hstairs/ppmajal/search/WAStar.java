@@ -125,11 +125,22 @@ public class WAStar extends SearchEngine {
         gValue.put(initState, 0f);//The initial state is at 0 distance, of course.
         float bestf = 0;
         previous = 0;
+        int number = 0;
         while (!frontier.isEmpty()) {
+            if (shouldStop(timeAtStart)) {
+                totalTime = (System.currentTimeMillis() - timeAtStart);
+                out.println("Search interrupted: timeout reached.");
+                return null;
+            }
+            number++;
+            if(number==100){
+                int debugger = 10;
+            }
             final SearchNode currentNode = frontier.dequeue();
             this.tryLog(currentNode, ExternalLoggerLogType.Expanding);
-
             if (currentNode.gValue == getPreviousCost(gValue, currentNode.s)){
+                if (saveSearchSpace)
+                    currentNode.set_visited(nodesExpanded);
                 nodesExpanded++;
                 long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);
                 final Boolean res = problem.goalSatisfied(currentNode.s);
@@ -144,6 +155,11 @@ public class WAStar extends SearchEngine {
                         nodesExpanded,nodesEvaluated,frontier,currentNode);
                 final Object[] actionsToSearch = getActionsToSearch(currentNode, problem, h);
                 for (final Iterator<Pair<State, Object>> it = problem.getSuccessors(currentNode.s,actionsToSearch); it.hasNext();) {
+                    if (shouldStop(timeAtStart)) {
+                        totalTime = (System.currentTimeMillis() - timeAtStart);
+                        out.println("Search interrupted: timeout reached.");
+                        return null;
+                    }
                     final Pair<State, Object> next = it.next();
                     final State successorState = next.getFirst();
                     final Object act = next.getSecond();

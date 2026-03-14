@@ -17,12 +17,19 @@ package enhsp2;/*
  * MA 02110-1301  USA
  */
 
+import enhsp2.ENHSP;
+import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 public class main {
     public static void main(String[] args) throws Exception {
-        ENHSP p = new ENHSP(false);
-        p.parseInput(args);
-        p.configurePlanner();
-        p.parsingDomainAndProblem(args);
-        p.planning();
+        try {
+            ENHSP p = new ENHSP(false);
+            p.parseInput(args);
+            p.configurePlanner();
+            p.parsingDomainAndProblem(args);
+            p.planning();
+        } catch (PlannerExitException ex) {
+            System.exit(ex.exitCode());
+        }
+
     }
 }

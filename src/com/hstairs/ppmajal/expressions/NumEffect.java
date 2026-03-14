@@ -335,7 +335,7 @@ public class NumEffect extends Expression implements PostCondition {
             for (ExtendedAddendum ad : r.summations) {
                 if (ad.bin != null) {
                     System.out.println("Error: Trying to roll up an unrollable action");
-                    System.exit(-1);
+                    throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                 }
 
                 if (ad.f != null && ad.f.equals(this.getFluentAffected())) {
@@ -344,7 +344,7 @@ public class NumEffect extends Expression implements PostCondition {
                         alpha = ad.n;
                     } else {
                         System.out.println("Error: Trying to roll up an unrollable action");
-                        System.exit(-1);
+                        throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
                     }
                 } else {
                     new_right.summations.add(ad);
@@ -448,7 +448,7 @@ public class NumEffect extends Expression implements PostCondition {
         if (eval == null) {
             System.out.print("State:" + s);
             System.out.println("Applying a not applicable effect!:" + this);
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
 
         if (this.operator.equals("increase")) {

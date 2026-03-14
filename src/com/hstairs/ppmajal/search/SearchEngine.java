@@ -26,6 +26,7 @@ public abstract class SearchEngine {
     final boolean helpfulActions;
     private SearchNode searchSpaceHandle;
     protected IExternalLogger extenalLogger;
+    protected long timeoutInMs = Long.MAX_VALUE;
 
     protected SearchEngine(boolean helpfulActionsPruning) {
         this.helpfulActions = helpfulActionsPruning;
@@ -102,6 +103,17 @@ public abstract class SearchEngine {
 
     public void setExtenalLogger(IExternalLogger extenalLogger) {
         this.extenalLogger = extenalLogger;
+    }
+
+    public void setTimeoutInMs(long timeoutInMs) {
+        this.timeoutInMs = timeoutInMs <= 0 ? Long.MAX_VALUE : timeoutInMs;
+    }
+
+    protected boolean shouldStop(long startTimeMs) {
+        if (Thread.currentThread().isInterrupted()) {
+            return true;
+        }
+        return (System.currentTimeMillis() - startTimeMs) >= timeoutInMs;
     }
 
     public void tryLog(SimpleSearchNode node, ExternalLoggerLogType logType) {

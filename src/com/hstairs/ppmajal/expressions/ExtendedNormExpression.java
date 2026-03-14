@@ -535,7 +535,7 @@ public class ExtendedNormExpression extends Expression {
         } catch (Exception ex) {
             System.out.println("Problem in substitution:" + numeric + this);
             Logger.getLogger(ExtendedNormExpression.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
         return result;
     }
@@ -833,7 +833,7 @@ public class ExtendedNormExpression extends Expression {
             res = new ExtendedNormExpression(Math.pow(a, b));
         } else {
             System.out.println("Not supported to-the-power operation");
-            System.exit(-1);
+            throw new com.hstairs.ppmajal.extraUtils.PlannerExitException(-1, "Planner requested termination due to an unrecoverable error.");
         }
         return res;
     }
