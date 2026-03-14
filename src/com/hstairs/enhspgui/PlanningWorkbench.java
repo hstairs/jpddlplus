@@ -77,6 +77,7 @@ public class PlanningWorkbench {
         private final DefaultListModel<String> planListModel;
         private final JList<String> planList;
         private final JButton viewStateButton;
+        private final JButton viewPlanGraphButton;
         private final JTextArea statsArea;
         private final JTextField quickTimeoutField;
         private final JButton runButton;
@@ -195,10 +196,14 @@ public class PlanningWorkbench {
             viewStateButton = new JButton("View State For Selected Step");
             viewStateButton.setEnabled(false);
             viewStateButton.addActionListener(e -> showSelectedStepStatePopup());
+            viewPlanGraphButton = new JButton("View Plan Graph");
+            viewPlanGraphButton.setEnabled(false);
+            viewPlanGraphButton.addActionListener(e -> showPlanGraphDialog());
             JPanel planPanel = new JPanel(new BorderLayout());
             planPanel.add(new JScrollPane(planList), BorderLayout.CENTER);
             JPanel planBottom = new JPanel(new FlowLayout(FlowLayout.LEFT));
             planBottom.add(viewStateButton);
+            planBottom.add(viewPlanGraphButton);
             planPanel.add(planBottom, BorderLayout.SOUTH);
             statsArea = new JTextArea();
             statsArea.setEditable(false);
@@ -1343,6 +1348,7 @@ public class PlanningWorkbench {
             pauseButton.setEnabled(true);
             stopButton.setEnabled(true);
             viewStateButton.setEnabled(false);
+            viewPlanGraphButton.setEnabled(false);
             pauseRequested = false;
             pauseButton.setText("Pause");
             latestPlanningResult = null;
@@ -1474,12 +1480,14 @@ public class PlanningWorkbench {
                             setPlanMessages("Planning stopped by user.");
                             statsArea.setText(buildStatsAndRawOutputText("Planning stopped by user."));
                             viewStateButton.setEnabled(false);
+                            viewPlanGraphButton.setEnabled(false);
                         } else {
                             PlanningResult result = get();
                             latestPlanningResult = result;
                             setPlanResult(result);
                             statsArea.setText(buildStatsAndRawOutputText(result.statsText));
                             viewStateButton.setEnabled(result.hasTrace());
+                            viewPlanGraphButton.setEnabled(result.hasPlanGraph());
                             if (searchTreeForThisRun) {
                                 loadLatestSearchTreeJsonIfPresent();
                             }
@@ -1489,6 +1497,7 @@ public class PlanningWorkbench {
                         setPlanMessages("Planning failed:", String.valueOf(e));
                         statsArea.setText(buildStatsAndRawOutputText("Planning failed:\n" + e));
                         viewStateButton.setEnabled(false);
+                        viewPlanGraphButton.setEnabled(false);
                     } finally {
                         runButton.setEnabled(true);
                         pauseButton.setEnabled(false);
@@ -1708,6 +1717,27 @@ public class PlanningWorkbench {
             JOptionPane.showMessageDialog(this, tabs, "State Trace - Step " + actionStepIndex, JOptionPane.INFORMATION_MESSAGE);
         }
 
+        private void showPlanGraphDialog() {
+            if (currentWorker != null) {
+                return;
+            }
+            PlanningResult result = latestPlanningResult;
+            if (result == null || !result.hasPlanGraph()) {
+                JOptionPane.showMessageDialog(this, "No plan available to visualize.", "Plan Graph", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            JDialog dialog = new JDialog(this, "Plan Graph", false);
+            PlanGraphPanel graphPanel = new PlanGraphPanel(result);
+            JScrollPane scrollPane = new JScrollPane(graphPanel);
+            scrollPane.getVerticalScrollBar().setUnitIncrement(20);
+            scrollPane.getHorizontalScrollBar().setUnitIncrement(20);
+            dialog.setLayout(new BorderLayout());
+            dialog.add(scrollPane, BorderLayout.CENTER);
+            dialog.setSize(1100, 700);
+            dialog.setLocationRelativeTo(this);
+            dialog.setVisible(true);
+        }
+
         private String buildStateDiff(String before, String after) {
             java.util.Map<String, String> b = parseStateAssignments(before);
             java.util.Map<String, String> a = parseStateAssignments(after);
@@ -1832,6 +1862,7 @@ public class PlanningWorkbench {
             List<String> actionLines = new ArrayList<>();
             List<String> displayLines = new ArrayList<>();
             List<Integer> displayToActionStep = new ArrayList<>();
+            List<PlanTimepointGroup> graphGroups = new ArrayList<>();
             statsBuilder.append("Plan found.\n");
             statsBuilder.append("Plan length: ").append(solution.rawPlan().size()).append('\n');
             statsBuilder.append("Search metric: ").append(solution.gValueAtTheEnd()).append('\n');
@@ -1842,13 +1873,21 @@ public class PlanningWorkbench {
             List<ActionDisplayEntry> entries = new ArrayList<>();
             List<Integer> rawStepToActionIndex = new ArrayList<>();
             boolean hasNonActionTransitions = false;
+            boolean hasActionWithExplicitTime = false;
+            boolean hasNonZeroActionTime = false;
+            boolean hasConcurrentActionsAtSameTime = false;
+            java.util.Set<String> explicitActionTimes = new java.util.LinkedHashSet<>();
             int stepIndex = 0;
             int actionIndex = 0;
             for (ImmutablePair<BigDecimal, com.hstairs.ppmajal.transition.TransitionGround> planStep : solution.rawPlan()) {
-                String action = planStep.getRight().toString();
-                String timeKey = normalizeTimeKey(planStep.getLeft(), stepIndex);
-                boolean isAction = planStep.getRight() != null
-                        && planStep.getRight().getSemantics().equals(com.hstairs.ppmajal.transition.Transition.Semantics.ACTION);
+                com.hstairs.ppmajal.transition.TransitionGround transition = planStep.getRight();
+                String action = transition == null ? "<null transition>" : transition.toString();
+                BigDecimal timeValue = planStep.getLeft();
+                boolean explicitTime = timeValue != null;
+                String timeKey = normalizeTimeKey(timeValue, stepIndex);
+                boolean isAction = transition != null
+                        && transition.getSemantics().equals(com.hstairs.ppmajal.transition.Transition.Semantics.ACTION);
+                boolean waiting = isWaitingActionText(action);
                 if (!isAction) {
                     hasNonActionTransitions = true;
                 }
@@ -1857,70 +1896,97 @@ public class PlanningWorkbench {
                     mappedActionIndex = actionIndex;
                     actionLines.add(action);
                     actionIndex++;
+                    if (explicitTime) {
+                        hasActionWithExplicitTime = true;
+                        if (normalizeTimeValue(timeValue).compareTo(BigDecimal.ZERO) != 0) {
+                            hasNonZeroActionTime = true;
+                        }
+                        if (!explicitActionTimes.add(timeKey)) {
+                            hasConcurrentActionsAtSameTime = true;
+                        }
+                    }
                 }
                 rawStepToActionIndex.add(mappedActionIndex);
-                entries.add(new ActionDisplayEntry(stepIndex, mappedActionIndex, timeKey, action));
+                entries.add(new ActionDisplayEntry(stepIndex, mappedActionIndex, timeKey, action, isAction, waiting, explicitTime));
                 stepIndex++;
             }
 
-            if (!hasNonActionTransitions) {
+            boolean hasMultipleActionTimepoints = explicitActionTimes.size() > 1;
+            boolean pddlPlusProblem = problem != null
+                    && ((problem.getProcessesSet() != null && !problem.getProcessesSet().isEmpty())
+                    || (problem.getEventsSet() != null && !problem.getEventsSet().isEmpty()));
+            boolean timedPlanCandidate = hasNonActionTransitions
+                    || hasConcurrentActionsAtSameTime
+                    || (hasActionWithExplicitTime && (hasMultipleActionTimepoints || hasNonZeroActionTime));
+            boolean timedPlan = pddlPlusProblem && timedPlanCandidate;
+            statsBuilder.append("Plan layout: ").append(timedPlan ? "timepoint groups" : "sequential").append('\n');
+
+            if (!timedPlan) {
                 int index = 0;
                 for (ActionDisplayEntry e : entries) {
-                    if (e.actionIndex < 0 || isWaitingActionText(e.action)) {
+                    if (!e.actionTransition || e.waitingTransition) {
                         continue;
                     }
                     displayLines.add(index + ": " + e.action);
                     displayToActionStep.add(e.actionIndex);
+                    graphGroups.add(new PlanTimepointGroup(
+                            String.valueOf(index),
+                            List.of(new PlanActionRef(e.actionIndex, e.action)),
+                            List.of()
+                    ));
                     index++;
                 }
             } else {
-                int pos = 0;
-                List<TimeGroup> groups = new ArrayList<>();
-                while (pos < entries.size()) {
-                    String currentTime = entries.get(pos).timeKey;
-                    List<ActionDisplayEntry> group = new ArrayList<>();
-                    while (pos < entries.size() && entries.get(pos).timeKey.equals(currentTime)) {
-                        group.add(entries.get(pos));
-                        pos++;
-                    }
-
-                    int waitingCount = 0;
-                    List<ActionDisplayEntry> nonWaiting = new ArrayList<>();
-                    for (ActionDisplayEntry e : group) {
-                        if (isWaitingActionText(e.action)) {
-                            waitingCount++;
-                            continue;
-                        }
-                        nonWaiting.add(e);
-                    }
-                    groups.add(new TimeGroup(currentTime, nonWaiting, waitingCount));
+                java.util.LinkedHashMap<String, List<ActionDisplayEntry>> groupedByTime = new java.util.LinkedHashMap<>();
+                for (ActionDisplayEntry entry : entries) {
+                    groupedByTime.computeIfAbsent(entry.timeKey, ignored -> new ArrayList<>()).add(entry);
                 }
-
-                for (int i = 0; i < groups.size(); i++) {
-                    TimeGroup g = groups.get(i);
-                    if (g.nonWaitingActions.isEmpty()) {
+                List<PlanTimepointGroup> compactGroups = new ArrayList<>();
+                java.util.LinkedHashSet<String> carriedOnDemandTransitions = new java.util.LinkedHashSet<>();
+                for (var groupEntry : groupedByTime.entrySet()) {
+                    String timeKey = groupEntry.getKey();
+                    List<ActionDisplayEntry> atTime = groupEntry.getValue();
+                    List<PlanActionRef> actionsAtTime = new ArrayList<>();
+                    java.util.LinkedHashSet<String> onDemandTransitionsAtTime = new java.util.LinkedHashSet<>();
+                    for (ActionDisplayEntry entry : atTime) {
+                        if (entry.actionTransition && !entry.waitingTransition) {
+                            actionsAtTime.add(new PlanActionRef(entry.actionIndex, entry.action));
+                        } else if (entry.action != null && !entry.action.isBlank()) {
+                            onDemandTransitionsAtTime.add(entry.action);
+                        }
+                    }
+                    if (actionsAtTime.isEmpty()) {
+                        carriedOnDemandTransitions.addAll(onDemandTransitionsAtTime);
                         continue;
                     }
-                    for (ActionDisplayEntry e : g.nonWaitingActions) {
-                        displayLines.add(g.timeKey + ": " + e.action);
-                        displayToActionStep.add(e.actionIndex);
-                    }
-
-                    String nextActionTime = null;
-                    int waitingBetween = 0;
-                    for (int j = i + 1; j < groups.size(); j++) {
-                        TimeGroup next = groups.get(j);
-                        waitingBetween += next.waitingCount;
-                        if (!next.nonWaitingActions.isEmpty()) {
-                            nextActionTime = next.timeKey;
-                            break;
-                        }
-                    }
-                    if (waitingBetween > 0 && nextActionTime != null) {
-                        displayLines.add(g.timeKey + ": -----waiting---- [" + nextActionTime + "]");
-                        displayToActionStep.add(-1);
+                    java.util.LinkedHashSet<String> mergedOnDemandTransitions = new java.util.LinkedHashSet<>(carriedOnDemandTransitions);
+                    mergedOnDemandTransitions.addAll(onDemandTransitionsAtTime);
+                    carriedOnDemandTransitions.clear();
+                    compactGroups.add(new PlanTimepointGroup(timeKey, actionsAtTime, new ArrayList<>(mergedOnDemandTransitions)));
+                }
+                if (!carriedOnDemandTransitions.isEmpty()) {
+                    if (!compactGroups.isEmpty()) {
+                        PlanTimepointGroup last = compactGroups.get(compactGroups.size() - 1);
+                        java.util.LinkedHashSet<String> mergedTail = new java.util.LinkedHashSet<>(last.onDemandTransitions);
+                        mergedTail.addAll(carriedOnDemandTransitions);
+                        last.onDemandTransitions.clear();
+                        last.onDemandTransitions.addAll(mergedTail);
+                    } else if (!groupedByTime.isEmpty()) {
+                        String fallbackTime = groupedByTime.keySet().iterator().next();
+                        compactGroups.add(new PlanTimepointGroup(fallbackTime, new ArrayList<>(), new ArrayList<>(carriedOnDemandTransitions)));
                     }
                 }
+                for (PlanTimepointGroup group : compactGroups) {
+                    String header = "[t=" + group.timeKey + "] " + group.actions.size() + " action(s)";
+                    displayLines.add(header);
+                    displayToActionStep.add(-1);
+                    for (PlanActionRef actionRef : group.actions) {
+                        displayLines.add("  - " + actionRef.action);
+                        displayToActionStep.add(actionRef.actionIndex);
+                    }
+                    graphGroups.add(group);
+                }
+                statsBuilder.append("Timepoints shown: ").append(graphGroups.size()).append('\n');
             }
 
             List<String> actionStateBefore = new ArrayList<>();
@@ -1954,16 +2020,29 @@ public class PlanningWorkbench {
                     actionStateAfter,
                     displayLines,
                     displayToActionStep,
+                    timedPlan,
+                    graphGroups,
                     generatedDomainPddl,
                     generatedProblemPddl
             );
+        }
+
+        private static BigDecimal normalizeTimeValue(BigDecimal time) {
+            if (time == null) {
+                return BigDecimal.ZERO;
+            }
+            BigDecimal normalized = time.stripTrailingZeros();
+            if (normalized.compareTo(BigDecimal.ZERO) == 0) {
+                return BigDecimal.ZERO;
+            }
+            return normalized;
         }
 
         private static String normalizeTimeKey(BigDecimal time, int stepIndex) {
             if (time == null) {
                 return "step " + stepIndex;
             }
-            BigDecimal normalized = time.stripTrailingZeros();
+            BigDecimal normalized = normalizeTimeValue(time);
             if (normalized.compareTo(BigDecimal.ZERO) == 0) {
                 return "0";
             }
@@ -2255,6 +2334,248 @@ public class PlanningWorkbench {
         }
     }
 
+    private static final class PlanGraphPanel extends JPanel {
+        private static final int MARGIN = 40;
+        private static final int BOX_WIDTH = 190;
+        private static final int BOX_HEIGHT = 34;
+        private static final int COLUMN_GAP = 80;
+        private static final int ROW_GAP = 16;
+        private final PlanningResult result;
+        private final List<TooltipRegion> tooltipRegions = new ArrayList<>();
+
+        PlanGraphPanel(PlanningResult result) {
+            this.result = result;
+            setOpaque(true);
+            setBackground(Color.WHITE);
+            ToolTipManager.sharedInstance().registerComponent(this);
+        }
+
+        @Override
+        public String getToolTipText(MouseEvent event) {
+            if (event == null) {
+                return null;
+            }
+            for (int i = tooltipRegions.size() - 1; i >= 0; i--) {
+                TooltipRegion region = tooltipRegions.get(i);
+                if (region.bounds.contains(event.getPoint())) {
+                    return region.tooltip;
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            if (result.timedPlan && !result.planTimepointGroups.isEmpty()) {
+                int columns = result.planTimepointGroups.size();
+                int maxRows = 1;
+                for (PlanTimepointGroup group : result.planTimepointGroups) {
+                    maxRows = Math.max(maxRows, group.actions.size());
+                }
+                int width = MARGIN * 2 + columns * BOX_WIDTH + Math.max(0, columns - 1) * COLUMN_GAP + 120;
+                int height = MARGIN * 2 + 110 + maxRows * (BOX_HEIGHT + ROW_GAP);
+                return new Dimension(Math.max(900, width), Math.max(360, height));
+            }
+            int steps = Math.max(1, result.actionLines.size());
+            int width = 960;
+            int height = MARGIN * 2 + 80 + steps * (BOX_HEIGHT + 40);
+            return new Dimension(width, Math.max(360, height));
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            tooltipRegions.clear();
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            if (result.timedPlan && !result.planTimepointGroups.isEmpty()) {
+                paintTimedPlan(g2);
+            } else {
+                paintSequentialPlan(g2);
+            }
+            g2.dispose();
+        }
+
+        private void paintSequentialPlan(Graphics2D g2) {
+            int width = getPreferredSize().width - (MARGIN * 2);
+            int x = MARGIN;
+            int y = MARGIN + 30;
+            g2.setColor(new Color(60, 66, 80));
+            g2.setFont(g2.getFont().deriveFont(Font.BOLD, 15f));
+            g2.drawString("Sequential plan", MARGIN, MARGIN - 8);
+
+            for (int i = 0; i < result.actionLines.size(); i++) {
+                String label = i + ": " + result.actionLines.get(i);
+                Rectangle bounds = drawActionBox(g2, x, y, width, BOX_HEIGHT, label,
+                        new Color(226, 239, 252), new Color(55, 95, 155));
+                registerTooltip(bounds, buildActionTooltip(i, result.actionLines.get(i)));
+                if (i < result.actionLines.size() - 1) {
+                    int xMid = x + (width / 2);
+                    int yStart = y + BOX_HEIGHT;
+                    int yEnd = y + BOX_HEIGHT + 28;
+                    drawArrow(g2, xMid, yStart, xMid, yEnd);
+                }
+                y += BOX_HEIGHT + 40;
+            }
+        }
+
+        private void paintTimedPlan(Graphics2D g2) {
+            List<PlanTimepointGroup> groups = result.planTimepointGroups;
+            int startX = MARGIN + 40;
+            int axisY = MARGIN + 45;
+            int panelBottom = getPreferredSize().height - MARGIN;
+
+            g2.setColor(new Color(60, 66, 80));
+            g2.setFont(g2.getFont().deriveFont(Font.BOLD, 15f));
+            g2.drawString("Timepoint groups (PDDL+/temporal)", MARGIN, MARGIN - 8);
+
+            for (int i = 0; i < groups.size(); i++) {
+                PlanTimepointGroup group = groups.get(i);
+                int x = startX + i * (BOX_WIDTH + COLUMN_GAP);
+                g2.setColor(new Color(110, 120, 135));
+                g2.setFont(g2.getFont().deriveFont(Font.BOLD, 13f));
+                g2.drawString("t=" + group.timeKey, x, axisY);
+                registerTooltip(new Rectangle(x, axisY - 14, BOX_WIDTH, 22), buildTimepointTooltip(group));
+                g2.setStroke(new BasicStroke(1.2f));
+                g2.setColor(new Color(214, 219, 230));
+                g2.drawLine(x + (BOX_WIDTH / 2), axisY + 10, x + (BOX_WIDTH / 2), panelBottom);
+                for (int row = 0; row < group.actions.size(); row++) {
+                    PlanActionRef actionRef = group.actions.get(row);
+                    int y = axisY + 22 + row * (BOX_HEIGHT + ROW_GAP);
+                    Rectangle bounds = drawActionBox(g2, x, y, BOX_WIDTH, BOX_HEIGHT, actionRef.action,
+                            new Color(229, 247, 234), new Color(44, 120, 70));
+                    registerTooltip(bounds, buildActionTooltip(actionRef.actionIndex, actionRef.action));
+                }
+            }
+
+            g2.setStroke(new BasicStroke(1.0f));
+            g2.setColor(new Color(120, 130, 150));
+            for (int i = 0; i < groups.size() - 1; i++) {
+                PlanTimepointGroup left = groups.get(i);
+                PlanTimepointGroup right = groups.get(i + 1);
+                int connectors = Math.min(left.actions.size(), right.actions.size());
+                int leftX = startX + i * (BOX_WIDTH + COLUMN_GAP);
+                int rightX = startX + (i + 1) * (BOX_WIDTH + COLUMN_GAP);
+                for (int row = 0; row < connectors; row++) {
+                    int y = axisY + 22 + row * (BOX_HEIGHT + ROW_GAP) + (BOX_HEIGHT / 2);
+                    drawArrow(g2, leftX + BOX_WIDTH, y, rightX, y);
+                }
+            }
+        }
+
+        private String buildActionTooltip(int actionIndex, String actionText) {
+            StringBuilder builder = new StringBuilder("<html><b>Action ");
+            builder.append(actionIndex).append("</b>: ").append(escapeHtml(ellipsize(actionText, 120)));
+            if (actionIndex >= 0 && actionIndex < result.actionStateBefore.size()) {
+                builder.append("<br><br><b>State when action is applied:</b><br>")
+                        .append(toHtmlMultiline(result.actionStateBefore.get(actionIndex), 2000));
+            } else {
+                builder.append("<br><br><i>State trace unavailable for this action.</i>");
+            }
+            if (result.timedPlan) {
+                builder.append("<br><br><i>In PDDL+ this state can be approximate (action-only replay).</i>");
+            }
+            builder.append("</html>");
+            return builder.toString();
+        }
+
+        private String buildTimepointTooltip(PlanTimepointGroup group) {
+            StringBuilder builder = new StringBuilder("<html><b>t=");
+            builder.append(escapeHtml(group.timeKey)).append("</b><br>");
+            if (group.onDemandTransitions.isEmpty()) {
+                builder.append("No waiting/process/event transitions recorded.");
+            } else {
+                builder.append("<b>Waiting/process/event transitions:</b><br>");
+                int shown = 0;
+                for (String transition : group.onDemandTransitions) {
+                    builder.append("&bull; ").append(escapeHtml(ellipsize(transition, 140))).append("<br>");
+                    shown++;
+                    if (shown >= 20) {
+                        builder.append("...").append("<br>");
+                        break;
+                    }
+                }
+            }
+            builder.append("</html>");
+            return builder.toString();
+        }
+
+        private void registerTooltip(Rectangle bounds, String tooltip) {
+            if (bounds == null || tooltip == null || tooltip.isBlank()) {
+                return;
+            }
+            tooltipRegions.add(new TooltipRegion(bounds, tooltip));
+        }
+
+        private static Rectangle drawActionBox(Graphics2D g2, int x, int y, int width, int height,
+                                               String label, Color fill, Color border) {
+            g2.setColor(fill);
+            g2.fillRoundRect(x, y, width, height, 16, 16);
+            g2.setColor(border);
+            g2.setStroke(new BasicStroke(1.4f));
+            g2.drawRoundRect(x, y, width, height, 16, 16);
+            g2.setColor(new Color(28, 32, 40));
+            g2.setFont(g2.getFont().deriveFont(Font.PLAIN, 12f));
+            g2.drawString(ellipsize(label, 72), x + 10, y + 22);
+            return new Rectangle(x, y, width, height);
+        }
+
+        private static void drawArrow(Graphics2D g2, int x1, int y1, int x2, int y2) {
+            g2.drawLine(x1, y1, x2, y2);
+            double angle = Math.atan2(y2 - y1, x2 - x1);
+            int arrowSize = 7;
+            int ax1 = (int) Math.round(x2 - arrowSize * Math.cos(angle - Math.PI / 6));
+            int ay1 = (int) Math.round(y2 - arrowSize * Math.sin(angle - Math.PI / 6));
+            int ax2 = (int) Math.round(x2 - arrowSize * Math.cos(angle + Math.PI / 6));
+            int ay2 = (int) Math.round(y2 - arrowSize * Math.sin(angle + Math.PI / 6));
+            g2.drawLine(x2, y2, ax1, ay1);
+            g2.drawLine(x2, y2, ax2, ay2);
+        }
+
+        private static String ellipsize(String text, int maxChars) {
+            if (text == null) {
+                return "";
+            }
+            if (text.length() <= maxChars) {
+                return text;
+            }
+            if (maxChars <= 3) {
+                return "...";
+            }
+            return text.substring(0, maxChars - 3) + "...";
+        }
+
+        private static String toHtmlMultiline(String text, int maxChars) {
+            String content = text == null ? "" : text;
+            if (content.length() > maxChars) {
+                content = content.substring(0, maxChars) + "...";
+            }
+            return escapeHtml(content).replace("\n", "<br>");
+        }
+
+        private static String escapeHtml(String text) {
+            if (text == null) {
+                return "";
+            }
+            String escaped = text;
+            escaped = escaped.replace("&", "&amp;");
+            escaped = escaped.replace("<", "&lt;");
+            escaped = escaped.replace(">", "&gt;");
+            escaped = escaped.replace("\"", "&quot;");
+            return escaped.replace("'", "&#39;");
+        }
+
+        private static final class TooltipRegion {
+            final Rectangle bounds;
+            final String tooltip;
+
+            TooltipRegion(Rectangle bounds, String tooltip) {
+                this.bounds = bounds;
+                this.tooltip = tooltip;
+            }
+        }
+    }
+
     private static final class SyntaxReport {
         final boolean ok;
         final String message;
@@ -2273,11 +2594,14 @@ public class PlanningWorkbench {
         final List<String> actionStateAfter;
         final List<String> displayLines;
         final List<Integer> displayToActionStep;
+        final boolean timedPlan;
+        final List<PlanTimepointGroup> planTimepointGroups;
         final String generatedDomainPddl;
         final String generatedProblemPddl;
 
         PlanningResult(String planText, String statsText, List<String> actionLines, List<String> actionStateBefore, List<String> actionStateAfter,
-                       List<String> displayLines, List<Integer> displayToActionStep,
+                       List<String> displayLines, List<Integer> displayToActionStep, boolean timedPlan,
+                       List<PlanTimepointGroup> planTimepointGroups,
                        String generatedDomainPddl, String generatedProblemPddl) {
             this.planText = planText;
             this.statsText = statsText;
@@ -2286,12 +2610,14 @@ public class PlanningWorkbench {
             this.actionStateAfter = actionStateAfter;
             this.displayLines = displayLines;
             this.displayToActionStep = displayToActionStep;
+            this.timedPlan = timedPlan;
+            this.planTimepointGroups = planTimepointGroups;
             this.generatedDomainPddl = generatedDomainPddl;
             this.generatedProblemPddl = generatedProblemPddl;
         }
 
         static PlanningResult error(String message, String generatedDomainPddl, String generatedProblemPddl) {
-            return new PlanningResult(message, message, List.of(), List.of(), List.of(), List.of(message), List.of(-1),
+            return new PlanningResult(message, message, List.of(), List.of(), List.of(), List.of(message), List.of(-1), false, List.of(),
                     generatedDomainPddl, generatedProblemPddl);
         }
 
@@ -2304,6 +2630,10 @@ public class PlanningWorkbench {
         boolean hasGeneratedPddl() {
             return generatedDomainPddl != null && generatedProblemPddl != null;
         }
+
+        boolean hasPlanGraph() {
+            return !actionLines.isEmpty() || !planTimepointGroups.isEmpty();
+        }
     }
 
     private static final class ActionDisplayEntry {
@@ -2311,24 +2641,41 @@ public class PlanningWorkbench {
         final int actionIndex;
         final String timeKey;
         final String action;
+        final boolean actionTransition;
+        final boolean waitingTransition;
+        final boolean explicitTime;
 
-        ActionDisplayEntry(int originalStepIndex, int actionIndex, String timeKey, String action) {
+        ActionDisplayEntry(int originalStepIndex, int actionIndex, String timeKey, String action,
+                           boolean actionTransition, boolean waitingTransition, boolean explicitTime) {
             this.originalStepIndex = originalStepIndex;
             this.actionIndex = actionIndex;
             this.timeKey = timeKey;
             this.action = action;
+            this.actionTransition = actionTransition;
+            this.waitingTransition = waitingTransition;
+            this.explicitTime = explicitTime;
         }
     }
 
-    private static final class TimeGroup {
+    private static final class PlanTimepointGroup {
         final String timeKey;
-        final List<ActionDisplayEntry> nonWaitingActions;
-        final int waitingCount;
+        final List<PlanActionRef> actions;
+        final List<String> onDemandTransitions;
 
-        TimeGroup(String timeKey, List<ActionDisplayEntry> nonWaitingActions, int waitingCount) {
+        PlanTimepointGroup(String timeKey, List<PlanActionRef> actions, List<String> onDemandTransitions) {
             this.timeKey = timeKey;
-            this.nonWaitingActions = nonWaitingActions;
-            this.waitingCount = waitingCount;
+            this.actions = actions;
+            this.onDemandTransitions = onDemandTransitions;
+        }
+    }
+
+    private static final class PlanActionRef {
+        final int actionIndex;
+        final String action;
+
+        PlanActionRef(int actionIndex, String action) {
+            this.actionIndex = actionIndex;
+            this.action = action;
         }
     }
 
