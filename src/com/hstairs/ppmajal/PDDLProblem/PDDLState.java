@@ -133,6 +133,7 @@ protected DoubleArrayList numFluents;
         return hash;
     }
 
+
     @Override
     public boolean equals (Object obj) {
         if (this == obj) {
@@ -270,6 +271,22 @@ protected DoubleArrayList numFluents;
         }
     }
 
+
+    // Angel
+    public PDDLState getRepresentative(Map<String, double[]> inputBounds) {
+        PDDLState ret = this.clone();
+
+        for (Entry<String, double[]> entry : inputBounds.entrySet()) {
+            String fluentName = entry.getKey();
+            double[] bounds = entry.getValue();   // [lowerBound, upperBound]
+            double lowerBound = bounds[0];        // tomamos el mínimo
+            NumFluent numFluent = NumFluent.numericFluent(fluentName);
+
+        
+            ret.setNumFluent(numFluent, lowerBound);
+        }
+        return ret;
+    }
 
     @Override
     public boolean satisfy (final Condition input) {

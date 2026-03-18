@@ -56,6 +56,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import java.util.Map;
 
 public class PlanningWorkbench {
 
@@ -1879,8 +1880,8 @@ public class PlanningWorkbench {
             java.util.Set<String> explicitActionTimes = new java.util.LinkedHashSet<>();
             int stepIndex = 0;
             int actionIndex = 0;
-            for (ImmutablePair<BigDecimal, com.hstairs.ppmajal.transition.TransitionGround> planStep : solution.rawPlan()) {
-                com.hstairs.ppmajal.transition.TransitionGround transition = planStep.getRight();
+            for (ImmutablePair<BigDecimal, ImmutablePair<com.hstairs.ppmajal.transition.TransitionGround,Map<String,Double>>> planStep : solution.rawPlan()) {
+                com.hstairs.ppmajal.transition.TransitionGround transition = planStep.getRight().getLeft();
                 String action = transition == null ? "<null transition>" : transition.toString();
                 BigDecimal timeValue = planStep.getLeft();
                 boolean explicitTime = timeValue != null;
@@ -1994,8 +1995,8 @@ public class PlanningWorkbench {
             try {
                 com.hstairs.ppmajal.problem.State current = problem.getInit().clone();
                 int rawIndex = 0;
-                for (ImmutablePair<BigDecimal, com.hstairs.ppmajal.transition.TransitionGround> step : solution.rawPlan()) {
-                    com.hstairs.ppmajal.transition.TransitionGround action = step.getRight();
+                for (ImmutablePair<BigDecimal, ImmutablePair<com.hstairs.ppmajal.transition.TransitionGround,Map<String,Double>>> step : solution.rawPlan()) {
+                    com.hstairs.ppmajal.transition.TransitionGround action = step.getRight().getLeft();
                     int mappedActionIndex = rawStepToActionIndex.get(rawIndex);
                     if (mappedActionIndex >= 0 && action != null
                             && action.getSemantics().equals(com.hstairs.ppmajal.transition.Transition.Semantics.ACTION)) {
@@ -2956,7 +2957,7 @@ public class PlanningWorkbench {
 
             planner = combo(plannerPresetValues());
             heuristic = combo("hadd", "blind", "hmax", "hmrp", "aibr", "hradd", "hrmax", "hlm-lp");
-            search = combo("gbfs", "wastar", "ehs", "ida", "lazygbfs", "lazywastar");
+            search = combo("gbfs", "wastar", "ehs", "ida", "lazygbfs", "lazywastar", "dpex", "dpexopt", "iddpex");
             novelty = combo("", "aqb", "aw", "iqb", "iw");
             kNov = new JTextField();
             ties = combo("arbitrary", "smaller_g", "larger_g");

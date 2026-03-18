@@ -3,11 +3,13 @@ package com.hstairs.ppmajal.PDDLProblem;
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.*;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
+import com.hstairs.ppmajal.search.searchnodes.DPEXSearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
+import com.hstairs.ppmajal.extraUtils.Pair;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -30,6 +32,13 @@ public class PDDLPlanner {
     private IExternalLogger extenalLogger;
     private final long timeoutInMs;
 
+
+    private Map<String, double[]> inputBounds;
+    private int dpexK;
+    private String rectification;
+    private String samplingfunction;     
+    private boolean ignoreStoringInputs;   
+
     // ---------------- Static Maps ---------------- //
     private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
         "smaller_g", SearchEngine.TieBreaking.LOWERG,
@@ -43,7 +52,10 @@ public class PDDLPlanner {
         {"ehs", "EHS", "Enhanced Heuristic Search"},
         {"ida", "IDA", "Iterative Deepening A*"},
         {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
-        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"}
+        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"},
+        {"dpex", "DPEX", "Delayed Partial EXpansion Search"},
+        {"dpexopt", "DPEX-OPT", "Delayed Partial EXpansion Search with costs"},
+        {"iddpex", "ID-DPEX", "Iterative Deepening Delayed Partial EXpansion Search with costs"}
     };
 
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
@@ -52,7 +64,10 @@ public class PDDLPlanner {
         Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
         Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
-        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+        Map.entry(SE_INFOS[6][0], (planner, tb) -> new DPEX(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch,planner.inputBounds,planner.dpexK, planner.rectification,planner.samplingfunction,planner.ignoreStoringInputs)),
+        Map.entry(SE_INFOS[7][0], (planner, tb) -> new DPEX(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch,planner.inputBounds,planner.dpexK, planner.rectification,planner.samplingfunction,planner.ignoreStoringInputs)),
+        Map.entry(SE_INFOS[8][0], (planner, tb) -> new IDDPEX(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch,planner.inputBounds,planner.dpexK, planner.rectification,planner.samplingfunction,planner.ignoreStoringInputs))    
     );
 
     final private boolean bucketBasedQueueSearch;
@@ -62,22 +77,28 @@ public class PDDLPlanner {
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
                 "", false, Float.POSITIVE_INFINITY,false, false,
-                null, Long.MAX_VALUE);
+                null,null,1,"","");
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, IExternalLogger extenalLogger) {
-        this(search, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t,
-                saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling, extenalLogger, Long.MAX_VALUE);
-    }
-
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, 
+                       IExternalLogger extenalLogger, Map<String, double[]> inputBounds, int dpexK,
+                       String rectification, String samplingfunction) {
+                        this(search, redundantConstraints, helpfulActionPruning, helpfulTransitions,
+                        hWeigth, planningDelta, executionDelta, t,
+                        saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling,
+                        extenalLogger, inputBounds, dpexK,
+                        rectification, samplingfunction, true, Long.MAX_VALUE);
+                       }
+                       
     public PDDLPlanner(String search, String redundantConstraints,
                        boolean helpfulActionPruning, boolean helpfulTransitions,
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
-                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling,
-                       IExternalLogger extenalLogger, long timeoutInMs) {
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, 
+                       IExternalLogger extenalLogger, Map<String, double[]> inputBounds, int dpexK,
+                       String rectification, String samplingfunction, boolean ignoreStoringInputs, long timeoutInMs) {
         this.search = search;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
@@ -92,6 +113,12 @@ public class PDDLPlanner {
         this.extenalLogger = extenalLogger;
         this.tunnelling = tunnelling;
         this.timeoutInMs = timeoutInMs <= 0 ? Long.MAX_VALUE : timeoutInMs;
+
+	this.inputBounds = inputBounds;
+        this.dpexK = dpexK;
+        this.rectification = rectification;
+        this.samplingfunction = samplingfunction;
+        this.ignoreStoringInputs = ignoreStoringInputs;
     }
 
     public SearchNode searchSpaceHandle;
@@ -117,16 +144,17 @@ public class PDDLPlanner {
                 solutionHandle, searchEngine.getStats(), solutionHandle.gValue);
     }
 
-    public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {
+    public LinkedList<ImmutablePair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>>> extractPlan(SimpleSearchNode input, PDDLProblem p) {
 
-        final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan = new LinkedList<>();
+        final LinkedList<ImmutablePair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>>> plan = new LinkedList<>();
         State lastState = input.s;
         int nTun = 0;
         if (!(input instanceof SearchNode c)) {
             SimpleSearchNode temp = input;
             while (temp.transition != null) {
                 Double time = null;
-                plan.addFirst(ImmutablePair.of(BigDecimal.ZERO, (TransitionGround) temp.transition));
+
+                plan.addFirst(ImmutablePair.of(BigDecimal.ZERO, ImmutablePair.of((TransitionGround) temp.transition,null)));
                 temp = temp.father;
             }
             return plan;
@@ -141,16 +169,21 @@ public class PDDLPlanner {
                     if (c.transition instanceof ImmutablePair) {
                         final ImmutablePair<TransitionGround, Integer> t = (ImmutablePair<TransitionGround, Integer>) c.transition;
                         for (int i = 0; i < t.right; i++) {
-                            plan.addFirst(ImmutablePair.of(time, t.left));
+                            plan.addFirst(ImmutablePair.of(time, ImmutablePair.of(t.left,null)));
                         }
                         System.out.println("JUMP for " + t.left + ":" + t.right);
                     } else if (c.transition instanceof TransitionGround){
-                        plan.addFirst(ImmutablePair.of(time, (TransitionGround) c.transition));
+                        if (c instanceof DPEXSearchNode){
+                        plan.addFirst(ImmutablePair.of(time, ImmutablePair.of((TransitionGround) c.transition,((DPEXSearchNode) c).sampledInputs)));
+                        }
+                        else{
+                            plan.addFirst(ImmutablePair.of(time, ImmutablePair.of((TransitionGround) c.transition,null)));
+                        }
                     } else if (c.transition instanceof List){
                         ArrayList<TransitionGround> transition = (ArrayList<TransitionGround>) c.transition;
                         nTun+=transition.size();
                         for (int k = ((ArrayList<?>) c.transition).size()-1; k >=0; k--){
-                            plan.addFirst(ImmutablePair.of(time, transition.get(k)));
+                            plan.addFirst(ImmutablePair.of(time, ImmutablePair.of(transition.get(k),null)));
                         }
                     }else{
                         throw new RuntimeException("This can't be");
@@ -167,20 +200,20 @@ public class PDDLPlanner {
             while (c != null) {
                 if (c.transition != null) {
                     // This is an action
-                    plan.addFirst(ImmutablePair.of(((PDDLState) c.s).time, (TransitionGround) c.transition));
+                    plan.addFirst(ImmutablePair.of(((PDDLState) c.s).time, ImmutablePair.of((TransitionGround) c.transition,null)));
                 } else { //This is when I am waiting
                     for (int i = 0; i < c.waitingPoints; i++) {
                         time = time.subtract(executionDelta);
-                        plan.addFirst(ImmutablePair.of(time, waiting));
+                        plan.addFirst(ImmutablePair.of(time, ImmutablePair.of(waiting,null)));
                     }
                 }
                 current = c.s;
                 c = (SearchNode) c.father;
             }
-            final LinkedList<ImmutablePair<BigDecimal, TransitionGround>> finalPlan = new LinkedList<>();
+            final LinkedList<ImmutablePair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>>> finalPlan = new LinkedList<>();
             BigDecimal currentTime = new BigDecimal(0);
-            for (org.apache.commons.lang3.tuple.Pair<BigDecimal, TransitionGround> ele : plan) {
-                TransitionGround right = ele.getRight();
+            for (org.apache.commons.lang3.tuple.Pair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>> ele : plan) {
+                TransitionGround right = ele.getRight().getLeft();
                 if (right.getSemantics().equals(Transition.Semantics.PROCESS)) {
                     ArrayList<TransitionGround> sponteneousTransitions = new ArrayList();
                     final ImmutablePair<State, Integer> stateCollectionPair
@@ -194,7 +227,7 @@ public class PDDLPlanner {
                         }
                         for (var v : sponteneousTransitions) {
                             finalPlan.add(ImmutablePair.
-                                    of(currentTime, v));
+                                    of(currentTime, ImmutablePair.of(v,null)));
                             if (v.getSemantics().equals(Transition.Semantics.PROCESS)) {
                                 currentTime = currentTime.add(executionDelta);
                             }
@@ -205,7 +238,7 @@ public class PDDLPlanner {
                     if (ele.getRight() != null && right.getSemantics().equals(Transition.Semantics.ACTION)) {
                         current.apply(right, current.clone());
                         finalPlan.add(ImmutablePair.
-                                of(currentTime, right));
+                                of(currentTime, ImmutablePair.of(right,null)));
                     } else {
                         throw new RuntimeException("We can't have something different from actions or processes. Instead I got:" + right);
                     }

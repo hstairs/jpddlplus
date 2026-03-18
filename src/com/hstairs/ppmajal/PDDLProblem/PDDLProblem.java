@@ -28,9 +28,12 @@ import com.hstairs.ppmajal.expressions.*;
 import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.parser.PddlLexer;
 import com.hstairs.ppmajal.parser.PddlParser;
+import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.problem.*;
 import com.hstairs.ppmajal.propositionalFactory.*;
+import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.SearchProblem;
 import com.hstairs.ppmajal.transition.*;
@@ -40,6 +43,7 @@ import it.unimi.dsi.fastutil.objects.Object2FloatMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.logging.Level;
@@ -151,10 +155,22 @@ public class PDDLProblem implements SearchProblem {
     private boolean readyForSearch;
 
 
+    private Map<String, double[]> inputBounds = null;
+    private String relaxationDPEX;
+
     public PDDLProblem(PDDLDomain domain, String groundingMethod, PrintStream out, Sdac sdac, boolean ignoreMetric) {
         this(domain, groundingMethod, out, sdac, ignoreMetric, new BigDecimal(1.0), new BigDecimal(1.0));
     }
 
+    public PDDLProblem(String problemFile, PDDLObjects constants, Set<Type> types,
+                       PDDLDomain domain, PrintStream out, String groundingMethod, Sdac sdac, boolean ignoreMetric, BigDecimal planningDelta, BigDecimal executionDelta, String relaxationDPEX) {
+        this(problemFile, constants, types, domain, out, groundingMethod, sdac, ignoreMetric, planningDelta, executionDelta);
+        this.relaxationDPEX = relaxationDPEX;
+    }
+
+    public String getRelaxationDPEX() {
+        return relaxationDPEX;
+    }
 
     public PDDLProblem(PDDLDomain domain, String groundingMethod, PrintStream out, Sdac sdac, boolean ignoreMetric, BigDecimal planningDelta, BigDecimal executionDelta) {
         indexInit = 0;
@@ -1488,6 +1504,32 @@ public class PDDLProblem implements SearchProblem {
         }
 
     }
+
+
+
+    public double[] getInputBounds(String name) {
+        return inputBounds.get(name);
+    }
+
+    public void addFictInitis(Map<String, double[]> inputBounds) {
+        this.inputBounds = inputBounds;
+        for (Map.Entry<String, double[]> entry : inputBounds.entrySet()) {
+            String funcName = entry.getKey();
+            double[] bounds = entry.getValue();
+
+            // Find the NumFluent by name (no parameters)
+            NumFluent nf = NumFluent.getNumFluent(funcName, new ArrayList<>());
+
+            if (nf != null && bounds != null && bounds.length > 0) {
+                double lowerBound = bounds[0]; // first element = lower bound
+                this.getInitNumFluentsValues().put(nf, new PDDLNumber(lowerBound));
+            } else{
+                System.out.println("Warning: NumFluent " + funcName + " not found or bounds are invalid.");
+            }
+        }
+    }
+
+
 
     float getTransitionCost(State s, TransitionGround gr, Float previousG, boolean ignoreCost, Metric m) {
         return this.getTransitionCost(s, gr, previousG, ignoreCost, m, 1);

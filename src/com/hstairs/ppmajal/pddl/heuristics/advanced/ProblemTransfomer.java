@@ -34,6 +34,13 @@ import java.util.ArrayList;
 
 import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 
+
+// Angel
+
+import com.hstairs.ppmajal.expressions.ExtendedAddendum;
+import com.hstairs.ppmajal.expressions.Expression;
+import java.util.Arrays;
+
 /**
  *
  * @author enrico
@@ -61,6 +68,9 @@ public class ProblemTransfomer {
     private static Int2IntOpenHashMap cptransition2transitionMap;
     private static Set<NumFluent> metricVars = new HashSet<>();
 
+    // Angel
+    private static Condition allProblemConditions;
+
     public static CompactPDDLProblem generateCompactProblem(PDDLProblem problem, String redConstraints,
                                                             boolean unitaryCost, int linearEffectsAbstraction) {
         int nTransitions = Transition.totNumberOfTransitions + 1;
@@ -68,6 +78,7 @@ public class ProblemTransfomer {
         p = problem;
 
         if (p.getMetric() != null){
+            System.out.println("Metric: " + p.getMetric().getMetExpr().getInvolvedNumericFluents());
             metricVars = p.getMetric().getMetExpr().getInvolvedNumericFluents();
         }
 
@@ -144,6 +155,14 @@ public class ProblemTransfomer {
             nTransitions = v + 1;
         }
         preconditionFunction[pseudoGoal] = normalizeAndTighthenCondition(p.getGoals(), redConstraints);
+        //Angel
+        propEffectFunction[pseudoGoal] = new IntArraySet();
+        numericEffectFunction[pseudoGoal] = new LinkedHashSet<>();
+        transition2cptransition[pseudoGoal] = Collections.singleton(pseudoGoal);
+
+        System.out.println("DPEX relaxation: "+ p.getRelaxationDPEX());
+
+        //System.out.println("Total transitions in the compact problem: " + (cptransition2transition.length-1));
 
         return new CompactPDDLProblem(preconditionFunction,
                 propEffectFunction, numericEffectFunction, actionCost,
@@ -316,7 +335,242 @@ public class ProblemTransfomer {
         }
     }
 
+/** Angel
+ * Relaja una condición sustituyendo input fluents por sus bounds.
+ * Para expresiones normalizadas (todo a la izquierda):
+ * - Si coeficiente > 0: usa upper bound
+ * - Si coeficiente < 0: usa lower bound
+ */
+private static Condition relaxConditionInputs(Condition cond) {
+    if (cond == null || p == null) {
+        return cond;
+    }
+    
+    // ✅ PROCESAR Comparison ANTES que Terminal (porque Comparison extiende Terminal)
+    if (cond instanceof Comparison) {
+        Comparison comp = (Comparison) cond;
+        Expression left = comp.getLeft();
+        
+        // Solo procesamos la izquierda (normalizado)
+        if (left instanceof ExtendedNormExpression) {
+            ExtendedNormExpression expr = (ExtendedNormExpression) left;
+            ArrayList<ExtendedAddendum> newSummations = new ArrayList<>();
+            boolean modified = false;
+            
+            for (ExtendedAddendum add : expr.summations) {
+                if (add.f != null) {
+                    double[] bounds = p.getInputBounds(add.f.getName());
+                    
+                    if (bounds != null) {
+                        // Es un input: sustituir por bound según signo
+                        double replacementValue = (add.n > 0) ? bounds[1] : bounds[0];
+                        ExtendedAddendum newAdd = new ExtendedAddendum();
+                        newAdd.n = add.n * replacementValue;
+                        newAdd.f = null;
+                        newSummations.add(newAdd);
+                        modified = true;
+                    } else {
+                        // No es input: copiar tal cual
+                        newSummations.add(add);
+                    }
+                } else {
+                    // Constante: copiar
+                    newSummations.add(add);
+                }
+            }
+            
+            if (modified) {
+                ExtendedNormExpression newLeft = new ExtendedNormExpression();
+                newLeft.summations = newSummations;
+                return Comparison.comparison(
+                    Comparison.Comparator.fromSymbol(comp.getComparator()),
+                    newLeft,
+                    comp.getRight(),
+                    comp.isNormalized()
+                );
+            }
+        }
+        return cond;
+    }
+    
+    // DESPUÉS procesar Terminal (más general)
+    if (cond instanceof Terminal) {
+        return cond;
+    }
+    
+    if (cond instanceof AndCond) {
+        Collection<Object> relaxedSons = new HashSet<>();
+        for (Object son : ((AndCond) cond).sons) {
+            if (son instanceof Condition) {
+                relaxedSons.add(relaxConditionInputs((Condition) son));
+            } else {
+                relaxedSons.add(son);
+            }
+        }
+        return new AndCond(relaxedSons);
+    }
+    
+    if (cond instanceof OrCond) {
+        Collection<Object> relaxedSons = new HashSet<>();
+        for (Object son : ((OrCond) cond).sons) {
+            if (son instanceof Condition) {
+                relaxedSons.add(relaxConditionInputs((Condition) son));
+            } else {
+                relaxedSons.add(son);
+            }
+        }
+        return new OrCond(relaxedSons);
+    }
+    
+    return cond;
+}
 
+private static void buildCondeffsMap(Int2ObjectOpenHashMap<HashSetValuedHashMap<Condition, Object>> tr2condeffs, Collection<TransitionGround> transitions, Condition globalConditions) {
+    
+    // For every transition
+    for (final TransitionGround tr : transitions) {
+        HashSetValuedHashMap<Condition, Object> condeffs = new HashSetValuedHashMap<>();
+        
+        var allCondEffects = tr.getAllConditionalEffects();
+        
+        // This iterates over every conditional effect. In our case the condition is true but is generalizable.
+        for (var entry : allCondEffects.entrySet()) {
+            final Condition condition = entry.getKey();
+            final Collection<Object> effects = entry.getValue();
+            
+            // If the relaxation is unitary, just add effects regularly
+            if ("unitary".equals(p.getRelaxationDPEX())) {                
+                for (Object eff : effects) {
+                    addCondeff(condeffs, condition, eff);
+                }
+                continue;
+            }
+
+            // If not, we are in the optimistic or signature compilation. 
+            // Then, we need to generate the cartesian product of all effect options.
+            List<List<Object>> optionsList = new ArrayList<>();
+            
+            // For signature analysis, we need the full preconditions (for the conditional case, we use the condition on the effect)
+            Condition fullPreconditions = tr.getPreconditions().and(condition);
+            
+
+            // For every conditional effect under condition
+            for (var effect : effects) {
+                if (effect instanceof NumEffect) {
+
+                    // We normalize the effect
+                    NumEffect neff = normalizeAssign((NumEffect) effect);
+                    
+                    // We verify whether the right part of the assignment is only an expression of inputs
+                    boolean canSplit = (neff.getRight() instanceof ExtendedNormExpression);
+                    
+                    if (canSplit) {
+                        ExtendedNormExpression expr = (ExtendedNormExpression) neff.getRight();
+                        
+                        // Only add supported right now for the expression :)!
+                        for (ExtendedAddendum ad : expr.summations) {
+                            if (ad.f != null) {
+                                double[] bounds = p.getInputBounds(ad.f.getName());
+                                if (bounds == null) {
+                                    canSplit = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!canSplit) {
+                        // It cannot be expanded so we just add it as is
+                        optionsList.add(Collections.singletonList((Object) neff));
+                    } else if ("signature".equals(p.getRelaxationDPEX())) {
+                        // SIGNATURE: we only generate the signature variant of the action
+                        optionsList.add(generateSignatureVariants(neff, globalConditions));
+                    } else {
+                        // OPTIMISTIC: we always generate both variants
+                        ExtendedNormExpression expr = (ExtendedNormExpression) neff.getRight();
+                        double lowerVal = 0.0;
+                        double upperVal = 0.0;
+                        
+                        for (ExtendedAddendum ad : expr.summations) {
+                            if (ad.f == null) {
+                                double coefficient = (ad.n != null) ? ad.n : 0.0;
+                                lowerVal += coefficient;
+                                upperVal += coefficient;
+                            } else {
+                                double[] bounds = p.getInputBounds(ad.f.getName());
+                                double coefficient = (ad.n != null) ? ad.n : 1.0;
+        
+                                if (coefficient > 0) {
+                                    lowerVal += coefficient * bounds[0];
+                                    upperVal += coefficient * bounds[1];
+                                } else {
+                                    lowerVal += coefficient * bounds[1];
+                                    upperVal += coefficient * bounds[0];
+                                }
+                            }
+                        }
+                        
+                        NumEffect effLower = new NumEffect(
+                            neff.getOperator(),
+                            neff.getFluentAffected(),
+                            new ExtendedNormExpression(lowerVal)
+                        );
+                        NumEffect effUpper = new NumEffect(
+                            neff.getOperator(),
+                            neff.getFluentAffected(),
+                            new ExtendedNormExpression(upperVal)
+                        );
+                        
+                        optionsList.add(Arrays.asList((Object) effLower, (Object) effUpper));
+                    }
+                    
+                } else if (effect instanceof Terminal) {
+                    optionsList.add(Collections.singletonList(effect));
+                } else {
+                    optionsList.add(Collections.singletonList(effect));
+                }
+            }
+            
+            // Create cartesian product
+            List<List<Object>> cartesian = new ArrayList<>();
+            cartesian.add(new ArrayList<>());
+            
+            for (List<Object> options : optionsList) {
+                List<List<Object>> newCartesian = new ArrayList<>();
+                for (List<Object> prefix : cartesian) {
+                    for (Object option : options) {
+                        List<Object> combination = new ArrayList<>(prefix);
+                        combination.add(option);
+                        newCartesian.add(combination);
+                    }
+                }
+                cartesian = newCartesian;
+            }
+            
+            // We create a unique condition for every combination
+            for (int combIdx = 0; combIdx < cartesian.size(); combIdx++) {
+                List<Object> combination = cartesian.get(combIdx);
+                
+                Condition uniqueCondition;
+                if (cartesian.size() == 1) {
+                    uniqueCondition = condition;
+                } else {
+                    Collection<Object> sons = new HashSet<>();
+                    sons.add(condition);
+                    uniqueCondition = new AndCond(sons);
+                }
+                
+                for (Object eff : combination) {
+                    addCondeff(condeffs, uniqueCondition, eff);
+                }
+            }
+        }
+        
+        tr2condeffs.put(tr.getId(), condeffs);
+    }
+}
+
+   /* 
     private static void buildCondeffsMap(Int2ObjectOpenHashMap<HashSetValuedHashMap<Condition, Object>> tr2condeffs, Collection<TransitionGround> transitions) {
 
         // ASSUMPTION: ALL EFFECTS ARE CONDITIONAL
@@ -351,26 +605,52 @@ public class ProblemTransfomer {
             tr2condeffs.put(tr.getId(), condeffs);
         }
     }
-
+    */
     private static int fillPreEff(int offset, String redConstraints, Collection<TransitionGround> transitions) {
 
         int i = offset;
+
+        Collection<TransitionGround> filteredTransitions = transitions;
+        if (!p.getRelaxationDPEX().equals("unitary")) {
+            // If the relaxation is not unitary, filter the control transitions
+            filteredTransitions = new LinkedHashSet<>();
+            for (TransitionGround tr : transitions) {
+                String name = tr.getName().toLowerCase();
+                if (!name.startsWith("increase_control") && !name.startsWith("decrease_control")) {
+                    filteredTransitions.add(tr);
+                }
+            }
+        }
+
 
         if (conditionalEffectsSensitive) {
 
             final Int2ObjectOpenHashMap<HashSetValuedHashMap<Condition, Object>> tr2condeffs = new Int2ObjectOpenHashMap<>();
 
-            buildCondeffsMap(tr2condeffs, transitions);
+            // This method has changed
+            Condition globalConditions = collectAllProblemConditions(filteredTransitions);
+            buildCondeffsMap(tr2condeffs, filteredTransitions, globalConditions);
 
-            for (final TransitionGround b : transitions) {
+            for (final TransitionGround b : filteredTransitions) {
                 HashSetValuedHashMap<Condition, Object> condeffs = tr2condeffs.get(b.getId());
                 for (Condition condition : condeffs.keySet()) {
-                    Condition c = b.getPreconditions();
-                    if (!condition.isValid()){
-                        c = c.and(condition);
+                    /*System.out.println("DEBUG fillPreEff: Procesando cp-index=" + i + " para transición original=" + b.getId() + " (" + b.getName() + ")");
+                    System.out.println("DEBUG fillPreEff: Condición clave: " + condition);
+                    System.out.println("DEBUG fillPreEff: Efectos en condeffs para esta condición: " + condeffs.get(condition));*/
+                    
+                    Condition c = b.getPreconditions().and(condition);
+
+                    // Normalizar
+                    Condition normalized = normalizeAndTighthenCondition(c, redConstraints);
+
+                    // Relax preconditions on optimistic and signature compilations
+                    if ("optimistic".equals(p.getRelaxationDPEX()) || "signature".equals(p.getRelaxationDPEX())) {
+                        normalized = relaxConditionInputs(normalized);
                     }
 
-                    preconditionFunctionMap.put(i, normalizeAndTighthenCondition(c, redConstraints));
+                    preconditionFunctionMap.put(i, normalized);                    
+                    
+                    //preconditionFunctionMap.put(i, normalizeAndTighthenCondition(c, redConstraints));
                     final IntArraySet propositional = new IntArraySet();
                     final Collection numEffect = new LinkedHashSet();
                     for (var effect : condeffs.get(condition)) {
@@ -391,6 +671,14 @@ public class ProblemTransfomer {
                     propEffectFunctionMap.put(i, propositional);
                     numericEffectFunctionMap.put(i, numEffect);
                     i++;
+                }
+
+                
+                for (TransitionGround tr : transitions) {
+                    String name = tr.getName().toLowerCase();
+                    if (name.startsWith("increase_control") || name.startsWith("decrease_control")) {
+                        transition2cptransitionMap.put(tr.getId(), new IntArraySet());
+                    }
                 }
 
             }
@@ -470,6 +758,207 @@ public class ProblemTransfomer {
             throw new RuntimeException("This was unexepected:" + cond);
         }
 
+    }
+
+
+
+    /**
+     * Analiza qué variantes (lower/upper) son necesarias para cada input en un efecto numérico,
+     * basándose en cómo aparece el fluent afectado en las precondiciones.
+     * 
+     * @param preconditions Las precondiciones de la acción
+     * @param affectedFluentName El nombre del fluent que se ve afectado por el efecto
+     * @return Conjunto con "lower", "upper", o ambos, indicando qué variantes son necesarias
+     */
+    private static Set<String> analyzeNecessaryVariantsForFluent(Condition preconditions, NumFluent affectedFluent, String operator) {
+        Set<String> signs = new HashSet<>();
+        
+        if (preconditions == null) {
+            // Sin precondiciones, generamos ambas por seguridad
+            signs.add("lower");
+            signs.add("upper");
+            return signs;
+        }
+        
+        // Buscar comparaciones que involucren el fluent afectado
+        collectFluentSigns(preconditions, affectedFluent, signs, operator);
+        
+        // Si no encontramos el fluent en ninguna precondición, generamos ambas por seguridad
+        if (signs.isEmpty()) {
+            signs.add("lower");
+            signs.add("upper");
+        }
+        
+        return signs;
+    }
+
+    /**
+     * Método auxiliar recursivo para recolectar los signos de un fluent en las precondiciones.
+     */
+    private static void collectFluentSigns(Condition cond, NumFluent affectedFluent, Set<String> signs, String operator) {
+        if (cond instanceof Comparison) {
+            Comparison comp = (Comparison) cond;
+            Expression left = comp.getLeft();
+            
+            // Las precondiciones están normalizadas, así que todo está en el lado izquierdo
+            if (left instanceof ExtendedNormExpression) {
+                ExtendedNormExpression expr = (ExtendedNormExpression) left;
+                
+                for (ExtendedAddendum ad : expr.summations) {
+                    if (ad.f != null && ad.f.equals(affectedFluent)) {
+                        double coefficient = (ad.n != null) ? ad.n : 1.0;
+                        boolean isIncrease = "increase".equals(operator);
+
+                        if (coefficient > 0) {
+                            signs.add(isIncrease ? "upper" : "lower");
+                        } else if (coefficient < 0) {
+                            signs.add(isIncrease ? "lower" : "upper");
+                        }
+                    }
+                }
+            }
+        } else if (cond instanceof AndCond) {
+            for (Object son : ((AndCond) cond).sons) {
+                if (son instanceof Condition) {
+                    collectFluentSigns((Condition) son, affectedFluent, signs, operator);
+                }
+            }
+        } else if (cond instanceof OrCond) {
+            // En el caso de OR, necesitamos ambas variantes para cubrir todas las ramas
+            for (Object son : ((OrCond) cond).sons) {
+                if (son instanceof Condition) {
+                    collectFluentSigns((Condition) son, affectedFluent, signs, operator);
+                }
+            }
+        }
+    }
+
+    /**
+     * Genera las variantes necesarias de un efecto numérico para el modo "signature".
+     * Analiza cada input en el efecto y determina si necesita lower, upper, o ambos bounds.
+     * 
+     * @param neff El efecto numérico a procesar
+     * @param preconditions Las precondiciones completas de la acción
+     * @return Lista de efectos numéricos (variantes necesarias)
+     */
+    private static List<Object> generateSignatureVariants(NumEffect neff, Condition preconditions) {
+        ExtendedNormExpression expr = (ExtendedNormExpression) neff.getRight();
+        
+        // Determinar qué variantes son necesarias según las precondiciones
+        NumFluent affectedFluent = neff.getFluentAffected();
+        String operator = neff.getOperator();
+        Set<String> necessaryVariants = analyzeNecessaryVariantsForFluent(preconditions, affectedFluent,operator);
+        
+        // Si solo necesitamos una variante, simplificamos
+        if (necessaryVariants.size() == 1) {
+            String variant = necessaryVariants.iterator().next();
+            double value = 0.0;
+            
+            for (ExtendedAddendum ad : expr.summations) {
+                if (ad.f == null) {
+                    // Constante
+                    value += (ad.n != null) ? ad.n : 0.0;
+                } else {
+                    // Input fluent
+                    double[] bounds = p.getInputBounds(ad.f.getName());
+                    double coefficient = (ad.n != null) ? ad.n : 1.0;
+                    
+                    if ("upper".equals(variant)) {
+                        // Queremos maximizar el efecto
+                        value += (coefficient > 0) ? coefficient * bounds[1] : coefficient * bounds[0];
+                    } else {
+                        // Queremos minimizar el efecto
+                        value += (coefficient > 0) ? coefficient * bounds[0] : coefficient * bounds[1];
+                    }
+                }
+            }
+            
+            NumEffect effVariant = new NumEffect(
+                neff.getOperator(),
+                neff.getFluentAffected(),
+                new ExtendedNormExpression(value)
+            );
+            return Collections.singletonList((Object) effVariant);
+        }
+        
+        // Si necesitamos ambas variantes, generamos lower y upper
+        double lowerVal = 0.0;
+        double upperVal = 0.0;
+        
+        for (ExtendedAddendum ad : expr.summations) {
+            if (ad.f == null) {
+                // Constante
+                double coefficient = (ad.n != null) ? ad.n : 0.0;
+                lowerVal += coefficient;
+                upperVal += coefficient;
+            } else {
+                // Input fluent
+                double[] bounds = p.getInputBounds(ad.f.getName());
+                double coefficient = (ad.n != null) ? ad.n : 1.0;
+                
+                if (coefficient > 0) {
+                    lowerVal += coefficient * bounds[0];
+                    upperVal += coefficient * bounds[1];
+                } else {
+                    lowerVal += coefficient * bounds[1];
+                    upperVal += coefficient * bounds[0];
+                }
+            }
+        }
+        
+        NumEffect effLower = new NumEffect(
+            neff.getOperator(),
+            neff.getFluentAffected(),
+            new ExtendedNormExpression(lowerVal)
+        );
+        NumEffect effUpper = new NumEffect(
+            neff.getOperator(),
+            neff.getFluentAffected(),
+            new ExtendedNormExpression(upperVal)
+        );
+        
+        return Arrays.asList((Object) effLower, (Object) effUpper);
+    }
+
+    /**
+     * Recopila TODAS las condiciones del problema: goal + precondiciones de todas las acciones.
+     * Esto es necesario para la compilación signature, ya que debemos analizar cómo se usa
+     * cada fluent en TODO el problema, no solo en la acción actual.
+     */
+    private static Condition collectAllProblemConditions(Collection<TransitionGround> transitions) {
+        List<Condition> allConditions = new ArrayList<>();
+        
+        // Añadir el goal
+        if (p.getGoals() != null) {
+            allConditions.add(p.getGoals());
+        }
+        
+        // Añadir las precondiciones de todas las transiciones
+        for (TransitionGround tr : transitions) {
+            if (tr.getPreconditions() != null) {
+                allConditions.add(tr.getPreconditions());
+            }
+            
+            // También añadir las condiciones de los efectos condicionales
+            var allCondEffects = tr.getAllConditionalEffects();
+            for (var entry : allCondEffects.entrySet()) {
+                Condition condition = entry.getKey();
+                // Solo agregar condiciones no-null y no-triviales
+                if (condition != null && !(condition instanceof Terminal)) {
+                    allConditions.add(condition);
+                }
+            }
+        }
+        
+        // Combinar todas las condiciones con AND
+        if (allConditions.isEmpty()) {
+            // Condición vacía = "true"
+            return new AndCond(new HashSet<>());
+        } else if (allConditions.size() == 1) {
+            return allConditions.get(0);
+        } else {
+            return new AndCond(allConditions);
+        }
     }
 
 }

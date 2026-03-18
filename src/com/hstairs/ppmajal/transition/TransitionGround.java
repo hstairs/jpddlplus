@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -96,6 +97,80 @@ public class TransitionGround extends Transition {
         return res.toString();
     }
     
+public String toString(Map<String, Double> inputValues) {
+    StringBuilder res = new StringBuilder();
+    Set<String> usedInputs = getUsedInputs(inputValues);
+
+    if (!usedInputs.isEmpty())    res.append("<(");
+    else                            res.append("(");
+    
+    res.append(name);
+    if (this.parameters != null) {
+        for (final PDDLObject obj : this.parameters) {
+            res.append(" ").append(obj.getName());
+        }
+    }
+
+    if (!usedInputs.isEmpty())    res.append("), ");
+    
+
+    // añadimos solo los inputs que realmente participan en esta acción
+    if (!usedInputs.isEmpty()) {
+        res.append("{");
+        for (String inputName : usedInputs) {
+            res.append(inputName)
+               .append("=")
+               .append(inputValues.get(inputName))
+               .append(", ");
+        }
+        // eliminamos la última coma y espacio si había elementos
+        res.setLength(res.length() - 2);
+        res.append("}");
+    } 
+
+    if (!usedInputs.isEmpty())    res.append(">");
+    else                            res.append(")");
+    
+    return res.toString();
+}
+
+    private Set<String> getUsedInputs(Map<String, Double> inputValues) {
+        Set<String> usedInputs = new LinkedHashSet<>();
+        if (inputValues == null || inputValues.isEmpty()) {
+            return usedInputs;
+        }
+
+        Set<NumFluent> involvedFluents = new HashSet<>();
+
+        if (this.preconditions != null) {
+            involvedFluents.addAll(this.preconditions.getInvolvedFluents());
+        }
+
+        for (NumEffect effect : this.getConditionalNumericEffects().getAllEffects()) {
+            involvedFluents.addAll(effect.getInvolvedFluents());
+        }
+
+        for (Condition condition : this.getConditionalNumericEffects().getActualConditionalEffects().keySet()) {
+            involvedFluents.addAll(condition.getInvolvedFluents());
+        }
+
+        for (Object conditionObj : this.getConditionalPropositionalEffects().getActualConditionalEffects().keySet()) {
+            if (conditionObj instanceof Condition condition) {
+                involvedFluents.addAll(condition.getInvolvedFluents());
+            }
+        }
+
+        for (NumFluent fluent : involvedFluents) {
+            String fluentName = fluent.getName();
+            if (inputValues.containsKey(fluentName)) {
+                usedInputs.add(fluentName);
+            }
+        }
+
+        return usedInputs;
+    }
+
+
     public String toStringAllModel() {
         StringBuilder res= new StringBuilder();
         res.append("(").append(name);

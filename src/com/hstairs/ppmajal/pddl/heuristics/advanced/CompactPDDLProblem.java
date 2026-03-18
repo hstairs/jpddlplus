@@ -19,9 +19,11 @@ public record CompactPDDLProblem(Condition[] preconditionFunction,
     public String toString(){
         StringBuilder ret = new StringBuilder("");
         for (int i=0; i< preconditionFunction.length; i++){
+            ret.append("=====================================\n");
             ret.append("Transition: ").append(Transition.getTransition(cpTr2TrMap[i])).append("\n");
             ret.append("Precondition in the model:").append(preconditionFunction[i]).append("\n");
             ret.append("Effect in the model:").append(propEffectFunction[i]).append("\n");
+            ret.append("Numeric effects in the model:").append(numericEffectFunction[i]).append("\n");
             ret.append("Cost:").append(actionCost[i]).append("\n");
         }
         return ret.toString();

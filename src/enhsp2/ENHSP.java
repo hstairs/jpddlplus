@@ -11,6 +11,8 @@ import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeurist
 import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.Sdac;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import com.hstairs.ppmajal.transition.TransitionSchema;
+import com.hstairs.ppmajal.transition.Transition.Semantics;
 import com.hstairs.enhsp2.SimpleExternalLogger;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import com.hstairs.ppmajal.transition.TransitionSchema;
@@ -27,8 +29,17 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.regex.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+
+
+
+import java.util.Collection;
+
 
 /*
  * Copyright (C) 2016-2017 Enrico Scala. Email enricos83@gmail.com.
@@ -134,6 +145,15 @@ public class ENHSP {
     boolean bucketBasedQueueSearch;
     boolean tunnelling;
 
+    // 
+    private Map<String, double[]> inputBounds = new HashMap<>();
+    private int dpexK = 1; // Number of sampled actions for DPEX
+    private String dpex_rectification; // Rectification function for DPEX
+    private String dpex_sampling; // Sampling function for DPEX
+    private String relaxationDPEX; // Relaxation function for DPEX
+    private boolean ignoreStoringInputs;
+    //
+
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
     }
@@ -151,15 +171,85 @@ public class ENHSP {
         return new ArrayList<>(PDDLPlanner.getAvailableTieBreakers());
     }
 
+    // 
+    private void extractInputBoundsFromFile(String domainFilePath) {
+        try {
+            String content = new String(Files.readAllBytes(Path.of(domainFilePath)));
+
+            // Capture @input[lower,upper]_precision ( _precision is optional)
+            Pattern pattern = Pattern.compile(
+                "\\((\\w+)[^\\)]*\\)\\s*;\\s*@input\\[(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?)\\](?:_(-?\\d+))?"
+            );
+            Matcher matcher = pattern.matcher(content);
+
+            while (matcher.find()) {
+                String functionName = matcher.group(1);
+                double lower = Double.parseDouble(matcher.group(2));
+                double upper = Double.parseDouble(matcher.group(3));
+
+                double precision = Double.NaN; 
+                if (matcher.group(4) != null) {
+                    precision = Double.parseDouble(matcher.group(4));
+                }
+
+                inputBounds.put(functionName, new double[]{lower, upper, precision});
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading domain file: " + e.getMessage());
+        }
+    }
+
+
+    public Pair<PDDLDomain, PDDLProblem> createDPEXrelaxation(String domainFile, String problemFile) {
+
+        Pair<PDDLDomain, PDDLProblem> res = parseDomainProblem(domainFile, problemFile, deltaExecution, System.out,this.relaxationDPEX  );
+
+        final PDDLDomain compiledDomain = res.getLeft();
+        final PDDLProblem compiledProblem = res.getRight();
+
+
+        //compiledDomain.prettyPrint();
+        //compiledProblem.prettyPrint();
+
+        return Pair.of(compiledDomain, compiledProblem);
+
+    }
+    
+
+
+    /// 
+
     public Pair<PDDLDomain, PDDLProblem> parseDomainProblem(String domainFile, String problemFile, String delta, PrintStream out) {
+        return parseDomainProblem(domainFile, problemFile, delta, out, "");
+    }
+    
+    public Pair<PDDLDomain, PDDLProblem> parseDomainProblem(String domainFile, String problemFile, String delta, PrintStream out, String relaxationDPEX) {
         try {
             final PDDLDomain localDomain = new PDDLDomain(domainFile);
+            
+            // 
+            this.extractInputBoundsFromFile(domainFile);
+
+            System.out.println("Input bounds extracted: " + this.inputBounds.keySet());
+
+            localDomain.addFictActions(this.inputBounds);
+
+           
+
             //domain.substituteEqualityConditions();
             pddlPlus = !localDomain.getProcessesSchema().isEmpty() || !localDomain.getEventsSchema().isEmpty();
 
             out.println("Domain parsed");
             final PDDLProblem localProblem = new PDDLProblem(problemFile, localDomain.getConstants(),
-                    localDomain.getTypes(), localDomain, out, groundingType, sdac, ignoreMetric,new BigDecimal(deltaPlanning),new BigDecimal(deltaExecution));
+                    localDomain.getTypes(), localDomain, out, groundingType, sdac, ignoreMetric,new BigDecimal(deltaPlanning),new BigDecimal(deltaExecution), relaxationDPEX);
+            
+
+            localProblem.addFictInitis(inputBounds);
+
+
+            //System.out.println(localProblem.getInitNumFluentsValues());
+            /// End Angel
+            
             if (!localDomain.getProcessesSchema().isEmpty()) {
                 localProblem.setDeltaTimeVariable(delta);
             }
@@ -184,6 +274,21 @@ public class ENHSP {
             if (stopAfterGrounding) {
                 throw new PlannerExitException(1, "Stopped after grounding as requested (-stopgro).");
             }
+
+
+            
+
+            // Remove all fictitious actions from the domain for DPEX
+            List<TransitionSchema> toRemove = new ArrayList<>();
+            for (TransitionSchema t : localDomain.getActionsSchema()) {
+                String name = t.toString();
+                if (name.startsWith("(decrease_control_") || name.startsWith("(increase_control_")) {
+                    toRemove.add(t);
+                }
+            }
+            localDomain.getActionsSchema().removeAll(toRemove);
+
+
             return Pair.of(localDomain, localProblem);
         } catch (PlannerExitException ex) {
             throw ex;
@@ -196,7 +301,7 @@ public class ENHSP {
     public boolean parsingDomainAndProblem(String[] args) {
         try {
             overallStart = System.currentTimeMillis();
-            Pair<PDDLDomain, PDDLProblem> res = parseDomainProblem(domainFile, problemFile, deltaExecution, System.out);
+            Pair<PDDLDomain, PDDLProblem> res = parseDomainProblem(domainFile, problemFile, deltaExecution, System.out, this.relaxationDPEX);
             if (res == null)
                 return false;
             domain = res.getKey();
@@ -275,7 +380,7 @@ public class ENHSP {
                     System.out.println("Numeric Plan Trace saved to " + fileName);
                 }
                 if (sp == null) {
-                    return bestSolution;
+                    return null;
                 }else {
                     bestSolution = lastSol;
                     depthLimit = endGValue;
@@ -359,6 +464,12 @@ public class ENHSP {
         options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
 
+        //
+        options.addOption("n_samp", true, "Number of sampled actions for DPEX");
+        options.addOption("rect", true, "Rectification function for DPEX");
+        options.addOption("samp_f", true, "Sampling function for DPEX");
+        options.addOption("relaxation", true, "Type of relaxation: unitary, optimistic, signature");
+        options.addOption("ignorestoringinputs", false, "Ignore storing inputs");
         return options;
     }
 
@@ -495,6 +606,62 @@ public class ENHSP {
                 new UnsupportedOperationException("Sdac value can be one of the followings:" +
                         "disables, rhs, condition");
             }
+            // 
+            // DPEX: n_samp
+            String dpexKstr = cmd.getOptionValue("n_samp");
+            if (dpexKstr != null) {
+                try {
+                    dpexK = Integer.parseInt(dpexKstr);
+                } catch (NumberFormatException e) {
+                    System.err.println("Invalid --n_samp value, using 1 by default.");
+                    dpexK = 1;
+                }
+            }
+
+            // DPEX: rectification function
+            String dpexRect = cmd.getOptionValue("rect");
+            if (dpexRect != null) {
+                String rectLower = dpexRect.toLowerCase();
+                if (rectLower.equals("linear") || rectLower.equals("quadratic") || rectLower.equals("logarithmic")) {
+                    this.dpex_rectification = rectLower;
+                } else {
+                    System.err.println("Invalid rectification function '" + dpexRect + "', using 'logarithmic' by default.");
+                    this.dpex_rectification = "logarithmic";
+                }
+            } else {
+                this.dpex_rectification = "logarithmic";
+            }
+
+            // DPEX: sampling function 
+            String dpexSamp = cmd.getOptionValue("samp_f");
+            if (dpexSamp != null) {
+                String sampLower = dpexSamp.toLowerCase();
+                if (sampLower.equals("uniform") || sampLower.equals("heuristic")) {
+                    this.dpex_sampling = sampLower;
+                } else {
+                    System.err.println("Invalid sampling function '" + dpexSamp + "', using 'uniform' by default.");
+                    this.dpex_sampling = "uniform";
+                }
+            } else {
+                this.dpex_sampling = "uniform";
+            }                    
+
+            // DPEX: relaxation type
+            this.relaxationDPEX = cmd.getOptionValue("relaxation");
+            if (this.relaxationDPEX != null) {
+                String relaxLower = this.relaxationDPEX.toLowerCase();
+                if (relaxLower.equals("unitary") || relaxLower.equals("optimistic") || relaxLower.equals("signature")) {
+                    this.relaxationDPEX = relaxLower;
+                } else {
+                    System.err.println("Invalid relaxation type '" + this.relaxationDPEX + "', using 'unitary' by default.");
+                    this.relaxationDPEX = "unitary";
+                }
+            } else {
+                this.relaxationDPEX = "unitary";
+            }
+
+            ignoreStoringInputs = cmd.hasOption("ignorestoringinputs");
+
             printMakespan = !cmd.hasOption("npm");
             helpfulActions = cmd.getOptionValue("ha") != null && "true".equals(cmd.getOptionValue("ha"));
             autoAnytime = cmd.hasOption("autoanytime");
@@ -598,7 +765,7 @@ public class ENHSP {
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
                 tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
-                bucketBasedQueueSearch, tunnelling, this.externalLogger, timeoutMs);
+                bucketBasedQueueSearch, tunnelling, this.externalLogger, this.inputBounds, this.dpexK, this.dpex_rectification, this.dpex_sampling, this.ignoreStoringInputs, timeoutMs);
 
         if (savingSearchSpaceJson) {
             Runtime.getRuntime().addShutdownHook(new Thread() {//this is to save json also when the planner is interrupted
@@ -624,7 +791,9 @@ public class ENHSP {
         if (plan.rawPlan() != null) {
             System.out.println("Problem Solved\n");
             System.out.println("Found Plan:");
-            printPlan(plan.rawPlan(), pddlPlus, lastState, savePlan);
+            
+    	    printPlan(plan.rawPlan(), pddlPlus, lastState, savePlan);
+            
             System.out.println("\nPlan-Length:" + plan.rawPlan().size());
             planLength = plan.rawPlan().size();
         } else {
@@ -648,24 +817,24 @@ public class ENHSP {
     }
 
 
-    private void printPlan(LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan, boolean temporal, PDDLState par, String fileName) {
+    private void printPlan(LinkedList<ImmutablePair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>>> plan, boolean temporal, PDDLState par, String fileName) {
         float i = 0f;
-        ImmutablePair<BigDecimal, TransitionGround> previous = null;
+        ImmutablePair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>> previous = null;
         List<String> fileContent = new ArrayList();
         boolean startProcess = false;
         int size = plan.size();
         int  j = 0;
-        for (ImmutablePair<BigDecimal, TransitionGround> ele : plan) {
+        for (ImmutablePair<BigDecimal, ImmutablePair<TransitionGround, Map<String,Double>>> ele : plan) {
             j++;
             if (!temporal) {
-                System.out.print(i + ": " + ele.getRight() + "\n");
+                System.out.print(i + ": " + ele.getRight().getLeft().toString(ele.getRight().getRight()) + "\n");
                 if (fileName != null){
-                    TransitionGround t = (TransitionGround) ele.getRight();
-                    fileContent.add(t.toString());
+                    TransitionGround t = (TransitionGround) ele.getRight().getLeft();
+                    fileContent.add(t.toString(ele.getRight().getRight()));
                 }
                 i++;
             } else {
-                TransitionGround t = (TransitionGround) ele.getRight();
+                TransitionGround t = (TransitionGround) ele.getRight().getLeft();
                 if (t.getSemantics() == TransitionGround.Semantics.PROCESS) {
                     if (!startProcess) {
                         previous = ele;
@@ -710,6 +879,24 @@ public class ENHSP {
             } catch (IOException ex) {
                 Logger.getLogger(ENHSP.class.getName()).log(Level.SEVERE, null, ex);
             }
+        }
+    }
+
+    // Angel
+    private void printPlanWithInputs(LinkedList<org.apache.commons.lang3.tuple.Pair<Object, Map<String, Double>>> planWithInputs) {
+        int step = 0;
+        for (org.apache.commons.lang3.tuple.Pair<Object, Map<String, Double>> pair : planWithInputs) {
+            Object action = pair.getLeft();
+            Map<String, Double> inputs = pair.getRight();
+            System.out.print(step + ": " + action);
+            if (inputs != null && !inputs.isEmpty()) {
+                System.out.print(" | inputs: ");
+                for (Map.Entry<String, Double> entry : inputs.entrySet()) {
+                    System.out.print(entry.getKey() + "=" + entry.getValue() + " ");
+                }
+            }
+            System.out.println();
+            step++;
         }
     }
 

@@ -38,6 +38,9 @@ import org.antlr.runtime.RecognitionException;
 import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.tree.Tree;
 
+
+import com.hstairs.ppmajal.expressions.PDDLNumber;
+
 /**
  * @author enrico
  */
@@ -577,6 +580,122 @@ public final class PDDLDomain {
         }
 
     }
+
+    // Angel
+    public void addFictActions(Map<String, double[]> inputBounds) {
+        for (Map.Entry<String, double[]> entry : inputBounds.entrySet()) {
+            String inputName = entry.getKey();
+            NumFluent inputFluent = NumFluent.getNumFluent(inputName, new ArrayList());
+
+            int decimals = (inputBounds.get(inputName).length > 2) ? (int) inputBounds.get(inputName)[2] : 6;
+            float precision = (float) Math.pow(10, -decimals);
+
+            // Increase action
+            NumEffect increaseEffect = NumEffect.easyNumEffect("increase", inputFluent, precision);
+
+            ConditionalEffects<NumEffect> numEffectInc = new ConditionalEffects<>();
+            numEffectInc.add(increaseEffect);
+
+            TransitionSchema increaseAction = new TransitionSchema(
+                new SchemaParameters(),
+                "increase_control_" + inputName,
+                new ConditionalEffects<>(),
+                numEffectInc,
+                null,
+                Semantics.ACTION,
+                new ArrayList<>()
+            );
+            this.addAction(increaseAction);
+
+            // Decrease action
+            NumEffect decreaseEffect = NumEffect.easyNumEffect("decrease", inputFluent, precision);
+            ConditionalEffects<NumEffect> numEffectDec = new ConditionalEffects<>();
+            numEffectDec.add(decreaseEffect);
+
+            TransitionSchema decreaseAction = new TransitionSchema(
+                new SchemaParameters(),
+                "decrease_control_" + inputName,
+                new ConditionalEffects<>(),
+                numEffectDec,
+                null,
+                Semantics.ACTION,
+                new ArrayList<>()
+            );
+            this.addAction(decreaseAction);
+        }
+    }
+
+    public void transformToDPEXcompilation ( String relaxationType, Map<String, double[]> inputBounds) {
+
+        // Optimistic relaxation
+        for (TransitionSchema action : this.getActionsSchema()) {
+            
+            // Preconditions first
+            Condition precond = action.getPreconditions();
+            if (precond instanceof AndCond) {
+                AndCond and = (AndCond) precond;
+                for (int i = 0; i < and.sons.length; i++) {
+                    Object cond = and.sons[i];
+                    if (cond instanceof Comparison) {
+                        Comparison comp = (Comparison) cond;
+                        if (comp.getRight() instanceof NumFluent) {
+                            NumFluent inputFluent = (NumFluent) comp.getRight();
+                            String inputName = inputFluent.getName();
+                            if (inputBounds.containsKey(inputName)) {
+                                double lowerBound = inputBounds.get(inputName)[0];
+                                Comparison newComp = Comparison.comparison(
+                                    Comparison.Comparator.fromSymbol(comp.getComparator()),
+                                    comp.getLeft(),
+                                    new PDDLNumber(lowerBound),
+                                    comp.isNormalized()
+                                );
+                                and.sons[i] = newComp; 
+                               // System.out.println(newComp);
+                                //System.out.println("Sustituido " + inputName + " por su lower bound: " + lowerBound);
+                            }
+                        }
+                    }
+                }
+            } else{
+                System.out.println("This was not an and: " + precond);
+            }
+
+            // Effects second
+            for (NumEffect effect : action.getAllNumericEffects()) {
+                // Solo procesamos efectos sobre inputs
+                if (effect.getRight() instanceof NumFluent) {
+                    NumFluent inputFluent = (NumFluent) effect.getRight();
+                    String inputName = inputFluent.getName();
+                    if (inputBounds.containsKey(inputName)) {
+                        if ("increase".equals(effect.getOperator())) {
+                            double upperBound = inputBounds.get(inputName)[1];
+                            effect.setRight(new PDDLNumber(upperBound));
+                            //System.out.println("Efecto INCREASE: Sustituido " + inputName + " por upper bound: " + upperBound);
+                        } else if ("decrease".equals(effect.getOperator())) {
+                            double lowerBound = inputBounds.get(inputName)[0];
+                            effect.setRight(new PDDLNumber(lowerBound));
+                            //System.out.println("Efecto DECREASE: Sustituido " + inputName + " por lower bound: " + lowerBound);
+                        }
+                    }
+                }
+            }
+
+            //System.out.println("Original action:\n" + action);
+        }
+
+        // Remove input fluents
+        /*
+        this.getFunctions().removeIf(f -> {
+            String fname = f.toString().replace("(", "").replace(")", "");
+            return inputBounds.containsKey(fname);
+        });        */
+
+ 
+    }
+
+
+
+    /// End Angel
 
     /**
      * @return the processesSchemata
