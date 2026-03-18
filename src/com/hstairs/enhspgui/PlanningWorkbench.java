@@ -1,14 +1,22 @@
 package com.hstairs.enhspgui;
 
-import com.hstairs.enhspgui.approx.ApproxPddlTranslator;
+import com.hstairs.enhsp.core.execution.PlanningExecutionController;
+import com.hstairs.enhsp.core.execution.PlanningStoppedException;
+import com.hstairs.enhsp.core.execution.SearchTreeListener;
+import com.hstairs.enhsp.core.format.PlannerOutputParser;
+import com.hstairs.enhsp.core.format.PlanningResultFormatter;
+import com.hstairs.enhsp.core.format.StateTraceFormatter;
+import com.hstairs.enhsp.core.model.PlanActionRef;
+import com.hstairs.enhsp.core.model.PlanTimepointGroup;
+import com.hstairs.enhsp.core.model.PlanningResult;
+import com.hstairs.enhsp.core.model.PlannerCliOptions;
+import com.hstairs.enhsp.core.pddl.ApproxPddlTranslator;
 import com.hstairs.enhspgui.tree.LazySearchTreeWindow;
 import com.hstairs.ppmajal.PDDLProblem.PDDLSolution;
-import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import enhsp2.ENHSP;
 import enhsp2.Planner;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -32,7 +40,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -87,10 +94,8 @@ public class PlanningWorkbench {
         private JMenuItem editProblemInVsCodeMenuItem;
         private JMenuItem reloadFromVsCodeMenuItem;
         private JMenuItem setTreeWidthLimitMenuItem;
-        private JCheckBoxMenuItem autocompleteToggleMenuItem;
         private JCheckBoxMenuItem vsCodeToggleMenuItem;
         private JCheckBoxMenuItem vsCodeAutoReloadToggleMenuItem;
-        private boolean autocompleteEnabled = false;
         private boolean vsCodeIntegrationEnabled = false;
         private boolean vsCodeAutoReloadEnabled = false;
         private final Timer vsCodeReloadTimer;
@@ -111,7 +116,7 @@ public class PlanningWorkbench {
         private boolean problemDirtySinceVsCodeSync = false;
         private AiAssistantDialog aiAssistantDialog;
         private SwingWorker<PlanningResult, Void> currentWorker;
-        private PlannerExecutionController executionController;
+        private PlanningExecutionController executionController;
         private volatile Thread planningThread;
         private boolean pauseRequested;
         private int editorFontSize = 13;
@@ -178,7 +183,8 @@ public class PlanningWorkbench {
 
             JLabel problemStatus = new JLabel(" ");
             problemArea = new LispSyntaxTextPane(EditorKind.PROBLEM, defaultProblem(), report -> updateStatus(problemStatus, report));
-            setAutocompleteEnabled(autocompleteEnabled);
+            domainArea.setAutocompleteEnabled(true);
+            problemArea.setAutocompleteEnabled(true);
             installVsCodeDirtyTracking();
 
             JSplitPane editors = new JSplitPane(
@@ -269,29 +275,9 @@ public class PlanningWorkbench {
             reloadFromVsCodeMenuItem = new JMenuItem("Reload From VS Code Files (Experimental)");
             reloadFromVsCodeMenuItem.addActionListener(e -> reloadFromVsCodeFiles());
             editMenu.add(reloadFromVsCodeMenuItem);
-            editMenu.addSeparator();
-            autocompleteToggleMenuItem = new JCheckBoxMenuItem("Auto-completion (Experimental)", autocompleteEnabled);
-            autocompleteToggleMenuItem.addActionListener(e -> {
-                boolean enabled = autocompleteToggleMenuItem.isSelected();
-                if (enabled && vsCodeIntegrationEnabled) {
-                    setVsCodeIntegrationEnabled(false);
-                    if (vsCodeToggleMenuItem != null) {
-                        vsCodeToggleMenuItem.setSelected(false);
-                    }
-                }
-                setAutocompleteEnabled(enabled);
-            });
-            editMenu.add(autocompleteToggleMenuItem);
             vsCodeToggleMenuItem = new JCheckBoxMenuItem("VS Code External Editing (Experimental)", vsCodeIntegrationEnabled);
             vsCodeToggleMenuItem.addActionListener(e -> {
-                boolean enabled = vsCodeToggleMenuItem.isSelected();
-                if (enabled && autocompleteEnabled) {
-                    setAutocompleteEnabled(false);
-                    if (autocompleteToggleMenuItem != null) {
-                        autocompleteToggleMenuItem.setSelected(false);
-                    }
-                }
-                setVsCodeIntegrationEnabled(enabled);
+                setVsCodeIntegrationEnabled(vsCodeToggleMenuItem.isSelected());
             });
             editMenu.add(vsCodeToggleMenuItem);
             vsCodeAutoReloadToggleMenuItem = new JCheckBoxMenuItem("VS Code Auto-reload (Experimental)", vsCodeAutoReloadEnabled);
@@ -841,30 +827,7 @@ public class PlanningWorkbench {
             problemArea.formatDocument();
         }
 
-        private void setAutocompleteEnabled(boolean enabled) {
-            if (enabled && vsCodeIntegrationEnabled) {
-                setVsCodeIntegrationEnabled(false);
-                if (vsCodeToggleMenuItem != null) {
-                    vsCodeToggleMenuItem.setSelected(false);
-                }
-            }
-            autocompleteEnabled = enabled;
-            domainArea.setAutocompleteEnabled(enabled);
-            problemArea.setAutocompleteEnabled(enabled);
-            if (autocompleteToggleMenuItem != null && autocompleteToggleMenuItem.isSelected() != enabled) {
-                autocompleteToggleMenuItem.setSelected(enabled);
-            }
-        }
-
         private void setVsCodeIntegrationEnabled(boolean enabled) {
-            if (enabled && autocompleteEnabled) {
-                autocompleteEnabled = false;
-                domainArea.setAutocompleteEnabled(false);
-                problemArea.setAutocompleteEnabled(false);
-                if (autocompleteToggleMenuItem != null) {
-                    autocompleteToggleMenuItem.setSelected(false);
-                }
-            }
             vsCodeIntegrationEnabled = enabled;
             if (!enabled) {
                 vsCodeAutoReloadEnabled = false;
@@ -1124,6 +1087,35 @@ public class PlanningWorkbench {
             return searchTreeWindow;
         }
 
+        private SearchTreeListener createSearchTreeListener(LazySearchTreeWindow treeWindow) {
+            if (treeWindow == null) {
+                return null;
+            }
+            return new SearchTreeListener() {
+                @Override
+                public void onSearchStart() {
+                    treeWindow.onSearchStart();
+                }
+
+                @Override
+                public void onLogEvent(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node,
+                                       com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType logType,
+                                       boolean isGoal) {
+                    treeWindow.onLogEvent(node, logType, isGoal);
+                }
+
+                @Override
+                public void onSearchEnd() {
+                    treeWindow.onSearchEnd();
+                }
+
+                @Override
+                public void markSolutionNode(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node) {
+                    treeWindow.markSolutionNode(node);
+                }
+            };
+        }
+
         private void openPlannerOptionsDialog() {
             PlannerOptionsDialog dialog = new PlannerOptionsDialog(this, plannerOptions);
             PlannerCliOptions updated = dialog.showDialog();
@@ -1360,7 +1352,7 @@ public class PlanningWorkbench {
             synchronized (rawOutputBuffer) {
                 rawOutputBuffer.setLength(0);
             }
-            executionController = new PlannerExecutionController();
+            executionController = new PlanningExecutionController();
             final boolean searchTreeForThisRun = showSearchTree;
             final boolean liveSearchTreeForThisRun = showSearchTree && liveSearchTree;
             if (showSearchTree) {
@@ -1369,7 +1361,7 @@ public class PlanningWorkbench {
                  treeWindow.setLiveJsonMode(liveSearchTreeForThisRun);
                 treeWindow.showWindow();
             }
-            executionController.setSearchTreeWindow(liveSearchTreeForThisRun ? searchTreeWindow : null);
+            executionController.setSearchTreeListener(liveSearchTreeForThisRun ? createSearchTreeListener(searchTreeWindow) : null);
 
             SwingWorker<PlanningResult, Void> worker = new SwingWorker<>() {
                 @Override
@@ -1425,7 +1417,9 @@ public class PlanningWorkbench {
                             }
                             persistLatestSearchJsonIfPresent(tmpDir);
                             executionController.checkStopped();
-                            return formatSolution(solution, planner.getProblem(), debugMode ? domainTextForPlanning : null, debugMode ? problemTextForPlanning : null);
+                            return PlanningResultFormatter.formatSolution(solution, planner.getProblem(),
+                                    debugMode ? domainTextForPlanning : null,
+                                    debugMode ? problemTextForPlanning : null);
                         }
                     } catch (PlanningStoppedException e) {
                         return PlanningResult.error("Planning stopped by user.", null, null);
@@ -1632,7 +1626,7 @@ public class PlanningWorkbench {
 
         private void handlePlannerOutputLine(String line) {
             appendRawOutputLine(line);
-            String interesting = extractInterestingLiveStat(line);
+            String interesting = PlannerOutputParser.extractInterestingLiveStat(line);
             if (interesting != null) {
                 synchronized (liveStatsBuffer) {
                     liveStatsBuffer.append(interesting).append('\n');
@@ -1644,30 +1638,6 @@ public class PlanningWorkbench {
                     statsArea.setCaretPosition(statsArea.getDocument().getLength());
                 }
             });
-        }
-
-        private String extractInterestingLiveStat(String rawLine) {
-            String line = rawLine == null ? "" : rawLine.trim();
-            if (line.isEmpty()) {
-                return null;
-            }
-            if (line.startsWith("h(I):")) {
-                return line;
-            }
-            if (line.startsWith("f(n) =")) {
-                return line;
-            }
-            if (line.startsWith("g(n)=") && line.contains("h(n)=")) {
-                return line;
-            }
-            if (line.startsWith("Plan-Length:")
-                    || line.startsWith("Metric (Search):")
-                    || line.startsWith("Planning Time (msec):")
-                    || line.startsWith("Expanded Nodes:")
-                    || line.startsWith("States Evaluated:")) {
-                return line;
-            }
-            return null;
         }
 
         private void showSelectedStepStatePopup() {
@@ -1689,32 +1659,149 @@ public class PlanningWorkbench {
                 JOptionPane.showMessageDialog(this, "Select an action line in the plan first.", "State Trace", JOptionPane.INFORMATION_MESSAGE);
                 return;
             }
-            String action = result.actionLines.get(actionStepIndex);
-            String before = actionStepIndex < result.actionStateBefore.size() ? result.actionStateBefore.get(actionStepIndex) : "N/A";
-            String after = actionStepIndex < result.actionStateAfter.size() ? result.actionStateAfter.get(actionStepIndex) : "N/A";
+
+            JDialog dialog = new JDialog(this, "State Trace Navigator", false);
+            dialog.setLayout(new BorderLayout(10, 10));
+
+            JPanel top = new JPanel(new BorderLayout(8, 8));
+            top.setBorder(new EmptyBorder(10, 10, 0, 10));
+            JLabel stepLabel = new JLabel();
+            stepLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+            JTextArea actionArea = new JTextArea();
+            actionArea.setEditable(false);
+            actionArea.setLineWrap(true);
+            actionArea.setWrapStyleWord(true);
+            actionArea.setRows(2);
+            actionArea.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
+            actionArea.setBackground(new Color(245, 248, 252));
+            actionArea.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(215, 222, 232)),
+                    new EmptyBorder(8, 10, 8, 10)
+            ));
+            top.add(stepLabel, BorderLayout.NORTH);
+            top.add(actionArea, BorderLayout.CENTER);
 
             JTabbedPane tabs = new JTabbedPane();
 
-            JTextArea diffArea = new JTextArea();
-            diffArea.setEditable(false);
-            diffArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
-            diffArea.setText("Action: " + action + "\n\n" + buildStateDiff(before, after));
+            JTextArea diffArea = createStateTraceArea();
             tabs.add("Differences", new JScrollPane(diffArea));
 
-            JTextArea fullArea = new JTextArea();
-            fullArea.setEditable(false);
-            fullArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
-            fullArea.setText("Action: " + action + "\n\nState before:\n" + before + "\n\nState after:\n" + after);
+            JTextArea fullArea = createStateTraceArea();
             tabs.add("Full States", new JScrollPane(fullArea));
 
-            JTextArea varsArea = new JTextArea();
-            varsArea.setEditable(false);
-            varsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
-            varsArea.setText("Action: " + action + "\n\n" + buildVariableValuesView(before, after));
+            JTextArea varsArea = createStateTraceArea();
             tabs.add("Variables", new JScrollPane(varsArea));
 
-            tabs.setPreferredSize(new Dimension(950, 620));
-            JOptionPane.showMessageDialog(this, tabs, "State Trace - Step " + actionStepIndex, JOptionPane.INFORMATION_MESSAGE);
+            JButton prevButton = new JButton("Previous");
+            JButton nextButton = new JButton("Next");
+            JLabel hintLabel = new JLabel("Use Left/Right arrow keys to move through the plan.");
+            hintLabel.setForeground(new Color(90, 100, 120));
+
+            JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+            controls.add(hintLabel);
+            controls.add(prevButton);
+            controls.add(nextButton);
+
+            dialog.add(top, BorderLayout.NORTH);
+            dialog.add(tabs, BorderLayout.CENTER);
+            dialog.add(controls, BorderLayout.SOUTH);
+
+            final int[] currentActionIndex = {actionStepIndex};
+            Runnable refreshView = () -> {
+                int current = currentActionIndex[0];
+                String action = result.actionLines.get(current);
+                String before = current < result.actionStateBefore.size() ? result.actionStateBefore.get(current) : "N/A";
+                String after = current < result.actionStateAfter.size() ? result.actionStateAfter.get(current) : "N/A";
+
+                stepLabel.setText("Action step " + current + " / " + (Math.max(0, result.actionLines.size() - 1)));
+                actionArea.setText(action);
+                diffArea.setText(StateTraceFormatter.buildStateDiff(before, after));
+                fullArea.setText("State before:\n" + before + "\n\nState after:\n" + after);
+                varsArea.setText(StateTraceFormatter.buildVariableValuesView(before, after));
+
+                prevButton.setEnabled(current > 0);
+                nextButton.setEnabled(current < result.actionLines.size() - 1);
+
+                int displayIndex = findDisplayIndexForActionStep(result, current);
+                if (displayIndex >= 0 && displayIndex < planListModel.size()) {
+                    planList.setSelectedIndex(displayIndex);
+                    planList.ensureIndexIsVisible(displayIndex);
+                }
+
+                dialog.setTitle("State Trace - Step " + current);
+                diffArea.setCaretPosition(0);
+                fullArea.setCaretPosition(0);
+                varsArea.setCaretPosition(0);
+            };
+
+            Runnable goPrevious = () -> {
+                if (currentActionIndex[0] > 0) {
+                    currentActionIndex[0]--;
+                    refreshView.run();
+                }
+            };
+            Runnable goNext = () -> {
+                if (currentActionIndex[0] < result.actionLines.size() - 1) {
+                    currentActionIndex[0]++;
+                    refreshView.run();
+                }
+            };
+
+            prevButton.addActionListener(e -> goPrevious.run());
+            nextButton.addActionListener(e -> goNext.run());
+            installStateTraceNavigationBindings(dialog, goPrevious, goNext, tabs, diffArea, fullArea, varsArea, actionArea);
+
+            dialog.setSize(980, 700);
+            dialog.setLocationRelativeTo(this);
+            refreshView.run();
+            dialog.setVisible(true);
+        }
+
+        private JTextArea createStateTraceArea() {
+            JTextArea area = new JTextArea();
+            area.setEditable(false);
+            area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+            return area;
+        }
+
+        private int findDisplayIndexForActionStep(PlanningResult result, int actionStepIndex) {
+            for (int i = 0; i < result.displayToActionStep.size(); i++) {
+                if (result.displayToActionStep.get(i) == actionStepIndex) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private void installStateTraceNavigationBindings(JDialog dialog, Runnable goPrevious, Runnable goNext,
+                                                         JComponent... components) {
+            Action prevAction = new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    goPrevious.run();
+                }
+            };
+            Action nextAction = new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    goNext.run();
+                }
+            };
+
+            bindStateTraceNavigation(dialog.getRootPane(), prevAction, nextAction, true);
+            for (JComponent component : components) {
+                bindStateTraceNavigation(component, prevAction, nextAction, false);
+            }
+        }
+
+        private void bindStateTraceNavigation(JComponent component, Action prevAction, Action nextAction, boolean windowScope) {
+            int condition = windowScope ? JComponent.WHEN_IN_FOCUSED_WINDOW : JComponent.WHEN_FOCUSED;
+            InputMap inputMap = component.getInputMap(condition);
+            ActionMap actionMap = component.getActionMap();
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0), "state-trace-prev");
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0), "state-trace-next");
+            actionMap.put("state-trace-prev", prevAction);
+            actionMap.put("state-trace-next", nextAction);
         }
 
         private void showPlanGraphDialog() {
@@ -1736,79 +1823,6 @@ public class PlanningWorkbench {
             dialog.setSize(1100, 700);
             dialog.setLocationRelativeTo(this);
             dialog.setVisible(true);
-        }
-
-        private String buildStateDiff(String before, String after) {
-            java.util.Map<String, String> b = parseStateAssignments(before);
-            java.util.Map<String, String> a = parseStateAssignments(after);
-            java.util.Set<String> keys = new java.util.TreeSet<>();
-            keys.addAll(b.keySet());
-            keys.addAll(a.keySet());
-
-            StringBuilder sb = new StringBuilder();
-            int changes = 0;
-            for (String k : keys) {
-                String bv = b.get(k);
-                String av = a.get(k);
-                if (!java.util.Objects.equals(bv, av)) {
-                    sb.append(k).append(": ").append(bv == null ? "<unset>" : bv)
-                      .append(" -> ").append(av == null ? "<unset>" : av).append('\n');
-                    changes++;
-                }
-            }
-            if (changes == 0) {
-                return "No state differences detected for this step.";
-            }
-            return sb.toString();
-        }
-
-        private String buildVariableValuesView(String before, String after) {
-            java.util.Map<String, String> b = parseStateAssignments(before);
-            java.util.Map<String, String> a = parseStateAssignments(after);
-            java.util.Set<String> keys = new java.util.TreeSet<>();
-            keys.addAll(b.keySet());
-            keys.addAll(a.keySet());
-            if (keys.isEmpty()) {
-                return "No explicit variable values parsed from state text.";
-            }
-            StringBuilder sb = new StringBuilder();
-            sb.append("Before -> After\n");
-            sb.append("----------------\n");
-            for (String k : keys) {
-                String bv = b.get(k);
-                String av = a.get(k);
-                sb.append(k)
-                  .append(": ")
-                  .append(bv == null ? "<unset>" : bv)
-                  .append(" -> ")
-                  .append(av == null ? "<unset>" : av);
-                if (!java.util.Objects.equals(bv, av)) {
-                    sb.append("   *");
-                }
-                sb.append('\n');
-            }
-            return sb.toString();
-        }
-
-        private java.util.Map<String, String> parseStateAssignments(String stateText) {
-            java.util.Map<String, String> map = new java.util.HashMap<>();
-            if (stateText == null) {
-                return map;
-            }
-            java.util.regex.Matcher valueMatcher = java.util.regex.Pattern
-                    .compile("(\\([^\\)]*\\)|[^\\s=]+)=([^\\s]+)")
-                    .matcher(stateText);
-            while (valueMatcher.find()) {
-                map.put(valueMatcher.group(1), valueMatcher.group(2));
-            }
-            java.util.regex.Matcher atomMatcher = java.util.regex.Pattern
-                    .compile("(\\([^\\)]*\\))")
-                    .matcher(stateText);
-            while (atomMatcher.find()) {
-                String atom = atomMatcher.group(1);
-                map.putIfAbsent(atom, "true");
-            }
-            return map;
         }
 
         private int selectedPlanLineIndex() {
@@ -1851,210 +1865,6 @@ public class PlanningWorkbench {
             currentWorker.cancel(true);
             setPlanMessages("Stopping planning...");
             statsArea.setText("Stopping planning...\n");
-        }
-
-        private static PlanningResult formatSolution(PDDLSolution solution, com.hstairs.ppmajal.PDDLProblem.PDDLProblem problem,
-                                                     String generatedDomainPddl, String generatedProblemPddl) {
-            if (solution == null || solution.rawPlan() == null) {
-                return PlanningResult.error("Problem unsolvable or no plan returned.", generatedDomainPddl, generatedProblemPddl);
-            }
-            StringBuilder statsBuilder = new StringBuilder();
-            List<String> actionLines = new ArrayList<>();
-            List<String> displayLines = new ArrayList<>();
-            List<Integer> displayToActionStep = new ArrayList<>();
-            List<PlanTimepointGroup> graphGroups = new ArrayList<>();
-            statsBuilder.append("Plan found.\n");
-            statsBuilder.append("Plan length: ").append(solution.rawPlan().size()).append('\n');
-            statsBuilder.append("Search metric: ").append(solution.gValueAtTheEnd()).append('\n');
-            statsBuilder.append("Expanded nodes: ").append(solution.stats().nodesExpanded()).append('\n');
-            statsBuilder.append("Evaluated states: ").append(solution.stats().nodesEvaluated()).append('\n');
-            statsBuilder.append("Dead ends: ").append(solution.stats().deadEnds()).append('\n');
-            statsBuilder.append("Duplicates: ").append(solution.stats().duplicates()).append('\n');
-            List<ActionDisplayEntry> entries = new ArrayList<>();
-            List<Integer> rawStepToActionIndex = new ArrayList<>();
-            boolean hasNonActionTransitions = false;
-            boolean hasActionWithExplicitTime = false;
-            boolean hasNonZeroActionTime = false;
-            boolean hasConcurrentActionsAtSameTime = false;
-            java.util.Set<String> explicitActionTimes = new java.util.LinkedHashSet<>();
-            int stepIndex = 0;
-            int actionIndex = 0;
-            for (ImmutablePair<BigDecimal, com.hstairs.ppmajal.transition.TransitionGround> planStep : solution.rawPlan()) {
-                com.hstairs.ppmajal.transition.TransitionGround transition = planStep.getRight();
-                String action = transition == null ? "<null transition>" : transition.toString();
-                BigDecimal timeValue = planStep.getLeft();
-                boolean explicitTime = timeValue != null;
-                String timeKey = normalizeTimeKey(timeValue, stepIndex);
-                boolean isAction = transition != null
-                        && transition.getSemantics().equals(com.hstairs.ppmajal.transition.Transition.Semantics.ACTION);
-                boolean waiting = isWaitingActionText(action);
-                if (!isAction) {
-                    hasNonActionTransitions = true;
-                }
-                int mappedActionIndex = -1;
-                if (isAction) {
-                    mappedActionIndex = actionIndex;
-                    actionLines.add(action);
-                    actionIndex++;
-                    if (explicitTime) {
-                        hasActionWithExplicitTime = true;
-                        if (normalizeTimeValue(timeValue).compareTo(BigDecimal.ZERO) != 0) {
-                            hasNonZeroActionTime = true;
-                        }
-                        if (!explicitActionTimes.add(timeKey)) {
-                            hasConcurrentActionsAtSameTime = true;
-                        }
-                    }
-                }
-                rawStepToActionIndex.add(mappedActionIndex);
-                entries.add(new ActionDisplayEntry(stepIndex, mappedActionIndex, timeKey, action, isAction, waiting, explicitTime));
-                stepIndex++;
-            }
-
-            boolean hasMultipleActionTimepoints = explicitActionTimes.size() > 1;
-            boolean pddlPlusProblem = problem != null
-                    && ((problem.getProcessesSet() != null && !problem.getProcessesSet().isEmpty())
-                    || (problem.getEventsSet() != null && !problem.getEventsSet().isEmpty()));
-            boolean timedPlanCandidate = hasNonActionTransitions
-                    || hasConcurrentActionsAtSameTime
-                    || (hasActionWithExplicitTime && (hasMultipleActionTimepoints || hasNonZeroActionTime));
-            boolean timedPlan = pddlPlusProblem && timedPlanCandidate;
-            statsBuilder.append("Plan layout: ").append(timedPlan ? "timepoint groups" : "sequential").append('\n');
-
-            if (!timedPlan) {
-                int index = 0;
-                for (ActionDisplayEntry e : entries) {
-                    if (!e.actionTransition || e.waitingTransition) {
-                        continue;
-                    }
-                    displayLines.add(index + ": " + e.action);
-                    displayToActionStep.add(e.actionIndex);
-                    graphGroups.add(new PlanTimepointGroup(
-                            String.valueOf(index),
-                            List.of(new PlanActionRef(e.actionIndex, e.action)),
-                            List.of()
-                    ));
-                    index++;
-                }
-            } else {
-                java.util.LinkedHashMap<String, List<ActionDisplayEntry>> groupedByTime = new java.util.LinkedHashMap<>();
-                for (ActionDisplayEntry entry : entries) {
-                    groupedByTime.computeIfAbsent(entry.timeKey, ignored -> new ArrayList<>()).add(entry);
-                }
-                List<PlanTimepointGroup> compactGroups = new ArrayList<>();
-                java.util.LinkedHashSet<String> carriedOnDemandTransitions = new java.util.LinkedHashSet<>();
-                for (var groupEntry : groupedByTime.entrySet()) {
-                    String timeKey = groupEntry.getKey();
-                    List<ActionDisplayEntry> atTime = groupEntry.getValue();
-                    List<PlanActionRef> actionsAtTime = new ArrayList<>();
-                    java.util.LinkedHashSet<String> onDemandTransitionsAtTime = new java.util.LinkedHashSet<>();
-                    for (ActionDisplayEntry entry : atTime) {
-                        if (entry.actionTransition && !entry.waitingTransition) {
-                            actionsAtTime.add(new PlanActionRef(entry.actionIndex, entry.action));
-                        } else if (entry.action != null && !entry.action.isBlank()) {
-                            onDemandTransitionsAtTime.add(entry.action);
-                        }
-                    }
-                    if (actionsAtTime.isEmpty()) {
-                        carriedOnDemandTransitions.addAll(onDemandTransitionsAtTime);
-                        continue;
-                    }
-                    java.util.LinkedHashSet<String> mergedOnDemandTransitions = new java.util.LinkedHashSet<>(carriedOnDemandTransitions);
-                    mergedOnDemandTransitions.addAll(onDemandTransitionsAtTime);
-                    carriedOnDemandTransitions.clear();
-                    compactGroups.add(new PlanTimepointGroup(timeKey, actionsAtTime, new ArrayList<>(mergedOnDemandTransitions)));
-                }
-                if (!carriedOnDemandTransitions.isEmpty()) {
-                    if (!compactGroups.isEmpty()) {
-                        PlanTimepointGroup last = compactGroups.get(compactGroups.size() - 1);
-                        java.util.LinkedHashSet<String> mergedTail = new java.util.LinkedHashSet<>(last.onDemandTransitions);
-                        mergedTail.addAll(carriedOnDemandTransitions);
-                        last.onDemandTransitions.clear();
-                        last.onDemandTransitions.addAll(mergedTail);
-                    } else if (!groupedByTime.isEmpty()) {
-                        String fallbackTime = groupedByTime.keySet().iterator().next();
-                        compactGroups.add(new PlanTimepointGroup(fallbackTime, new ArrayList<>(), new ArrayList<>(carriedOnDemandTransitions)));
-                    }
-                }
-                for (PlanTimepointGroup group : compactGroups) {
-                    String header = "[t=" + group.timeKey + "] " + group.actions.size() + " action(s)";
-                    displayLines.add(header);
-                    displayToActionStep.add(-1);
-                    for (PlanActionRef actionRef : group.actions) {
-                        displayLines.add("  - " + actionRef.action);
-                        displayToActionStep.add(actionRef.actionIndex);
-                    }
-                    graphGroups.add(group);
-                }
-                statsBuilder.append("Timepoints shown: ").append(graphGroups.size()).append('\n');
-            }
-
-            List<String> actionStateBefore = new ArrayList<>();
-            List<String> actionStateAfter = new ArrayList<>();
-            try {
-                com.hstairs.ppmajal.problem.State current = problem.getInit().clone();
-                int rawIndex = 0;
-                for (ImmutablePair<BigDecimal, com.hstairs.ppmajal.transition.TransitionGround> step : solution.rawPlan()) {
-                    com.hstairs.ppmajal.transition.TransitionGround action = step.getRight();
-                    int mappedActionIndex = rawStepToActionIndex.get(rawIndex);
-                    if (mappedActionIndex >= 0 && action != null
-                            && action.getSemantics().equals(com.hstairs.ppmajal.transition.Transition.Semantics.ACTION)) {
-                        com.hstairs.ppmajal.problem.State before = current.clone();
-                        com.hstairs.ppmajal.problem.State prevForApply = current.clone();
-                        current.apply(action, prevForApply);
-                        com.hstairs.ppmajal.problem.State after = current.clone();
-                        actionStateBefore.add(String.valueOf(before));
-                        actionStateAfter.add(String.valueOf(after));
-                    }
-                    rawIndex++;
-                }
-                statsBuilder.append("Trace states available: ").append(actionStateBefore.size()).append('\n');
-            } catch (Exception e) {
-                statsBuilder.append("Trace states unavailable: ").append(e.getMessage()).append('\n');
-            }
-            return new PlanningResult(
-                    String.join("\n", displayLines),
-                    statsBuilder.toString(),
-                    actionLines,
-                    actionStateBefore,
-                    actionStateAfter,
-                    displayLines,
-                    displayToActionStep,
-                    timedPlan,
-                    graphGroups,
-                    generatedDomainPddl,
-                    generatedProblemPddl
-            );
-        }
-
-        private static BigDecimal normalizeTimeValue(BigDecimal time) {
-            if (time == null) {
-                return BigDecimal.ZERO;
-            }
-            BigDecimal normalized = time.stripTrailingZeros();
-            if (normalized.compareTo(BigDecimal.ZERO) == 0) {
-                return BigDecimal.ZERO;
-            }
-            return normalized;
-        }
-
-        private static String normalizeTimeKey(BigDecimal time, int stepIndex) {
-            if (time == null) {
-                return "step " + stepIndex;
-            }
-            BigDecimal normalized = normalizeTimeValue(time);
-            if (normalized.compareTo(BigDecimal.ZERO) == 0) {
-                return "0";
-            }
-            return normalized.toPlainString();
-        }
-
-        private static boolean isWaitingActionText(String action) {
-            if (action == null) {
-                return false;
-            }
-            String a = action.trim().toLowerCase();
-            return a.equals("(waiting)") || a.contains("waiting");
         }
 
         private static String defaultDomain() {
@@ -2586,317 +2396,6 @@ public class PlanningWorkbench {
         }
     }
 
-    private static final class PlanningResult {
-        final String planText;
-        final String statsText;
-        final List<String> actionLines;
-        final List<String> actionStateBefore;
-        final List<String> actionStateAfter;
-        final List<String> displayLines;
-        final List<Integer> displayToActionStep;
-        final boolean timedPlan;
-        final List<PlanTimepointGroup> planTimepointGroups;
-        final String generatedDomainPddl;
-        final String generatedProblemPddl;
-
-        PlanningResult(String planText, String statsText, List<String> actionLines, List<String> actionStateBefore, List<String> actionStateAfter,
-                       List<String> displayLines, List<Integer> displayToActionStep, boolean timedPlan,
-                       List<PlanTimepointGroup> planTimepointGroups,
-                       String generatedDomainPddl, String generatedProblemPddl) {
-            this.planText = planText;
-            this.statsText = statsText;
-            this.actionLines = actionLines;
-            this.actionStateBefore = actionStateBefore;
-            this.actionStateAfter = actionStateAfter;
-            this.displayLines = displayLines;
-            this.displayToActionStep = displayToActionStep;
-            this.timedPlan = timedPlan;
-            this.planTimepointGroups = planTimepointGroups;
-            this.generatedDomainPddl = generatedDomainPddl;
-            this.generatedProblemPddl = generatedProblemPddl;
-        }
-
-        static PlanningResult error(String message, String generatedDomainPddl, String generatedProblemPddl) {
-            return new PlanningResult(message, message, List.of(), List.of(), List.of(), List.of(message), List.of(-1), false, List.of(),
-                    generatedDomainPddl, generatedProblemPddl);
-        }
-
-        boolean hasTrace() {
-            return !actionLines.isEmpty()
-                    && actionStateBefore.size() == actionLines.size()
-                    && actionStateAfter.size() == actionLines.size();
-        }
-
-        boolean hasGeneratedPddl() {
-            return generatedDomainPddl != null && generatedProblemPddl != null;
-        }
-
-        boolean hasPlanGraph() {
-            return !actionLines.isEmpty() || !planTimepointGroups.isEmpty();
-        }
-    }
-
-    private static final class ActionDisplayEntry {
-        final int originalStepIndex;
-        final int actionIndex;
-        final String timeKey;
-        final String action;
-        final boolean actionTransition;
-        final boolean waitingTransition;
-        final boolean explicitTime;
-
-        ActionDisplayEntry(int originalStepIndex, int actionIndex, String timeKey, String action,
-                           boolean actionTransition, boolean waitingTransition, boolean explicitTime) {
-            this.originalStepIndex = originalStepIndex;
-            this.actionIndex = actionIndex;
-            this.timeKey = timeKey;
-            this.action = action;
-            this.actionTransition = actionTransition;
-            this.waitingTransition = waitingTransition;
-            this.explicitTime = explicitTime;
-        }
-    }
-
-    private static final class PlanTimepointGroup {
-        final String timeKey;
-        final List<PlanActionRef> actions;
-        final List<String> onDemandTransitions;
-
-        PlanTimepointGroup(String timeKey, List<PlanActionRef> actions, List<String> onDemandTransitions) {
-            this.timeKey = timeKey;
-            this.actions = actions;
-            this.onDemandTransitions = onDemandTransitions;
-        }
-    }
-
-    private static final class PlanActionRef {
-        final int actionIndex;
-        final String action;
-
-        PlanActionRef(int actionIndex, String action) {
-            this.actionIndex = actionIndex;
-            this.action = action;
-        }
-    }
-
-    private static final class PlanningStoppedException extends RuntimeException {
-        PlanningStoppedException() {
-            super("Planning stopped");
-        }
-    }
-
-    private static final class PlannerCliOptions {
-        String planner = "";
-        String heuristic = "hadd";
-        String search = "gbfs";
-        String novelty = "";
-        String kNov = "";
-        String tieBreaking = "arbitrary";
-        String redundantConstraints = "no";
-        String grounding = "internal";
-        String sdac = "disabled";
-        String wh = "";
-        String deltaPlanning = "";
-        String deltaExecution = "";
-        String deltaHeuristic = "";
-        String deltaValidation = "";
-        String delta = "";
-        String depthLimit = "";
-        String timeout = "";
-        String kSubdomains = "";
-        String tolerance = "";
-        String inputPlan = "";
-        String savePlan = "";
-        String posthocLogger = "";
-        String effectAbstraction = "";
-        String customArgs = "";
-
-        boolean helpfulActions;
-        boolean helpfulTransitions;
-        boolean printEvents;
-        boolean printTrace;
-        boolean ignoreMetric;
-        boolean disableAibrPreprocessing;
-        boolean stopAfterGrounding;
-        boolean internalValidation;
-        boolean onlyPlan;
-        boolean printActions;
-        boolean silent;
-        boolean autoAnytime;
-        boolean anytime;
-        boolean unitCostHeuristic;
-        boolean noPrintMakespan;
-        boolean printAllInfo;
-        boolean bucketBasedQueueSearch;
-        boolean tunnelling;
-        boolean saveSearchJson;
-
-        static PlannerCliOptions defaults() {
-            return new PlannerCliOptions();
-        }
-
-        PlannerCliOptions copy() {
-            PlannerCliOptions c = new PlannerCliOptions();
-            c.planner = planner;
-            c.heuristic = heuristic;
-            c.search = search;
-            c.novelty = novelty;
-            c.kNov = kNov;
-            c.tieBreaking = tieBreaking;
-            c.redundantConstraints = redundantConstraints;
-            c.grounding = grounding;
-            c.sdac = sdac;
-            c.wh = wh;
-            c.deltaPlanning = deltaPlanning;
-            c.deltaExecution = deltaExecution;
-            c.deltaHeuristic = deltaHeuristic;
-            c.deltaValidation = deltaValidation;
-            c.delta = delta;
-            c.depthLimit = depthLimit;
-            c.timeout = timeout;
-            c.kSubdomains = kSubdomains;
-            c.tolerance = tolerance;
-            c.inputPlan = inputPlan;
-            c.savePlan = savePlan;
-            c.posthocLogger = posthocLogger;
-            c.effectAbstraction = effectAbstraction;
-            c.customArgs = customArgs;
-
-            c.helpfulActions = helpfulActions;
-            c.helpfulTransitions = helpfulTransitions;
-            c.printEvents = printEvents;
-            c.printTrace = printTrace;
-            c.ignoreMetric = ignoreMetric;
-            c.disableAibrPreprocessing = disableAibrPreprocessing;
-            c.stopAfterGrounding = stopAfterGrounding;
-            c.internalValidation = internalValidation;
-            c.onlyPlan = onlyPlan;
-            c.printActions = printActions;
-            c.silent = silent;
-            c.autoAnytime = autoAnytime;
-            c.anytime = anytime;
-            c.unitCostHeuristic = unitCostHeuristic;
-            c.noPrintMakespan = noPrintMakespan;
-            c.printAllInfo = printAllInfo;
-            c.bucketBasedQueueSearch = bucketBasedQueueSearch;
-            c.tunnelling = tunnelling;
-            c.saveSearchJson = saveSearchJson;
-            return c;
-        }
-
-        void appendArgs(List<String> args) {
-            addArgWithValue(args, "-planner", planner);
-            addArgWithValue(args, "-h", heuristic);
-            addArgWithValue(args, "-s", search);
-            addArgWithValue(args, "-nov", novelty);
-            addArgWithValue(args, "-knov", kNov);
-            addArgWithValue(args, "-ties", tieBreaking);
-            addArgWithValue(args, "-red", redundantConstraints);
-            addArgWithValue(args, "-gro", grounding);
-            addArgWithValue(args, "-sdac", sdac);
-            addArgWithValue(args, "-wh", wh);
-            addArgWithValue(args, "-dp", deltaPlanning);
-            addArgWithValue(args, "-de", deltaExecution);
-            addArgWithValue(args, "-dh", deltaHeuristic);
-            addArgWithValue(args, "-dv", deltaValidation);
-            addArgWithValue(args, "-d", delta);
-            addArgWithValue(args, "-dl", depthLimit);
-            addArgWithValue(args, "-timeout", timeout);
-            addArgWithValue(args, "-k", kSubdomains);
-            addArgWithValue(args, "-tolerance", tolerance);
-            addArgWithValue(args, "-inputplan", inputPlan);
-            addArgWithValue(args, "-sp", savePlan);
-            addArgWithValue(args, "-with_posthoc_logger", posthocLogger);
-            addArgWithValue(args, "-ea", effectAbstraction);
-
-            addFlag(args, "-ha", helpfulActions);
-            addFlag(args, "-ht", helpfulTransitions);
-            addPlainFlag(args, "-pe", printEvents);
-            addPlainFlag(args, "-pt", printTrace);
-            addPlainFlag(args, "-im", ignoreMetric);
-            addPlainFlag(args, "-dap", disableAibrPreprocessing);
-            addPlainFlag(args, "-stopgro", stopAfterGrounding);
-            addPlainFlag(args, "-ival", internalValidation);
-            addPlainFlag(args, "-onlyplan", onlyPlan);
-            addPlainFlag(args, "-print_actions", printActions);
-            addPlainFlag(args, "-silent", silent);
-            addPlainFlag(args, "-autoanytime", autoAnytime);
-            addPlainFlag(args, "-anytime", anytime);
-            addPlainFlag(args, "-uch", unitCostHeuristic);
-            addPlainFlag(args, "-npm", noPrintMakespan);
-            addPlainFlag(args, "-pai", printAllInfo);
-            addPlainFlag(args, "-bbqs", bucketBasedQueueSearch);
-            addPlainFlag(args, "-tun", tunnelling);
-            addPlainFlag(args, "-sjr", saveSearchJson);
-
-            // Must be appended last so custom args override presets/UI fields.
-            args.addAll(tokenizeCliArgs(customArgs));
-        }
-
-        private static void addPlainFlag(List<String> args, String flag, boolean enabled) {
-            if (enabled) {
-                args.add(flag);
-            }
-        }
-
-        private static void addFlag(List<String> args, String flag, boolean enabled) {
-            if (enabled) {
-                args.add(flag);
-                args.add("true");
-            }
-        }
-
-        private static void addArgWithValue(List<String> args, String flag, String value) {
-            if (value != null && !value.isBlank()) {
-                args.add(flag);
-                args.add(value.trim());
-            }
-        }
-
-        private static List<String> tokenizeCliArgs(String raw) {
-            List<String> out = new ArrayList<>();
-            if (raw == null || raw.isBlank()) {
-                return out;
-            }
-            StringBuilder current = new StringBuilder();
-            boolean inSingle = false;
-            boolean inDouble = false;
-            boolean escaped = false;
-            for (int i = 0; i < raw.length(); i++) {
-                char c = raw.charAt(i);
-                if (escaped) {
-                    current.append(c);
-                    escaped = false;
-                    continue;
-                }
-                if (c == '\\') {
-                    escaped = true;
-                    continue;
-                }
-                if (c == '\'' && !inDouble) {
-                    inSingle = !inSingle;
-                    continue;
-                }
-                if (c == '"' && !inSingle) {
-                    inDouble = !inDouble;
-                    continue;
-                }
-                if (Character.isWhitespace(c) && !inSingle && !inDouble) {
-                    if (current.length() > 0) {
-                        out.add(current.toString());
-                        current.setLength(0);
-                    }
-                    continue;
-                }
-                current.append(c);
-            }
-            if (current.length() > 0) {
-                out.add(current.toString());
-            }
-            return out;
-        }
-    }
-
     private static final class PlannerOptionsDialog extends JDialog {
         private PlannerCliOptions result;
         private final PlannerCliOptions working;
@@ -3315,104 +2814,6 @@ public class PlanningWorkbench {
         }
     }
 
-    private static final class PlannerExecutionController implements IExternalLogger {
-        private final Object lock = new Object();
-        private volatile boolean paused = false;
-        private volatile boolean stopped = false;
-        private volatile LazySearchTreeWindow searchTreeWindow;
-        private volatile com.hstairs.ppmajal.conditions.Condition goalCondition;
-
-        void setSearchTreeWindow(LazySearchTreeWindow searchTreeWindow) {
-            this.searchTreeWindow = searchTreeWindow;
-        }
-
-        void setGoalCondition(com.hstairs.ppmajal.conditions.Condition goalCondition) {
-            this.goalCondition = goalCondition;
-        }
-
-        void markSolutionNode(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node) {
-            if (searchTreeWindow != null && node != null) {
-                searchTreeWindow.markSolutionNode(node);
-            }
-        }
-
-        @Override
-        public void beforeExecution() {
-            if (searchTreeWindow != null) {
-                searchTreeWindow.onSearchStart();
-            }
-            waitIfPausedAndCheckStop();
-        }
-
-        @Override
-        public void log(com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode node, ExternalLoggerLogType logType) {
-            if (searchTreeWindow != null) {
-                boolean isGoal = false;
-                if (goalCondition != null && node != null && node.s != null) {
-                    try {
-                        isGoal = node.s.satisfy(goalCondition);
-                    } catch (Exception ignored) {
-                    }
-                }
-                searchTreeWindow.onLogEvent(node, logType, isGoal);
-            }
-            waitIfPausedAndCheckStop();
-        }
-
-        @Override
-        public void afterExecution() {
-            if (searchTreeWindow != null) {
-                searchTreeWindow.onSearchEnd();
-            }
-            waitIfPausedAndCheckStop();
-        }
-
-        void pause() {
-            paused = true;
-        }
-
-        void resume() {
-            synchronized (lock) {
-                paused = false;
-                lock.notifyAll();
-            }
-        }
-
-        void stop() {
-            synchronized (lock) {
-                stopped = true;
-                paused = false;
-                lock.notifyAll();
-            }
-        }
-
-        boolean isStopped() {
-            return stopped;
-        }
-
-        void checkStopped() {
-            if (stopped || Thread.currentThread().isInterrupted()) {
-                throw new PlanningStoppedException();
-            }
-        }
-
-        private void waitIfPausedAndCheckStop() {
-            synchronized (lock) {
-                while (paused && !stopped) {
-                    try {
-                        lock.wait(100);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new PlanningStoppedException();
-                    }
-                }
-            }
-            if (stopped || Thread.currentThread().isInterrupted()) {
-                throw new PlanningStoppedException();
-            }
-        }
-    }
-
     private static final class LineNumberView extends JTextArea {
         private final JTextPane editor;
 
@@ -3553,15 +2954,14 @@ public class PlanningWorkbench {
             addCompletion(COMMON_COMPLETIONS, "(exists ...)", "(exists (|) )");
             addCompletion(COMMON_COMPLETIONS, ":requirements", ":requirements |");
             addCompletion(COMMON_COMPLETIONS, ":types", ":types |");
-            addCompletion(COMMON_COMPLETIONS, ":predicates", ":predicates (|)");
-            addCompletion(COMMON_COMPLETIONS, ":functions", ":functions (|)");
-            addCompletion(COMMON_COMPLETIONS, ":action", "(:action ACTION_NAME\n :parameters (|)\n :precondition (and )\n :effect (and ))");
+            addCompletion(COMMON_COMPLETIONS, ":predicates", ":predicates\n  (|)\n");
+            addCompletion(COMMON_COMPLETIONS, ":functions", ":functions\n  (|)\n");
             addCompletion(COMMON_COMPLETIONS, ":parameters", ":parameters (|)");
-            addCompletion(COMMON_COMPLETIONS, ":precondition", ":precondition (and |)");
-            addCompletion(COMMON_COMPLETIONS, ":effect", ":effect (and |)");
-            addCompletion(COMMON_COMPLETIONS, ":objects", ":objects |");
-            addCompletion(COMMON_COMPLETIONS, ":init", ":init (|)");
-            addCompletion(COMMON_COMPLETIONS, ":goal", ":goal (and |)");
+            addCompletion(COMMON_COMPLETIONS, ":precondition", ":precondition\n  (and\n    |\n  )");
+            addCompletion(COMMON_COMPLETIONS, ":effect", ":effect\n  (and\n    |\n  )");
+            addCompletion(COMMON_COMPLETIONS, ":objects", ":objects\n  |");
+            addCompletion(COMMON_COMPLETIONS, ":init", ":init\n  |\n");
+            addCompletion(COMMON_COMPLETIONS, ":goal", ":goal\n  (and\n    |\n  )");
             addCompletion(COMMON_COMPLETIONS, ":metric", ":metric minimize (|)");
             addCompletion(COMMON_COMPLETIONS, "(increase ...)", "(increase |)");
             addCompletion(COMMON_COMPLETIONS, "(decrease ...)", "(decrease |)");
@@ -3569,23 +2969,83 @@ public class PlanningWorkbench {
             addCompletion(COMMON_COMPLETIONS, "(scale-up ...)", "(scale-up |)");
             addCompletion(COMMON_COMPLETIONS, "(scale-down ...)", "(scale-down |)");
 
-            addCompletion(DOMAIN_COMPLETIONS, "domain skeleton",
-                    "(define (domain DOMAIN_NAME)\n  (:requirements :strips :typing)\n  (:predicates\n    (p)\n  )\n  |\n)\n");
-            addCompletion(DOMAIN_COMPLETIONS, "action skeleton",
-                    "(:action ACTION_NAME\n :parameters (|)\n :precondition (and )\n :effect (and ))");
+            addTemplateCompletion(DOMAIN_COMPLETIONS, "template: full domain",
+                    "domain define requirements predicates functions action",
+                    "(define (domain DOMAIN_NAME)\n" +
+                            "  (:requirements :strips :typing :fluents)\n" +
+                            "  (:predicates\n" +
+                            "    (predicate-name ?x - TYPE)\n" +
+                            "  )\n" +
+                            "  (:functions\n" +
+                            "    (function-name ?x - TYPE)\n" +
+                            "  )\n" +
+                            "\n" +
+                            "  |\n" +
+                            ")\n");
+            addTemplateCompletion(DOMAIN_COMPLETIONS, "template: action",
+                    "domain operator action precondition effect parameters",
+                    "(:action ACTION_NAME\n" +
+                            "  :parameters (?x - TYPE)\n" +
+                            "  :precondition (and\n" +
+                            "    |\n" +
+                            "  )\n" +
+                            "  :effect (and\n" +
+                            "    \n" +
+                            "  )\n" +
+                            ")\n");
+            addTemplateCompletion(DOMAIN_COMPLETIONS, "template: predicates block",
+                    "domain predicates facts relations",
+                    "(:predicates\n" +
+                            "  (|)\n" +
+                            ")\n");
+            addTemplateCompletion(DOMAIN_COMPLETIONS, "template: functions block",
+                    "domain functions numeric fluents",
+                    "(:functions\n" +
+                            "  (|)\n" +
+                            ")\n");
+            addTemplateCompletion(DOMAIN_COMPLETIONS, "template: requirements block",
+                    "domain requirements",
+                    "(:requirements :strips :typing :fluents |)\n");
             addCompletion(DOMAIN_COMPLETIONS, "(domain ...)", "(domain |)");
-            addCompletion(DOMAIN_COMPLETIONS, ":requirements", ":requirements |");
-            addCompletion(DOMAIN_COMPLETIONS, ":predicates", ":predicates (|)");
-            addCompletion(DOMAIN_COMPLETIONS, ":functions", ":functions (|)");
 
-            addCompletion(PROBLEM_COMPLETIONS, "problem skeleton",
-                    "(define (problem PROBLEM_NAME)\n  (:domain DOMAIN_NAME)\n  (:objects |)\n  (:init )\n  (:goal (and ))\n)\n");
+            addTemplateCompletion(PROBLEM_COMPLETIONS, "template: full problem",
+                    "problem define objects init goal metric",
+                    "(define (problem PROBLEM_NAME)\n" +
+                            "  (:domain DOMAIN_NAME)\n" +
+                            "  (:objects\n" +
+                            "    |obj1 - TYPE\n" +
+                            "  )\n" +
+                            "  (:init\n" +
+                            "    \n" +
+                            "  )\n" +
+                            "  (:goal\n" +
+                            "    (and\n" +
+                            "      \n" +
+                            "    )\n" +
+                            "  )\n" +
+                            ")\n");
+            addTemplateCompletion(PROBLEM_COMPLETIONS, "template: init block",
+                    "problem init initial state",
+                    "(:init\n" +
+                            "  |\n" +
+                            ")\n");
+            addTemplateCompletion(PROBLEM_COMPLETIONS, "template: goal block",
+                    "problem goal target",
+                    "(:goal\n" +
+                            "  (and\n" +
+                            "    |\n" +
+                            "  )\n" +
+                            ")\n");
+            addTemplateCompletion(PROBLEM_COMPLETIONS, "template: metric block",
+                    "problem metric minimize maximize cost",
+                    "(:metric minimize (|))\n");
+            addTemplateCompletion(PROBLEM_COMPLETIONS, "template: objects block",
+                    "problem objects constants instances",
+                    "(:objects\n" +
+                            "  |obj1 - TYPE\n" +
+                            ")\n");
             addCompletion(PROBLEM_COMPLETIONS, "(problem ...)", "(problem |)");
             addCompletion(PROBLEM_COMPLETIONS, "(:domain ...)", "(:domain |)");
-            addCompletion(PROBLEM_COMPLETIONS, ":objects", ":objects |");
-            addCompletion(PROBLEM_COMPLETIONS, ":init", ":init (|)");
-            addCompletion(PROBLEM_COMPLETIONS, ":goal", ":goal (and |)");
-            addCompletion(PROBLEM_COMPLETIONS, ":metric", ":metric minimize (|)");
         }
 
         private final EditorKind kind;
@@ -3662,7 +3122,7 @@ public class PlanningWorkbench {
             actionMap.put("lisp-auto-indent-enter", new AbstractAction() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (acceptAutocompleteFromKeyboard()) {
+                    if (acceptSelectedAutocomplete()) {
                         return;
                     }
                     insertAutoIndentedNewline();
@@ -3683,7 +3143,7 @@ public class PlanningWorkbench {
                 }
             });
 
-            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE,
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_J,
                     Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()), "lisp-autocomplete-show");
             actionMap.put("lisp-autocomplete-show", new AbstractAction() {
                 @Override
@@ -3796,12 +3256,16 @@ public class PlanningWorkbench {
 
         private static void addCompletions(List<AutocompleteItem> target, String... values) {
             for (String value : values) {
-                target.add(new AutocompleteItem(value, value));
+                target.add(new AutocompleteItem(value, value, value, 10));
             }
         }
 
         private static void addCompletion(List<AutocompleteItem> target, String label, String insertion) {
-            target.add(new AutocompleteItem(label, insertion));
+            target.add(new AutocompleteItem(label, insertion, label, 10));
+        }
+
+        private static void addTemplateCompletion(List<AutocompleteItem> target, String label, String searchText, String insertion) {
+            target.add(new AutocompleteItem(label, insertion, searchText + " " + label, 0));
         }
 
         private void showAutocomplete(boolean forced) {
@@ -3852,6 +3316,7 @@ public class PlanningWorkbench {
             List<AutocompleteItem> filtered = new ArrayList<>();
             for (AutocompleteItem item : source) {
                 String key = item.label.toLowerCase();
+                String searchText = item.searchText.toLowerCase();
                 String normalizedKey = normalizeCompletionKey(item.label);
                 String normalizedPrefix = normalizeCompletionKey(prefix);
                 if (p.isBlank()) {
@@ -3861,6 +3326,7 @@ public class PlanningWorkbench {
                     continue;
                 }
                 if (key.startsWith(p) || key.contains(p)
+                        || searchText.startsWith(p) || searchText.contains(p)
                         || normalizedKey.startsWith(normalizedPrefix)
                         || normalizedKey.contains(normalizedPrefix)) {
                     filtered.add(item);
@@ -3868,7 +3334,8 @@ public class PlanningWorkbench {
             }
 
             filtered.sort(Comparator
-                    .comparing((AutocompleteItem i) -> !i.label.toLowerCase().startsWith(p))
+                    .comparingInt((AutocompleteItem i) -> i.priority)
+                    .thenComparing((AutocompleteItem i) -> !i.label.toLowerCase().startsWith(p))
                     .thenComparingInt(i -> i.label.length())
                     .thenComparing(i -> i.label));
             if (filtered.size() > 30) {
@@ -3884,26 +3351,6 @@ public class PlanningWorkbench {
                     .replace(":", "")
                     .replace("...", "")
                     .trim();
-        }
-
-        private boolean acceptAutocompleteFromKeyboard() {
-            if (!autocompleteEnabled) {
-                return false;
-            }
-            if (autocompletePopup.isVisible()) {
-                return acceptSelectedAutocomplete();
-            }
-
-            String prefix = currentTokenPrefix();
-            if (prefix.isBlank()) {
-                return false;
-            }
-
-            List<AutocompleteItem> suggestions = collectCompletions(prefix, false);
-            if (suggestions.isEmpty()) {
-                return false;
-            }
-            return acceptAutocompleteItem(suggestions.get(0));
         }
 
         private boolean acceptSelectedAutocomplete() {
@@ -4364,10 +3811,14 @@ public class PlanningWorkbench {
         private static final class AutocompleteItem {
             private final String label;
             private final String insertion;
+            private final String searchText;
+            private final int priority;
 
-            private AutocompleteItem(String label, String insertion) {
+            private AutocompleteItem(String label, String insertion, String searchText, int priority) {
                 this.label = label;
                 this.insertion = insertion;
+                this.searchText = searchText;
+                this.priority = priority;
             }
 
             @Override

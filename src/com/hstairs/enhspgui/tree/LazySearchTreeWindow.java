@@ -110,6 +110,7 @@ public final class LazySearchTreeWindow {
         frame = new JFrame("Search Tree");
         frame.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
         frame.setSize(860, 620);
+        frame.setMinimumSize(new Dimension(980, 680));
         frame.setLocationByPlatform(true);
 
         canvas = new GraphCanvas();
@@ -133,18 +134,22 @@ public final class LazySearchTreeWindow {
         });
         renderTimer.setRepeats(false);
 
-        JPanel controls = createControlsPanel();
+        JComponent controls = createControlsPanel();
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, canvasScrollPane, new JScrollPane(info));
+        split.setBorder(BorderFactory.createEmptyBorder());
+        split.setContinuousLayout(true);
+        split.setDividerSize(8);
         split.setResizeWeight(0.9);
 
-        JPanel root = new JPanel(new BorderLayout());
+        JPanel root = new JPanel(new BorderLayout(0, 8));
+        root.setBorder(new EmptyBorder(8, 8, 8, 8));
         root.add(controls, BorderLayout.NORTH);
         root.add(split, BorderLayout.CENTER);
         frame.setContentPane(root);
     }
 
-    private JPanel createControlsPanel() {
+    private JComponent createControlsPanel() {
         JButton showPathButton = new JButton("Show Path");
         showPathButton.addActionListener(e -> highlightSelectedPath());
 
@@ -183,20 +188,50 @@ public final class LazySearchTreeWindow {
         JButton zoomResetButton = new JButton("Zoom 1:1");
         zoomResetButton.addActionListener(e -> resetZoom());
 
-        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
-        controls.add(showPathButton);
-        controls.add(showGlobalPathButton);
-        controls.add(clearPathButton);
-        controls.add(showGeneratedToggle);
-        controls.add(verticalLayoutToggle);
-        controls.add(saveJpegButton);
-        controls.add(saveSvgButton);
-        controls.add(fitButton);
-        controls.add(fitAllButton);
-        controls.add(zoomInButton);
-        controls.add(zoomOutButton);
-        controls.add(zoomResetButton);
-        return controls;
+        JPanel controls = new JPanel();
+        controls.setLayout(new BoxLayout(controls, BoxLayout.X_AXIS));
+        controls.setBorder(new EmptyBorder(4, 4, 4, 4));
+        controls.add(createToolbarGroup("Path", showPathButton, showGlobalPathButton, clearPathButton));
+        controls.add(Box.createHorizontalStrut(8));
+        controls.add(createToolbarGroup("View", fitButton, fitAllButton, showGeneratedToggle, verticalLayoutToggle));
+        controls.add(Box.createHorizontalStrut(8));
+        controls.add(createToolbarGroup("Zoom", zoomInButton, zoomOutButton, zoomResetButton));
+        controls.add(Box.createHorizontalStrut(8));
+        controls.add(createToolbarGroup("Export", saveJpegButton, saveSvgButton));
+        controls.add(Box.createHorizontalGlue());
+
+        JScrollPane controlsScrollPane = new JScrollPane(
+                controls,
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        );
+        controlsScrollPane.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(210, 216, 226)),
+                new EmptyBorder(2, 2, 2, 2)
+        ));
+        controlsScrollPane.getHorizontalScrollBar().setUnitIncrement(24);
+        controlsScrollPane.getViewport().setBackground(new Color(245, 248, 252));
+        controlsScrollPane.setBackground(new Color(245, 248, 252));
+        Dimension preferred = controls.getPreferredSize();
+        controlsScrollPane.setPreferredSize(new Dimension(100, preferred.height + 10));
+        return controlsScrollPane;
+    }
+
+    private JPanel createToolbarGroup(String title, JComponent... components) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(210, 216, 226)),
+                new EmptyBorder(4, 6, 4, 6)
+        ));
+        panel.setBackground(new Color(250, 252, 255));
+        JLabel label = new JLabel(title + ":");
+        label.setForeground(new Color(85, 95, 115));
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 11f));
+        panel.add(label);
+        for (JComponent component : components) {
+            panel.add(component);
+        }
+        return panel;
     }
 
     private void clearPathHighlight() {
@@ -656,6 +691,7 @@ public final class LazySearchTreeWindow {
         n.gValue = ev.node.gValue;
         if (ev.node instanceof SearchNode sn) {
             n.fValue = sn.f;
+            n.hValue = heuristicValue(sn);
         }
 
         if (ev.type == ExternalLoggerLogType.Generating) {
@@ -697,6 +733,7 @@ public final class LazySearchTreeWindow {
         created.parent = parent;
         if (node instanceof SearchNode sn) {
             created.fValue = sn.f;
+            created.hValue = heuristicValue(sn);
         }
         if (parent == null) {
             created.isStart = true;
@@ -1051,6 +1088,7 @@ public final class LazySearchTreeWindow {
                   .append(" children=").append(n.children.size())
                   .append("\nStatus: ").append(n.status == null ? "-" : statusLabel(n.status))
                   .append("  g=").append(n.gValue)
+                  .append(Float.isNaN(n.hValue) ? "" : "  h=" + compactFloat(n.hValue))
                   .append(Float.isNaN(n.fValue) ? "" : "  f=" + n.fValue)
                   .append("\nAction: ").append(n.action)
                   .append("\n\nState values:\n").append(n.stateValues);
@@ -1096,6 +1134,28 @@ public final class LazySearchTreeWindow {
         canvasScrollPane.getVerticalScrollBar().setValue(0);
 
         scheduleRefresh(true);
+    }
+
+    private static float heuristicValue(SearchNode node) {
+        if (node == null) {
+            return Float.NaN;
+        }
+        if (node.jsonRepresentation != null) {
+            Object distance = firstPresent(node.jsonRepresentation, "distance", "h", "hValue");
+            if (distance instanceof Number number) {
+                return number.floatValue();
+            }
+            if (distance != null) {
+                try {
+                    return Float.parseFloat(String.valueOf(distance));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        if (!Float.isNaN(node.f) && !Float.isNaN(node.gValue)) {
+            return node.f - node.gValue;
+        }
+        return Float.NaN;
     }
 
     private void loadJsonTreeNow(Path jsonPath) {
@@ -1197,6 +1257,7 @@ public final class LazySearchTreeWindow {
         }
 
         node.fValue = jsonFloat(obj, "f", "fValue");
+        node.hValue = jsonFloat(obj, "distance", "h", "hValue");
         boolean visited = jsonBoolean(obj, "visited", "expanded", "closed");
         node.isGoal = jsonBoolean(obj, "goal", "is_goal");
         node.isSolution = jsonBoolean(obj, "solution", "is_solution", "in_solution");
@@ -1386,6 +1447,7 @@ public final class LazySearchTreeWindow {
         GraphNode parent;
         ExternalLoggerLogType status;
         float gValue;
+        float hValue = Float.NaN;
         float fValue = Float.NaN;
 
         boolean expanded = false;
@@ -1709,6 +1771,17 @@ public final class LazySearchTreeWindow {
             int ly = n.y + ((NODE_D - fm.getHeight()) / 2) + fm.getAscent();
             g2.setColor(pathMode && !onPath ? NODE_LABEL_FADED_COLOR : NODE_LABEL_COLOR);
             g2.drawString(label, lx, ly);
+
+            if (!Float.isNaN(n.hValue)) {
+                String hLabel = "h=" + compactFloat(n.hValue);
+                Font hFont = oldFont.deriveFont(Math.max(8f, oldFont.getSize2D() - 4f));
+                g2.setFont(hFont);
+                FontMetrics hMetrics = g2.getFontMetrics();
+                int hx = n.x + (NODE_D - hMetrics.stringWidth(hLabel)) / 2;
+                int hy = n.y + NODE_D + hMetrics.getAscent() + 1;
+                g2.setColor(pathMode && !onPath ? NODE_LABEL_FADED_COLOR : new Color(70, 70, 70));
+                g2.drawString(hLabel, hx, hy);
+            }
             g2.setFont(oldFont);
 
             if (aggregatedGeneratedChildren > 0) {
@@ -1811,6 +1884,17 @@ public final class LazySearchTreeWindow {
             return "(" + tiny + (params.isEmpty() ? "" : " " + params) + ")";
         }
         return action;
+    }
+
+    private static String compactFloat(float value) {
+        if (Math.abs(value - Math.rint(value)) < 1e-4) {
+            return Integer.toString(Math.round(value));
+        }
+        String text = String.format(Locale.ROOT, "%.2f", value);
+        while (text.contains(".") && (text.endsWith("0") || text.endsWith("."))) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text;
     }
 
     private static String abbreviateWord(String word) {
