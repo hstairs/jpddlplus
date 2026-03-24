@@ -1,4 +1,4 @@
-package com.hstairs.enhspgui.approx;
+package com.hstairs.enhsp.integration.approx;
 
 import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 
@@ -558,7 +558,7 @@ public final class ApproxPddlTranslator {
         try {
             if (args.length < 1 || args.length > 3) {
                 System.err.println("Usage:");
-                System.err.println("  java com.hstairs.enhspgui.approx.ApproxPddlTranslator <input.pddl> [output.pddl] [domain|problem]");
+                System.err.println("  java com.hstairs.enhsp.integration.approx.ApproxPddlTranslator <input.pddl> [output.pddl] [domain|problem]");
                 throw new PlannerExitException(2, "Invalid arguments for ApproxPddlTranslator.");
             }
             Path input = Path.of(args[0]);

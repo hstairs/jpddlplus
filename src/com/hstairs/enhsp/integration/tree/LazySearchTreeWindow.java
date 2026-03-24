@@ -1,4 +1,4 @@
-package com.hstairs.enhspgui.tree;
+package com.hstairs.enhsp.integration.tree;
 
 import com.hstairs.ppmajal.extraUtils.ExternalLoggerLogType;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
