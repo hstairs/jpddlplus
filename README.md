@@ -87,3 +87,12 @@ Available planner configurations are described on the [ENHSP usage page](https:/
 ### Limitations
 
 - General formulas in action preconditions, constraints, and goals are supported only by AIBR and subgoaling-based heuristics.
+
+## Credits
+
+The following contributors are listed in alphabetical order. The order does not distinguish the merit or size of the contribution.
+
+- Luigi Bonassi: development of a novel abstraction heuristic for linear numeric planning (2025)
+- Dillon Chen: novelty-based heuristics (2024)
+- Dongxu Li: initial implementation of the abstraction of linear numeric planning into simple numeric planning (2017)
+- Andrea Paolini: refactoring of the novelty-based heuristics presented by Dillon, plus subgoaling-based novelty (2025)
