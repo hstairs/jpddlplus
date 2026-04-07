@@ -644,15 +644,10 @@ public class PlanningWorkbench {
         }
 
         private Path loadIntoEditor(JTextPane editor) {
-            JFileChooser chooser = lastLoadedDirectory == null
-                    ? new JFileChooser()
-                    : new JFileChooser(lastLoadedDirectory.toFile());
-            chooser.setDialogTitle("Load PDDL file");
-            int res = chooser.showOpenDialog(this);
-            if (res != JFileChooser.APPROVE_OPTION) {
+            Path file = chooseOpenPath("Load PDDL file");
+            if (file == null) {
                 return null;
             }
-            Path file = chooser.getSelectedFile().toPath();
             try {
                 suppressEditorDirtyTracking = true;
                 try {
@@ -782,6 +777,37 @@ public class PlanningWorkbench {
         }
 
         private Path chooseSavePath(String title, Path currentFile, String fallbackName) {
+            if (isMacOs()) {
+                return chooseSavePathWithNativeDialog(title, currentFile, fallbackName);
+            }
+            return chooseSavePathWithSwing(title, currentFile, fallbackName);
+        }
+
+        private Path chooseOpenPath(String title) {
+            if (isMacOs()) {
+                return chooseOpenPathWithNativeDialog(title);
+            }
+            return chooseOpenPathWithSwing(title);
+        }
+
+        private Path chooseOpenPathWithSwing(String title) {
+            JFileChooser chooser = lastLoadedDirectory == null
+                    ? new JFileChooser()
+                    : new JFileChooser(lastLoadedDirectory.toFile());
+            chooser.setDialogTitle(title);
+            int res = chooser.showOpenDialog(this);
+            if (res != JFileChooser.APPROVE_OPTION) {
+                return null;
+            }
+            Path selected = chooser.getSelectedFile().toPath();
+            Path parent = selected.getParent();
+            if (parent != null) {
+                lastLoadedDirectory = parent;
+            }
+            return selected;
+        }
+
+        private Path chooseSavePathWithSwing(String title, Path currentFile, String fallbackName) {
             JFileChooser chooser = lastLoadedDirectory == null
                     ? new JFileChooser()
                     : new JFileChooser(lastLoadedDirectory.toFile());
@@ -795,12 +821,56 @@ public class PlanningWorkbench {
             if (res != JFileChooser.APPROVE_OPTION) {
                 return null;
             }
-            Path target = chooser.getSelectedFile().toPath();
-            Path parent = target.getParent();
+            Path selected = chooser.getSelectedFile().toPath();
+            Path parent = selected.getParent();
             if (parent != null) {
                 lastLoadedDirectory = parent;
             }
-            return target;
+            return selected;
+        }
+
+        private Path chooseOpenPathWithNativeDialog(String title) {
+            FileDialog dialog = new FileDialog(this, title, FileDialog.LOAD);
+            if (lastLoadedDirectory != null) {
+                dialog.setDirectory(lastLoadedDirectory.toAbsolutePath().toString());
+            }
+            dialog.setVisible(true);
+            String file = dialog.getFile();
+            String directory = dialog.getDirectory();
+            if (file == null || directory == null) {
+                return null;
+            }
+            Path selected = Path.of(directory, file);
+            Path parent = selected.getParent();
+            if (parent != null) {
+                lastLoadedDirectory = parent;
+            }
+            return selected;
+        }
+
+        private Path chooseSavePathWithNativeDialog(String title, Path currentFile, String fallbackName) {
+            FileDialog dialog = new FileDialog(this, title, FileDialog.SAVE);
+            Path initialDir = currentFile != null ? currentFile.getParent() : lastLoadedDirectory;
+            if (initialDir != null) {
+                dialog.setDirectory(initialDir.toAbsolutePath().toString());
+            }
+            dialog.setFile(currentFile != null ? currentFile.getFileName().toString() : fallbackName);
+            dialog.setVisible(true);
+            String file = dialog.getFile();
+            String directory = dialog.getDirectory();
+            if (file == null || directory == null) {
+                return null;
+            }
+            Path selected = Path.of(directory, file);
+            Path parent = selected.getParent();
+            if (parent != null) {
+                lastLoadedDirectory = parent;
+            }
+            return selected;
+        }
+
+        private boolean isMacOs() {
+            return System.getProperty("os.name", "").toLowerCase().contains("mac");
         }
 
         private boolean saveEditorToFile(JTextPane editor, Path target, String actionName) {
