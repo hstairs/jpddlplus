@@ -16,7 +16,6 @@ import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Sdac;
 import com.hstairs.ppmajal.transition.TransitionGround;
-import com.hstairs.enhsp2.SimpleExternalLogger;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import com.hstairs.ppmajal.transition.TransitionSchema;
 import org.apache.commons.cli.*;
