@@ -32,7 +32,7 @@ public class ProgrammaticPlanningProblemsTest extends TestCase {
 
         H1 heuristic = new H1(problem);
         PDDLPlanner planner = new PDDLPlanner();
-        PDDLSolution solution = planner.plan(problem, heuristic);
+        PDDLSolution solution = planner.plan(problem, heuristic, System.out);
 
         assertNotNull(solution);
         assertNotNull(solution.rawPlan());

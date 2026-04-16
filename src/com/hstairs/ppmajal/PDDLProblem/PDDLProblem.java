@@ -1512,6 +1512,13 @@ public class PDDLProblem implements SearchProblem {
         liftedGoals = con;
     }
 
+    public void setGroundGoalsForSearch(Condition con) {
+        groundGoals = con;
+        if (readyForSearch) {
+            makeInit();
+        }
+    }
+
 
 
     protected class naiveSuccessorIterator implements ObjectIterator<Pair<State, Object>> {

@@ -1,5 +1,5 @@
 
-# What is this library about?
+### What is this library about?
 
 This repository contains the JPDDLPLUS API, which is a planning manager library meant to build systems that speak the PDDL language, with a focus on the extention that deals with numeric state varibales, numeric constraints, events and processes, commonly referred as PDDL+. It supports many features that go way beyond classical planning, such as numeric representations, linear and non-linear constraints, autonomout processes, events, global constraints and other things. This is an evolution of the PPMAJAL Library, now deprecated.
 

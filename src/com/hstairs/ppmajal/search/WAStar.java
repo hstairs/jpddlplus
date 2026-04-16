@@ -22,7 +22,7 @@ public class WAStar extends SearchEngine {
     final protected float hw;
     final protected TieBreaker tieBreaker;
     final protected boolean saveSearchSpace;
-    final protected float gBound;
+    protected float gBound;
 
     final protected boolean bucketPriorityQueue;
 
@@ -44,6 +44,12 @@ public class WAStar extends SearchEngine {
     public SearchStats getStats(){
         return new SearchStats(nodesExpanded,nodesEvaluated,deadEndsDetected,duplicatedDetected,totalTime,heuristicTime);
     }
+
+    @Override
+    public void setGBound(float gBound) {
+        this.gBound = gBound;
+    }
+
     protected float getPreviousCost(Object2FloatMap<State> gMap, State successorState) {
         return gMap.getOrDefault(successorState.getRepresentative(), G_DEFAULT);
     }
