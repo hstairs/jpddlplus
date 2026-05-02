@@ -13,6 +13,7 @@ import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class PDDLPlanner {
@@ -34,6 +35,7 @@ public class PDDLPlanner {
     private final long timeoutInMs;
     private final boolean iterativeOptimization;
     private final Function<PDDLProblem, SearchHeuristic> heuristicBuilder;
+    private Consumer<SimpleSearchNode> iterativeSolutionListener;
 
     // ---------------- Static Maps ---------------- //
     private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
@@ -121,6 +123,15 @@ public class PDDLPlanner {
     }
 
     public SearchNode searchSpaceHandle;
+
+    public SearchEngine getSearchEngine() {
+        return searchEngine;
+    }
+
+    public void setIterativeSolutionListener(Consumer<SimpleSearchNode> iterativeSolutionListener) {
+        this.iterativeSolutionListener = iterativeSolutionListener;
+    }
+
     public PDDLSolution plan(PDDLProblem p, SearchHeuristic h, PrintStream out){
         TieBreaker tb = new TieBreaker(
                 TIE_BREAKERS.getOrDefault(t, SearchEngine.TieBreaking.ARBITRARY)
@@ -137,6 +148,7 @@ public class PDDLPlanner {
                     new PDDLIterativeOptimizationSupport(p, heuristicBuilder),
                     DEFAULT_ITERATIVE_OPTIMIZATION_MAX_ITERATIONS
             );
+            ((IterativeMetricSearch) searchEngine).setIncumbentListener(iterativeSolutionListener);
         }
 
         searchEngine.setExtenalLogger(this.extenalLogger);

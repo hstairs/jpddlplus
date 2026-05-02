@@ -5,6 +5,9 @@ import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 public class IterativeMetricSearch extends SearchEngine {
 
@@ -13,6 +16,8 @@ public class IterativeMetricSearch extends SearchEngine {
     private final SearchEngine search;
     private final IterativeOptimizationSupport optimizationSupport;
     private final int maxIterations;
+    private final List<SimpleSearchNode> incumbentSolutions = new ArrayList<>();
+    private Consumer<SimpleSearchNode> incumbentListener;
     private IterativeMetricSummary iterativeMetricSummary;
 
     public IterativeMetricSearch(SearchEngine search, IterativeOptimizationSupport optimizationSupport) {
@@ -60,6 +65,7 @@ public class IterativeMetricSearch extends SearchEngine {
     public SimpleSearchNode search(SearchProblem problem, SearchHeuristic h, PrintStream out) {
         zeroCounters();
         iterativeMetricSummary = null;
+        incumbentSolutions.clear();
         final long overallStart = System.currentTimeMillis();
 
         if (optimizationSupport == null || !optimizationSupport.isSupported(problem)) {
@@ -81,6 +87,8 @@ public class IterativeMetricSearch extends SearchEngine {
                 return null;
             }
             bestSolution = currentSolution;
+            incumbentSolutions.add(currentSolution);
+            notifyIncumbent(currentSolution);
             bestValue = optimizationSupport.evaluateObjective(currentSolution);
             minObservedValue = Math.min(minObservedValue, bestValue);
             maxObservedValue = Math.max(maxObservedValue, bestValue);
@@ -121,6 +129,8 @@ public class IterativeMetricSearch extends SearchEngine {
                 }
 
                 bestSolution = candidate;
+                incumbentSolutions.add(candidate);
+                notifyIncumbent(candidate);
                 bestValue = candidateValue;
                 successfulIterations++;
                 out.println("Iterative metric search: improved value=" + bestValue);
@@ -172,6 +182,20 @@ public class IterativeMetricSearch extends SearchEngine {
         deadEndsDetected += stats.deadEnds();
         duplicatedDetected += stats.duplicates();
         heuristicTime += stats.heuristicTime();
+    }
+
+    public List<SimpleSearchNode> getIncumbentSolutions() {
+        return List.copyOf(incumbentSolutions);
+    }
+
+    public void setIncumbentListener(Consumer<SimpleSearchNode> incumbentListener) {
+        this.incumbentListener = incumbentListener;
+    }
+
+    private void notifyIncumbent(SimpleSearchNode incumbent) {
+        if (incumbentListener != null) {
+            incumbentListener.accept(incumbent);
+        }
     }
 
 }
