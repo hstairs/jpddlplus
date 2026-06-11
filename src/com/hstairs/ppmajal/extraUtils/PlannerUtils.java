@@ -67,6 +67,9 @@ public class PlannerUtils {
             case "hrmax":
                 h = new H1(p,false,false,false,"brute",false,false,false,false,false);
                 break;
+            case "hrmaxssnp":
+                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true);
+                break;
             default:
                 throw new IllegalStateException("Unexpected value: " + heuristic);
         }

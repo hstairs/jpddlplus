@@ -84,6 +84,8 @@ public class PDDLHeuristic {
                 return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "hrmax":
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+            case "hrmaxssnp":
+                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "h1res":
@@ -135,6 +137,7 @@ public class PDDLHeuristic {
                 new HeuristicInfo("mgc", "MGC", "Manhattan heuristic for numeric goals."),
                 new HeuristicInfo("hradd", "HRAdd", "Additive version of subgoaling heuristic plus redundant constraints."),
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
+                new HeuristicInfo("hrmaxssnp", "HRMaxSSNP", "HRMax with SSNP-aware additive twist enabled."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
                 new HeuristicInfo("h1res", "H1Res", "Resolution-based heuristic without optimizations."),
                 new HeuristicInfo("h1res2", "H1Res2", "Resolution-based heuristic with relaxed operator relevance pruning."),

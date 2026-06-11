@@ -114,34 +114,44 @@ public class H1 implements SearchHeuristic {
     private final boolean storeInitActions;
 
     private boolean isHelpfulMap = false;
+    private boolean ssnpAwareVersion;
 
     public H1(PDDLProblem problem) {
-        this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
+        this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
     }
 
 
     
     public H1(PDDLProblem problem, boolean additive) {
-        this(problem, additive, false, false, "no", false, false, false, false, null, false, -1);
+        this(problem, additive, false, false, "no", false, false, false, false, null, false, -1,false);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability,
-                helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
+                helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction,false);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability, helpfulTransitions,
-                conjunctionsMax, null, unitaryCost, -1);
+                conjunctionsMax, null, unitaryCost, -1,false);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
             Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+                helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
+                redundantMap, unitaryCost, compNumericStrategy, false);
+    }
+
+    public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean ssnpAwareVersion) {
+        this.ssnpAwareVersion = ssnpAwareVersion;
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -164,6 +174,7 @@ public class H1 implements SearchHeuristic {
         conditionToAction = new IntArraySet[totNumberOfTerms];
         allConditions = new IntArraySet();
         allActions = new IntArraySet();
+        indAchievers = new IntArraySet[cp.numActions()];
 
         nodeOf = new FibonacciHeapNode[cp.numActions()];
         fillPreEffFunctions(new LinkedHashSet(problem.actions));
@@ -237,7 +248,6 @@ public class H1 implements SearchHeuristic {
             maxNumRepetition = null;
             repetitionsInThePlan = null;
         }
-
     }
 
     private void fillPreEffFunctions(LinkedHashSet<TransitionGround> transitions) {
@@ -472,8 +482,8 @@ public class H1 implements SearchHeuristic {
     
 
     public IntArraySet getAchievers(int conditionId) {
-        final IntArraySet achiever = getAllAchievers()[conditionId];
-        if (achiever == null) {
+        final IntArraySet achievers = getAllAchievers()[conditionId];
+        if (achievers == null) {
             getAllAchievers()[conditionId] = new IntArraySet();
         }
         return getAllAchievers()[conditionId];
@@ -505,7 +515,11 @@ public class H1 implements SearchHeuristic {
                             if (getActionHCost()[actionId] < minAchieverPreconditionCost[conditionId]) {
                                 minAchieverPreconditionCost[conditionId] = getActionHCost()[actionId];
                             }
-                            localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
+                            if (isAdditive(actionId,conditionId)) {
+                                localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
+                            }else{
+                                localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
+                            }
                         }
                         if (localUpdate) {
                             cacheValue(newCost,actionId,t);
@@ -541,8 +555,45 @@ public class H1 implements SearchHeuristic {
 
     }
 
+    private boolean isAdditive(int actionId, int conditionId) {
+        if (ssnpAwareVersion){
+
+            IntArraySet s = this.getIndAchievers(actionId);
+            if (s==null || s.isEmpty()){
+                return true;
+            }
+            for (var actId : getAchievers(conditionId)){
+                if (s.contains(actId) ){
+                    return false;
+                }
+
+            }
+            return true;
+        }else{
+            return this.isAdditive();
+        }
+
+
+    }
+    IntArraySet[] indAchievers;
+    private IntArraySet getIndAchievers(int actionId) {
+        if (indAchievers[actionId] == null){
+            indAchievers[actionId] = new IntArraySet();
+            Condition condition = cp.preconditionFunction()[actionId];
+            for (Condition v: condition.getTerminalConditions()){
+                if (v instanceof Terminal) {
+                    for (var actId : getAchievers(((Terminal) v).getId())) {
+                        indAchievers[actionId].add(actId);
+                        indAchievers[actionId].addAll(getIndAchievers(actId));
+                    }
+                }
+            }
+        }
+        return indAchievers[actionId];
+    }
+
     protected void updateAchievers(int conditionId, int actionId) {
-        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
+        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() || ssnpAwareVersion ) {
             getAchievers(conditionId).add(actionId);
         }
     }
