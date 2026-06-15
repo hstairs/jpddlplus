@@ -86,6 +86,8 @@ public class PDDLHeuristic {
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "hrmaxssnp":
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
+            case "hmaxssnp":
+                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "h1res":

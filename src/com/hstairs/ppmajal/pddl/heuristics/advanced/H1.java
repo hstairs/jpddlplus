@@ -297,6 +297,10 @@ public class H1 implements SearchHeuristic {
             Arrays.fill(establishedAchiever, -1);
             Arrays.fill(numRepetition, Float.MAX_VALUE);
         }
+        if (ssnpAwareVersion){
+            indAchievers = new IntArraySet[cp.numActions()];
+            allAchievers = new IntArraySet[totNumberOfTerms];
+        }
         if (!isAdditive()) {
             Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
         }
@@ -557,15 +561,18 @@ public class H1 implements SearchHeuristic {
 
     private boolean isAdditive(int actionId, int conditionId) {
         if (ssnpAwareVersion){
-
+            if (this.actionHCost[actionId] == 0f || getAchievers(conditionId).size() == 1){
+                return true;
+            }
             IntArraySet s = this.getIndAchievers(actionId);
             if (s==null || s.isEmpty()){
                 return true;
             }
             for (var actId : getAchievers(conditionId)){
-                if (s.contains(actId) ){
-                    return false;
-                }
+                if (actionHCost[actId]< actionHCost[actionId])
+                    if (s.contains(actId) ){
+                        return false;
+                    }
 
             }
             return true;
