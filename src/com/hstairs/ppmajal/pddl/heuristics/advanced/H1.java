@@ -68,7 +68,7 @@ public class H1 implements SearchHeuristic {
     final IntArraySet[] conditionToAction;
     final IntArraySet allConditions;
     private final IntArraySet allComparisons;
-    protected final FibonacciHeapNode[] nodeOf;
+    protected FibonacciHeapNode[] nodeOf;
     boolean reachability;
     private final boolean conjunctionsMax;
 

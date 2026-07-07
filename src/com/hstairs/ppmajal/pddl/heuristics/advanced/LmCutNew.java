@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.jgrapht.alg.util.Pair;
 import org.jgrapht.util.FibonacciHeap;
+import org.jgrapht.util.FibonacciHeapNode;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,14 +58,48 @@ public class LmCutNew extends H1 {
         Arrays.fill(this.pcf, -1);
     }
 
-    void updateJG(State gs, Collection<Cut> cuts) {
+    Float updateJG(JGraph jg, State gs, Collection<Cut> cuts) {
 
         final FibonacciHeap heap = new FibonacciHeap();
+        Arrays.fill(getClosed(), false);
+        nodeOf = new FibonacciHeapNode[cp.numActions()];
         for (Cut cut : cuts) {
-
+            for (var v : jg.E[pcf[cut.actionId]]) {
+                if (v.act == cut.actionId) {
+                    final float supporterCost = getActionCost()[cut.actionId] == 0f
+                            ? actionHCost[cut.actionId]
+                            : computeSupporterCost(v.cond, v.act, gs);
+                    if (updateIfNeeded(v.cond, supporterCost)) {
+                        updateActions(v.cond, heap);
+                    }
+                }
+            }
 
         }
 
+        while (!heap.isEmpty()) {
+            final int actionId = (int) heap.removeMin().getData();
+            jg.V.add(pcf[actionId]);
+            closed[actionId] = true;
+            if (actionId != cp.goal()) {
+                final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
+                for (final int conditionId : conditionsAchievableByAction) {
+                    if (!getConditionInit()[conditionId]) {
+                        jg.E[pcf[actionId]].add(new Supp(actionId, conditionId));
+                        final float supporterCost = getActionCost()[actionId] == 0f
+                                ? actionHCost[actionId]
+                                : computeSupporterCost(conditionId, actionId, gs);
+                        if (updateIfNeeded(conditionId, supporterCost)) {
+                            updateActions(conditionId, heap);
+                        }
+                    }
+                }
+            } else if (getActionHCost()[actionId] == 0f) {
+                break;
+            }
+
+        }
+        return getActionHCost()[cp.goal()];
     }
 
     Pair<JGraph, Float> constructJG(State gs) {
@@ -114,15 +149,16 @@ public class LmCutNew extends H1 {
             if (!getClosed()[actionId]) {
                 getClosed()[actionId] = true;
                 vertices.add(pcf[actionId]);
+                nodeOf[actionId] = null;
                 if (actionId != cp.goal()) {
                     final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
                     for (final int conditionId : conditionsAchievableByAction) {
-                        if (!getConditionInit()[conditionId] ) {
+                        if (!getConditionInit()[conditionId]) {
                             edges[pcf[actionId]].add(new Supp(actionId, conditionId));
                             reverseEdges[conditionId].add(actionId);
 
                             final float supporterCost = getActionCost()[actionId] == 0f
-                                    ? 0f
+                                    ? actionHCost[actionId]
                                     : computeSupporterCost(conditionId, actionId, gs);
                             if (updateIfNeeded(conditionId, supporterCost)) {
                                 updateActions(conditionId, heap);
@@ -142,7 +178,7 @@ public class LmCutNew extends H1 {
         final IntArraySet actions = getConditionToAction()[conditionId];
         if (actions != null) {
             for (final int actionId : actions) {
-                if (!getClosed()[actionId]) {
+                if (!closed[actionId]) {
                     final Pair<Float, Integer> justifier = estimateCost(cp.preconditionFunction()[actionId]);
                     final float value = justifier.getFirst();
                     if (value < Float.MAX_VALUE && !getActionInit()[actionId]) {
@@ -152,13 +188,18 @@ public class LmCutNew extends H1 {
                                 addActionsInPriority(actionId, heap, value);
                             } else {
                                 getActionHCost()[actionId] = value;
-                                heap.decreaseKey(getNodeOf()[actionId], value);
+                                if (getNodeOf()[actionId] == null){
+                                    addActionsInPriority(actionId, heap, value);
+                                }else {
+                                    heap.decreaseKey(getNodeOf()[actionId], value);
+                                }
                             }
                         }
                         pcf[actionId] = justifier.getSecond() == null ? root : justifier.getSecond();
                     }
                 }
             }
+
         }
     }
 
@@ -167,16 +208,20 @@ public class LmCutNew extends H1 {
         float cost = 0f;
         boolean firstTime = true;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
-
+        JGraph justificationGraph = null;
         while (true) {
             final boolean[] goalZone = new boolean[getTotNumberOfTerms() + 1];
-            final Pair<JGraph, Float> jGraphAndValue = constructJG(gs);
-            final JGraph justificationGraph = jGraphAndValue.getFirst();
-            final float goalValue = jGraphAndValue.getSecond();
 
-            if (goalValue == 0f || goalValue == Float.MAX_VALUE) {
-                return firstTime ? goalValue : cost;
+            if (firstTime) {
+                final Pair<JGraph, Float> jGraphAndValue = constructJG(gs);
+                justificationGraph = jGraphAndValue.getFirst();
+                final float goalValue = jGraphAndValue.getSecond();
+
+                if (goalValue == 0f || goalValue == Float.MAX_VALUE) {
+                    return firstTime ? goalValue : cost;
+                }
             }
+
             firstTime = false;
 
             markGoalZone(justificationGraph, pcf[cp.goal()], goalZone);
@@ -189,7 +234,7 @@ public class LmCutNew extends H1 {
             final float[] actionOut = new float[cp.numActions()];
             Arrays.fill(actionOut, Float.POSITIVE_INFINITY);
             for (final var cut : cuts) {
-                final float supporterCost = computeSupporterCost(cut.conditionId, cut.actionId, gs);
+                final float supporterCost = computeOnlySupporterCost(cut.conditionId, cut.actionId, gs);
                 if (supporterCost < min) {
                     min = supporterCost;
                 }
@@ -203,6 +248,18 @@ public class LmCutNew extends H1 {
                 getActionCost()[cut.actionId] -= min / actionOut[cut.actionId];
             }
             cost += min;
+            if (true){
+                Float res = updateJG(justificationGraph,gs,cuts);
+                if (res == 0f){
+                    return cost;
+                }
+            }else{
+                final Pair<JGraph, Float> jGraphAndValue = constructJG(gs);
+                justificationGraph = constructJG(gs).getFirst();
+                if (jGraphAndValue.getSecond() == 0f){
+                    return cost;
+                }
+            }
         }
     }
 
@@ -283,6 +340,19 @@ public class LmCutNew extends H1 {
         if (contribution > 0) {
             final float repetitions = computeRepetitions(terminal, contribution, gs);
             return getActionHCost()[actionId] + repetitions * getActionCost()[actionId];
+        }
+        return -1f;
+    }
+
+    private float computeOnlySupporterCost(int conditionId, int actionId, State gs) {
+        final Terminal terminal = Terminal.getTerminal(conditionId);
+        if (terminal instanceof BoolPredicate || terminal instanceof NotCond) {
+            return getActionCost()[actionId];
+        }
+        final double contribution = numericContribution(actionId, (Comparison) terminal);
+        if (contribution > 0) {
+            final float repetitions = computeRepetitions(terminal, contribution, gs);
+            return repetitions * getActionCost()[actionId];
         }
         return -1f;
     }
