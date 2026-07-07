@@ -82,12 +82,16 @@ public class PDDLHeuristic {
                 return new ManhattanHeuristic(heuristicProblem);
             case "hradd":
                 return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
-            case "hrmax":
+           case "hrmax":
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "hrmaxssnp":
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
             case "hmaxssnp":
                 return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
+            case "lmcut":
+                return new LmCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+            case "lmcut_new":
+                return new LmCutNew(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "h1res":
@@ -141,6 +145,7 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
                 new HeuristicInfo("hrmaxssnp", "HRMaxSSNP", "HRMax with SSNP-aware additive twist enabled."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
+                new HeuristicInfo("lmcut_new", "LMCutNew", "LM-Cut variant implemented as an H1 extension."),
                 new HeuristicInfo("h1res", "H1Res", "Resolution-based heuristic without optimizations."),
                 new HeuristicInfo("h1res2", "H1Res2", "Resolution-based heuristic with relaxed operator relevance pruning."),
                 new HeuristicInfo("h1res3", "H1Res3", "Resolution-based heuristic with both relevance and transition pruning."),
