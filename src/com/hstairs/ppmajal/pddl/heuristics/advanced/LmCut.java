@@ -52,7 +52,7 @@ public class LmCut extends H1 {
         final FibonacciHeap heap = new FibonacciHeap();
         Arrays.fill(getClosed(), false);
         nodeOf = new FibonacciHeapNode[cp.numActions()];
-        ArrayList<Cut> toExplore = new ArrayList<>();
+        final ArrayList<Cut> toExplore = new ArrayList<>();
         for (Cut cut : cuts) {
             for (var v : jg.E[pcf[cut.act]][cut.act]) {
                 toExplore.add(new Cut(cut.act, v));
@@ -257,7 +257,7 @@ public class LmCut extends H1 {
                 if (supporterCost < min) {
                     min = supporterCost;
                 }
-                actionOut[cut.act] = Math.min(actionOut[cut.act], supporterCost);
+                actionOut[cut.act] = Math.min(actionOut[cut.act], supporterCost/getActionCost()[cut.act]);
             }
 
             if (min <= 0.00001f) {
