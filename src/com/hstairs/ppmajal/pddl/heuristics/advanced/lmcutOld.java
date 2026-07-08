@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301  USA
  */
- /*
+/*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
@@ -32,26 +32,24 @@ import com.hstairs.ppmajal.expressions.NumEffect;
 import com.hstairs.ppmajal.expressions.NumFluent;
 import com.hstairs.ppmajal.extraUtils.ArrayShifter;
 import com.hstairs.ppmajal.problem.State;
-import com.hstairs.ppmajal.search.BucketPriorityQueue;
-import com.hstairs.ppmajal.search.SearchEngine;
 import com.hstairs.ppmajal.search.SearchHeuristic;
-import com.hstairs.ppmajal.search.TieBreaker;
-import com.hstairs.ppmajal.search.searchnodes.BucketPriorityQueueNode;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.jgrapht.alg.util.Pair;
+import org.jgrapht.util.FibonacciHeap;
+import org.jgrapht.util.FibonacciHeapNode;
 
 import java.util.*;
 
 import static com.hstairs.ppmajal.transition.Transition.getTransition;
-import static java.lang.Math.ceil;
 
 /**
  * @author enrico
  */
-public class H1WithBucketEXP implements SearchHeuristic {
+public class lmcutOld implements SearchHeuristic  {
 
     /**
      * @return the heuristicNumberOfActions
@@ -72,6 +70,8 @@ public class H1WithBucketEXP implements SearchHeuristic {
     final IntArraySet[] conditionToAction;
     final IntArraySet allConditions;
     private final IntArraySet allComparisons;
+    protected final FibonacciHeapNode[] nodeOf;
+    private final int[] pcf;
     boolean reachability;
     private final boolean conjunctionsMax;
 
@@ -91,54 +91,55 @@ public class H1WithBucketEXP implements SearchHeuristic {
     protected final int totNumberOfActionsRefactored;
     IntArraySet[] allAchievers;
     final private IntArraySet[] deleters;
-    protected int[] establishedAchiever;
-    protected float[] numRepetition;
-    private IntArraySet helpfulActions;
+    private List helpfulActions;
     IntArraySet reachableTransitions;
     private Collection<TransitionGround> reachableTransitionsInstances;
+    int root;
 
     final float UNKNOWNEFFECT = Float.NEGATIVE_INFINITY;
     final protected IntArraySet freePreconditionActions;
-//    private List<Pair<Integer, IntArraySet>> plan;
     private IntArraySet plan;
     final protected IntArraySet[] repetitionsInThePlan;
-    private float[] minAchieverPreconditionCost;
     protected IntArraySet allActions;
 
     final boolean useSmartConstraints;
 
+    public boolean[] helpfulTransitionsMap = null;
 
-    //Plan Fixing Data Structures;
-    final boolean[] visited;
-    protected final int[] maxNumRepetition ;
-    private boolean hardConditionthroughNumError;
-
-
-    public H1WithBucketEXP(PDDLProblem problem) {
-        this(problem, true, false, false, "no", false, false, false, false, null, false, -1);
+    public lmcutOld(PDDLProblem problem) {
+        this(problem, true, false, false, "no", false, false, false, false, null, false, -1, false);
     }
 
 
-
-    public H1WithBucketEXP(PDDLProblem problem, boolean additive) {
-        this(problem, additive, false, false, "no", false, false, false, false, null, false, -1);
+    public lmcutOld(PDDLProblem problem, boolean additive) {
+        this(problem, additive, false, false, "no", false, false, false, false, null, false, -1, false);
     }
 
-    public H1WithBucketEXP(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-                           boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
+    public lmcutOld(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+                    boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost, int linearEffectsAbstraction) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction);
+                redConstraints, helpfulActionsComputation, reachability,
+                helpfulTransitions, conjunctionsMax, null, unitaryCost, linearEffectsAbstraction, false);
     }
 
-    public H1WithBucketEXP(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-                           boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
+    public lmcutOld(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+                    boolean helpfulTransitions, boolean conjunctionsMax, boolean unitaryCost) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
-                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax, null, unitaryCost, -1);
+                redConstraints, helpfulActionsComputation, reachability, helpfulTransitions,
+                conjunctionsMax, null, unitaryCost, -1, false);
     }
 
-    public H1WithBucketEXP(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
-                           boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+    public lmcutOld(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+                    boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy) {
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+                helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
+                redundantMap, unitaryCost, compNumericStrategy, false);
+    }
 
+    public lmcutOld(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+                    boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean ssnpAwareVersion) {
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
         this.problem = problem;
@@ -147,12 +148,10 @@ public class H1WithBucketEXP implements SearchHeuristic {
         this.extractRelaxedPlan = extractRelaxedPlan;
         allComparisons = new IntArraySet();
         freePreconditionActions = new IntArraySet();
-        hardConditionthroughNumError = compNumericStrategy > -2;
-//        problem.prettyPrint();
-        if (hardConditionthroughNumError)
+        final boolean hardConditionThroughNumError = compNumericStrategy > -2;
+        if (hardConditionThroughNumError)
             System.out.println("Numeric Error for Complex Condition Activated");
         cp = ProblemTransfomer.generateCompactProblem(problem, redConstraints, unitaryCost, compNumericStrategy);
-//        System.out.println(cp);
         useSmartConstraints = "smart".equals(redConstraints);
 
         totNumberOfTerms = Terminal.getTotCounter();
@@ -161,6 +160,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
         allConditions = new IntArraySet();
         allActions = new IntArraySet();
 
+        nodeOf = new FibonacciHeapNode[cp.numActions()];
         fillPreEffFunctions(new LinkedHashSet(problem.actions));
         fillPreEffFunctions(new LinkedHashSet(problem.getEventsSet()));
         fillPreEffFunctions(new LinkedHashSet(problem.getProcessesSet()));
@@ -178,12 +178,9 @@ public class H1WithBucketEXP implements SearchHeuristic {
         conditionCost = new float[totNumberOfTerms];
         closed = new boolean[cp.numActions()];
 
-        hardcoreVersion = cp.numActions() * totNumberOfTermsRefactored < 1999999999;
-//        System.out.println("Heuristic Number of Actions:" + heuristicNumberOfActions);
-//        System.out.println("Heuristic Number of Actions Refactored:" + totNumberOfActionsRefactored);
-//        System.out.println("Tot Number of Terms:" + totNumberOfTerms);
-//        System.out.println("Tot Number of Terms Refactored:" + totNumberOfTermsRefactored);
+        root = getTotNumberOfTerms();
 
+        hardcoreVersion = cp.numActions() * totNumberOfTermsRefactored < 1999999999;
         if (hardcoreVersion) {
             numericContributionRaw = new float[totNumberOfActionsRefactored][totNumberOfTermsRefactored];
             for (final float[] row : numericContributionRaw) {
@@ -191,54 +188,38 @@ public class H1WithBucketEXP implements SearchHeuristic {
             }
             numericContribution = null;
         } else {
-//            System.out.println("H1 with small memory footprint");
             numericContributionRaw = null;
             numericContribution = new HashMap<>();
         }
-        //        numericContribution = new HashMap<>();
 
         conditionInit = new boolean[totNumberOfTerms];
         actionInit = new boolean[cp.numActions()];
+        pcf = new int[cp.numActions()];
+        Arrays.fill(pcf, -1);
         if (extractRelaxedPlan || useSmartConstraints || helpfulActionsComputation) {
             allAchievers = new IntArraySet[totNumberOfTerms];
         }
         if (useSmartConstraints) {
             deleters = new IntArraySet[totNumberOfTerms];
             conditionsDeletableBy = new IntArraySet[cp.numActions()];
-        }else{
+        } else {
             deleters = null;
             conditionsDeletableBy = null;
         }
-        if (extractRelaxedPlan || helpfulActionsComputation) {
-            establishedAchiever = new int[totNumberOfTerms];
-            numRepetition = new float[totNumberOfTerms];
-        }
         this.helpfulTransitions = helpfulTransitions;
-        if (!additive) {
-            minAchieverPreconditionCost = new float[totNumberOfTerms];
-        }
 
         maxMRP = maxHelpfulTransitions;
         this.conjunctionsMax = conjunctionsMax;
         System.out.println("H1 Setup Time (msec): " + (System.currentTimeMillis() - startSetup));
-
-
-        if (extractRelaxedPlan || helpfulActionsComputation){
-            maxNumRepetition = new int[Transition.totNumberOfTransitions+1];
-            visited = new boolean[totNumberOfTerms];
-            repetitionsInThePlan = new IntArraySet[Transition.totNumberOfTransitions+1];
-        }else{
-            visited = null;
-            maxNumRepetition = null;
-            repetitionsInThePlan = null;
-        }
-
+        repetitionsInThePlan = extractRelaxedPlan || helpfulActionsComputation
+                ? new IntArraySet[Transition.totNumberOfTransitions + 1]
+                : null;
     }
 
     private void fillPreEffFunctions(LinkedHashSet<TransitionGround> transitions) {
 
         for (final TransitionGround b : transitions) {
-            for (final int i : cp.tr2CpTrMap()[b.getId()]){
+            for (final int i : cp.tr2CpTrMap()[b.getId()]) {
                 allActions.add(i);
                 updatePreconditionFunction(i);
             }
@@ -246,7 +227,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
 
     }
 
-    
+
     void updatePreconditionFunction(int i) {
         final Collection<Condition> terminalConditions = cp.preconditionFunction()[i].getTerminalConditionsInArray();
         if (terminalConditions.isEmpty()) {
@@ -263,269 +244,246 @@ public class H1WithBucketEXP implements SearchHeuristic {
                 conditionToAction[t.getId()] = groundActions;
                 getAllConditions().add(((Terminal) c).getId());
                 if (c instanceof Comparison) {
-//                    System.out.println(c);
                     final Comparison normalize = (Comparison) c.normalize();
-//                    System.out.println(normalize);
                     getAllComparisons().add(normalize.getId());
                 }
             }
         }
     }
 
-    protected BucketPriorityQueue smallSetup(State gs) {
+
+    record Supp(int act, int cond) {
+    }
+
+    ;
+
+    private record JGraph(Set<Integer> V, Set<Supp>[] E, Set<Integer>[] ERev) {
+    }
+
+    ;
+
+    public Pair<JGraph, Float> constructJG(State gs) {
+        IntArraySet V = new IntArraySet();
+        Set<Supp>[] E = new HashSet[getTotNumberOfTerms() + 1];
+        Set<Integer>[] ERev = new HashSet[getTotNumberOfTerms() + 1];
+        V.add(root);
+        E[root] = new HashSet<>();
+        ERev[root] = new HashSet<>();
+
         Arrays.fill(getActionHCost(), Float.MAX_VALUE);
         Arrays.fill(getConditionCost(), Float.MAX_VALUE);
         Arrays.fill(getClosed(), false);
         Arrays.fill(getActionInit(), false);
         Arrays.fill(getConditionInit(), false);
-        if (extractRelaxedPlan || isHelpfulActionsComputation()) {
-            Arrays.fill(establishedAchiever, -1);
-            Arrays.fill(numRepetition, Float.MAX_VALUE);
-        }
-        if (!isAdditive()) {
-            Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
-        }
-
-//        Printer.pddlPrint(problem, (PDDLState) gs);
-        final BucketPriorityQueue h = new BucketPriorityQueue(this.totNumberOfActionsRefactored*10,0,1);
+        allAchievers = new IntArraySet[totNumberOfTerms];
+        final FibonacciHeap h = new FibonacciHeap();
         for (final int i : getAllConditions()) {
             if (gs.satisfy(Terminal.getTerminal(i))) {
                 conditionCost[i] = 0f;
                 conditionInit[i] = true;
-                updateActions(i, h, true);
             }
+            V.add(i);
+            E[i] = new HashSet();
+            ERev[i] = new HashSet();
         }
         for (final int freePreconditionAction : freePreconditionActions) {
-            actionHCost[freePreconditionAction] = 0;
+            actionHCost[freePreconditionAction] = 0f;
             actionInit[freePreconditionAction] = true;
             addActionsInPriority(freePreconditionAction, h, 0f);
+            V.add(root);
+            pcf[freePreconditionAction] = root;
         }
-        return h;
+
+        for (var a : allActions) {
+            Condition condition = cp.preconditionFunction()[a];
+            if (gs.satisfy(condition) && !actionInit[a]) {
+                addActionsInPriority(a, h, 0f);
+                actionHCost[a] = 0f;
+                actionInit[a] = true;
+                pcf[a] = root;
+            }
+        }
+
+        while (!h.isEmpty()) {
+            final int actionId = (int) h.removeMin().getData();
+            if (!closed[actionId]) {
+                closed[actionId] = true;
+                V.add(this.pcf[actionId]);
+                if (actionId != cp.goal()) {
+                    final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
+                    for (final int conditionId : conditionsAchievableByAction) {
+                        if (!getConditionInit()[conditionId]) {
+                            E[this.pcf[actionId]].add(new Supp(actionId, conditionId));
+                            ERev[conditionId].add(actionId);
+
+                            float temp;
+                            if (getActionCost()[actionId] == 0f) {
+                                temp = 0f;
+                            } else {
+                                temp = computeRepetition(conditionId, actionId, gs);
+                            }
+                            if (updateIfNeeded(conditionId, temp)) {
+                                updateActions(conditionId, h);
+                            }
+                        }
+                    }
+                } else if (actionHCost[actionId] == 0f) {
+                    break;
+                }
+            }
+        }
+        return Pair.of(new JGraph(V, E, ERev), actionHCost[cp.goal()]);
     }
+
+    float computeRepetition(int conditionId, int actionId, State gs) {
+        final Terminal t = Terminal.getTerminal(conditionId);
+        if (t instanceof BoolPredicate || t instanceof NotCond) {//affecting a prop variable
+            return getActionCost()[actionId] + getActionHCost()[actionId];
+        } else {//affecting a num comparison
+            final double v = this.numericContribution(actionId, (Comparison) t);
+            if (v > 0) {
+                float rep = computeRepetition(t, v, gs);
+                final float newCost = rep * getActionCost()[actionId];
+                return getActionHCost()[actionId] + newCost;
+            }
+        }
+        return -1f;
+    }
+
+    float[] tempActionCost;
+
+    record Cut(int actionId, int conditionId) {
+    }
+
+    ;
 
     @Override
     public float computeEstimate(State gs) {
-        final BucketPriorityQueue h = this.smallSetup(gs);
-        //reachability = reachableTransitions == null /* First time executing it*/|| reachability;
-        final boolean dontstop = reachability || reachableTransitions == null;
-        while (!h.isEmpty()) {
-            h1Node dequeue = (h1Node) h.dequeue();
-            final int actionId = dequeue.idAction;
-            if (actionId == cp.goal() && !dontstop) {
-                break;
+        float cost = 0f;
+        boolean firstTime = true;
+        tempActionCost = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
+        while (true) {
+            boolean goalZone[] = new boolean[totNumberOfTerms + 1];
+            Pair<JGraph, Float> jGraphFloatPair = constructJG(gs);
+            JGraph JG = jGraphFloatPair.getFirst();
+            if (jGraphFloatPair.getSecond() == 0f || jGraphFloatPair.getSecond() == Float.MAX_VALUE) {
+                if (firstTime)
+                    return jGraphFloatPair.getSecond();
+                else
+                    return cost;
             }
-
-            if (actionHCost[actionId]!=dequeue.getRanks()[0]) {
-                continue;
+            firstTime = false;
+            markGoalZone(JG, pcf[cp.goal()], goalZone);
+            assert(!goalZone[root]);
+            Collection<Cut> cuts = computeCuts(JG, goalZone);
+            if (cuts.isEmpty()) {
+                return cost;
             }
-
-            if (dontstop && actionId != cp.goal()) {
-                if (reachableTransitions == null) {
-                    reachableTransitions = new IntArraySet();
+            float min = Float.POSITIVE_INFINITY;
+            float[] actionOut = new float[cp.numActions()];
+            Arrays.fill(actionOut, Float.POSITIVE_INFINITY);
+            for (var v : cuts) {
+                float temp = computeRepetition(v.conditionId, v.actionId, gs);
+                if (temp < min) {
+                    min = temp;
                 }
-                reachableTransitions.add(actionId);
+                actionOut[v.actionId] = Math.min(actionOut[v.actionId], temp);
             }
-            closed[actionId] = true;
-            if (actionId != cp.goal()) {
-                expand(actionId, h, gs);
+
+            if (min <= 0.00001f) {
+                return cost;
+            }
+            for (var v : cuts) {
+                getActionCost()[v.actionId] -= min / actionOut[v.actionId];
+            }
+            cost += min;
+        }
+
+    }
+
+    private void markGoalZone(JGraph jg, int starting, boolean[] goalZone) {
+        goalZone[starting] = true;
+        for (var v : jg.ERev[starting]) {
+            if (getActionCost()[v] <= 0f)
+                markGoalZone(jg, pcf[v], goalZone);
+        }
+    }
+
+    private Collection<Cut> computeCuts(JGraph JG, boolean goalZone[]) {
+
+        Collection<Cut> cuts = new ArrayList<Cut>();
+        IntArrayFIFOQueue q = new IntArrayFIFOQueue();
+        q.enqueue(root);
+        IntArraySet closed = new IntArraySet();
+        while (!q.isEmpty()) {
+            int ele = q.dequeueInt();
+            closed.add(ele);
+            for (final var v : JG.E[ele]) {
+                if (goalZone[v.cond]) {
+                    cuts.add(new Cut(v.act, v.cond));
+                } else {
+                    if (!closed.contains(v.cond))
+                        q.enqueue(v.cond);
+                }
             }
         }
-        
-        if (getActionHCost()[cp.goal()] == Float.MAX_VALUE ){
-            return Float.MAX_VALUE;
-        }
-        
-        if (this.extractRelaxedPlan){
-            return relaxedPlanCost(gs);
-        }
-        
-        if (this.isHelpfulActionsComputation()){//this is to be used when hadd is wanted to be used with helpful actions taken from mrp
-            relaxedPlanCost(gs);
-        }
-//        System.exit(-1);
-        return getActionHCost()[cp.goal()];
+        return cuts;
+
 
     }
 
-    void addActionsInPriority(final int i, final BucketPriorityQueue p, final float v) {
-        p.enqueue(new h1Node(i,v));
+    void addActionsInPriority(final int i, final FibonacciHeap p, final float v) {
+        final FibonacciHeapNode fibonacciHeapNode = new FibonacciHeapNode(i);
+        nodeOf[i] = fibonacciHeapNode;
+        p.insert(fibonacciHeapNode, v);
     }
 
-    protected void updateActions(final int c, final BucketPriorityQueue p) {
-        this.updateActions(c, p, false);
-    }
-
-    protected void updateActions(final int c, final BucketPriorityQueue p, boolean init) {
+    protected void updateActions(final int c, final FibonacciHeap p) {
         final IntArraySet actions = getConditionToAction()[c];
         if (actions != null) {
             for (final int i : actions) {
-                if (!getClosed()[i]) {
-                    final float v = estimateCost(cp.preconditionFunction()[i], getActionHCost()[i]);
-                    if (v < 0){
-                        throw new RuntimeException("This isn't possible!, v can't be negative");
-                    }
-                    if (init && v == 0) {
-                        actionInit[i] = true;
-                    }
-                    if (v < Float.MAX_VALUE) {
+                if (!closed[i]) {
+                    Pair<Float, Integer> justifier = estimateCost(cp.preconditionFunction()[i]);
+                    float v = justifier.getFirst();
+                    if (v < Float.MAX_VALUE && !actionInit[i]) {
                         if (v < getActionHCost()[i]) {
+                            if (getActionHCost()[i] == Float.MAX_VALUE) {
                                 actionHCost[i] = v;
                                 addActionsInPriority(i, p, v);
+                            } else {
+                                actionHCost[i] = v;
+                                p.decreaseKey(getNodeOf()[i], v);
+                            }
+
+                        }
+                        if (justifier == null || justifier.getSecond() == null) {
+                            pcf[i] = root;
+                        } else {
+                            pcf[i] = justifier.getSecond();
                         }
                     }
                 }
             }
         }
-    }
-
-    protected float relaxedPlanCost(State gs) {
-        final Condition goal = cp.preconditionFunction()[cp.goal()];
-
-        final LinkedList<Pair<Collection, Float>> stack = new LinkedList();
-        stack.push(getActivatingConditions(goal));
-        plan = new IntArraySet();
-        Arrays.fill(visited, false);
-        helpfulActions = new IntArraySet();
-        Arrays.fill(maxNumRepetition, 0);
-        Arrays.fill(repetitionsInThePlan, null);
-        while (!stack.isEmpty()) {
-
-            final Pair<Collection, Float> elements;
-            elements = stack.pollLast();
-            for (final int conditionId : (Collection<Integer>) elements.getFirst()) {
-                if (!visited[conditionId]) {
-                    if (!getConditionInit()[conditionId]) {
-                        if (isHelpfulActionsComputation()) {
-                            if (getAchievers(conditionId).isEmpty()) {
-                                throw new RuntimeException("Houston we have problem here. Condition \n" + Terminal.getTerminal(conditionId) + " has never been achieved");
-                            }
-                            for (final int id : getAchievers(conditionId)) {
-                                if (getActionInit()[id]) {
-                                    helpfulActions.add(id);
-                                }
-                            }
-                        }
-                        
-                        final int actionId = establishedAchiever[conditionId];
-                        final int rep = (int) ceil(numRepetition[conditionId]);
-                        final int trActionId = cp.cpTr2TrMap()[actionId];
-                        if (repetitionsInThePlan[trActionId] == null){
-                            repetitionsInThePlan[trActionId] = new IntArraySet();
-                        }
-                        
-                        if (maxNumRepetition[trActionId] != rep){
-                            repetitionsInThePlan[trActionId].add(rep);
-                            maxNumRepetition[trActionId] = Math.max(maxNumRepetition[trActionId],rep);
-                        }
-//                        plan.add(act);
-                        plan.add(cp.cpTr2TrMap()[actionId]);
-                        stack.push(getActivatingConditions(cp.preconditionFunction()[actionId]));
-                    }
-                    visited[conditionId] = true;
-                }
-            }
-        }
-        
-        //This is the MRP
-        float ret = 0;
-        for (final int action : plan) {
-            //all cp actions for a given action have the same cost.
-            final var t = cp.tr2CpTrMap()[action].iterator().next();
-            ret += maxNumRepetition[action] * getActionCost()[t];
-//            System.out.println(TransitionGround.getTransition(action) + " " + maxNumRepetition[action]);
-        }
-
-//        System.exit(-1);
-        return ret;
     }
 
     @Override
     public Collection getAllEstimates() {
         return SearchHeuristic.super.getAllEstimates(); //To change body of generated methods, choose Tools | Templates.
     }
-    
-    
+
 
     public IntArraySet getAchievers(int conditionId) {
-        final IntArraySet achiever = getAllAchievers()[conditionId];
-        if (achiever == null) {
+        final IntArraySet achievers = getAllAchievers()[conditionId];
+        if (achievers == null) {
             getAllAchievers()[conditionId] = new IntArraySet();
         }
         return getAllAchievers()[conditionId];
     }
 
-    private void expand(int actionId, BucketPriorityQueue p, State s) {
-
-        final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
-        for (final int conditionId : conditionsAchievableByAction) {//This is for all terminal conditions
-            if (!getConditionInit()[conditionId] && (!isReachability() || getConditionCost()[conditionId] == Float.MAX_VALUE)) {
-                final Terminal t = Terminal.getTerminal(conditionId);
-                boolean update = false;
-                if (t instanceof BoolPredicate || t instanceof NotCond) {//affecting a prop variable
-                    if (updateIfNeeded(conditionId, getActionHCost()[actionId] + getActionCost()[actionId])) {
-                        update = true;
-                        cacheValue(getActionCost()[actionId],actionId,t);
-                        updateRelPlanInfo(conditionId, actionId, 1);
-                    }
-                } else {//affecting a num comparison
-                    final double v = this.numericContribution(actionId, (Comparison) t);
-                    if (v > 0) {
-
-                        final float rep = computeRepetition(t,v,s);
-                        final float newCost = rep * getActionCost()[actionId];
-                        boolean localUpdate = false;
-                        if (isAdditive()) {
-                            localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
-                        } else {
-                            if (getActionHCost()[actionId] < minAchieverPreconditionCost[conditionId]) {
-                                minAchieverPreconditionCost[conditionId] = getActionHCost()[actionId];
-                            }
-                            localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
-                        }
-                        if (localUpdate) {
-                            cacheValue(newCost,actionId,t);
-                            update = true;
-                            updateRelPlanInfo(conditionId, actionId, rep);
-                        }
-                    } else if (v == UNKNOWNEFFECT) {//this is a hard condition basically
-                        float newCost = 0f;
-                        float rep = computeRepetition(t, 1f, s);
-                        if (rep < 0){
-                            rep = 0f;
-                        }
-                        if (isAdditive()) {
-                            if (hardConditionthroughNumError) {
-                                newCost = rep*getActionCost()[actionId];
-                            }else{
-                                newCost = getActionCost()[actionId];
-                            }
-                        }
-                        if (updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost)) {
-                            update = true;
-                            updateRelPlanInfo(conditionId, actionId, rep);
-                        }
-                    }
-
-                }
-                if (update) {
-                    updateActions(conditionId, p);
-                }
-            }
-        }
-
-    }
-
     protected void updateAchievers(int conditionId, int actionId) {
-        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
-            getAchievers(conditionId).add(actionId);
-        }
-    }
+        getAchievers(conditionId).add(actionId);
 
-    protected void updateRelPlanInfo(int conditionId, int actionId, float rep) {
-        if (extractRelaxedPlan || isHelpfulActionsComputation()) {
-            establishedAchiever[conditionId] = actionId;
-            numRepetition[conditionId] = rep;
-        }
     }
 
     protected boolean updateIfNeeded(final int t, final float value) {
@@ -536,90 +494,48 @@ public class H1WithBucketEXP implements SearchHeuristic {
         return false;
     }
 
-    protected Pair<Collection, Float> getActivatingConditions(final Condition c) {
-        if (c instanceof AndCond) {
-            final AndCond and = (AndCond) c;
-            if (and.sons == null || and.sons.length == 0) {
-                return Pair.of(Collections.EMPTY_LIST, 0f);
-            }
-            IntArraySet left = new IntArraySet();
-            float cost = 0f;
-            for (final var son :  and.sons) {
-                Pair<Collection, Float> activatingConditions = getActivatingConditions((Condition) son);
-                cost += activatingConditions.getSecond();
-                left.addAll(activatingConditions.getFirst());
-            }
-            return Pair.of(left, cost);
-
-        } else if (c instanceof OrCond) {
-            final OrCond or = (OrCond) c;
-            if (or.sons == null || or.sons.length==0) {
-                return Pair.of(Collections.EMPTY_LIST, 0f);
-            }
-            float ret = Float.MAX_VALUE;
-            Collection left = null;
-            for (final var son :  or.sons) {
-                final Pair<Collection, Float> estimate = getActivatingConditions((Condition) son);
-                if (estimate.getSecond() != Float.MAX_VALUE) {
-                    if (estimate.getSecond() < ret) {
-                        ret = estimate.getSecond();
-                        left = estimate.getFirst();
-                    }
-                }
-            }
-            return Pair.of(left, ret);
-        } else if (c instanceof Terminal) {
-            final Terminal t = (Terminal) c;
-            return Pair.of(new IntArraySet(Collections.singleton(t.getId())), getConditionCost()[t.getId()]);
-        } else {
-            throw new RuntimeException("This is not supported:" + c);
-        }
+    @Override
+    public boolean[] getHelpfulTransitionMap() {
+        return this.helpfulTransitionsMap;
     }
 
-    
-    protected float estimateCost(final Condition c, float previous) {
-        return this.estimateCost(c, isAdditive(),previous);
-    }
-    
 
-    private float estimateCost(final Condition c, boolean additive, float previous) {
+    private Pair<Float, Integer> estimateCost(final Condition c) {
         if (c instanceof AndCond and) {
             if (and.sons == null) {
-                return 0f;
+                return Pair.of(0f, null);
             }
             float ret = 0f;
+            Integer best = null;
             for (final var son : and.sons) {
-                final float estimate = estimateCost((Condition) son,previous);
-                if (estimate == Float.MAX_VALUE || estimate >=previous) {
-                    return estimate;
+                Pair<Float, Integer> costJustifier = estimateCost((Condition) son);
+                if (ret < costJustifier.getFirst()) {
+                    ret = costJustifier.getFirst();
+                    best = costJustifier.getSecond();
                 }
-                if (additive && !isConjunctionsMax()) {// && !this.extractRelaxedPlan) {
-                    ret += estimate;
-                } else {
-                    ret = (estimate > ret) ? estimate : ret;
-                }
+
             }
-            return ret;
+            return Pair.of(ret, best);
 
         } else if (c instanceof OrCond and) {
             if (and.sons == null) {
-                return 0f;
+                return Pair.of(0f, null);
             }
-            float ret = Float.MAX_VALUE;
-            for (final Object son : and.sons) {
-                final float estimate = estimateCost((Condition)son,previous);
-                if (estimate != Float.MAX_VALUE) {
-                    ret = (estimate < ret) ? estimate : ret;
-                    if (ret == 0){
-                        return 0f;
-                    }
+            float ret = Float.POSITIVE_INFINITY;
+            Integer best = null;
+            for (final var son : and.sons) {
+                Pair<Float, Integer> floatIntegerPair = estimateCost((Condition) son);
+                if (ret > floatIntegerPair.getFirst()) {
+                    ret = floatIntegerPair.getFirst();
+                    best = floatIntegerPair.getSecond();
                 }
+
             }
-            return ret;
+            return Pair.of(ret, best);
         } else if (c instanceof Terminal t) {
-            return getConditionCost()[t.getId()];
+            return Pair.of(getConditionCost()[t.getId()], t.getId());
         } else {
-            return 0f;
+            throw new RuntimeException("This is not supported:" + c);
         }
     }
 
@@ -640,7 +556,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
 
     //Semantics: UNKNOWEFFECT don't know because comp is hard. > 0 is achiever, 0 no
     protected float numericContribution(int t, Comparison comp) {
-        
+
         if (cp.numericEffectFunction()[t] == null || cp.numericEffectFunction()[t].isEmpty()) {
             return 0f;
         }
@@ -701,7 +617,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
 
     @Override
     public Object[] getTransitions(final boolean helpful) {
-        Collection res = null;
+        Collection res;
         if (helpfulActions == null || !helpful) {
             if (reachableTransitionsInstances == null) {
                 if (reachableTransitions == null) {
@@ -711,7 +627,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
                     for (final int i : reachableTransitions) {
                         Transition transition = getTransition(cp.cpTr2TrMap()[i]);
                         if (transition.getSemantics().equals(Transition.Semantics.ACTION))
-                            reachableTransitionsInstances.add((TransitionGround)transition);
+                            reachableTransitionsInstances.add((TransitionGround) transition);
                     }
                     reachableTransitionsInstances = new ArrayList<>(reachableTransitionsInstances);
                     res = reachableTransitionsInstances;
@@ -720,28 +636,17 @@ public class H1WithBucketEXP implements SearchHeuristic {
                 res = reachableTransitionsInstances;
             }
         } else {
-            final Collection actions = new ArrayList<>();
-            for (final int i : helpfulActions) {
-                final TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
-                if (transition.getSemantics() == Transition.Semantics.ACTION) {
-                    actions.add(transition);
-                }
-            }
-            res = actions;
-
+            res = helpfulActions;
         }
         if (helpfulTransitions) {
-//            if (helpfulActionsComputation) {
-//                for (Pair<TransitionGround, Integer> helpfulTransition : getHelpfulTransitions()) {
-//                    res.remove(helpfulTransition.getLeft());
-//                    res.add(helpfulTransition);
-//                }
-//            }else {
             res.addAll(getHelpfulTransitions());
-            //
-//            }
         }
         return res.toArray();
+    }
+
+
+    public Collection<TransitionGround> getPotentialApplicableActions() {
+        return this.getAllTransitions();
     }
 
     @Override
@@ -752,7 +657,9 @@ public class H1WithBucketEXP implements SearchHeuristic {
             }
             reachableTransitionsInstances = new LinkedHashSet<TransitionGround>();
             for (final int i : reachableTransitions) {
-                reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
+                TransitionGround transition = (TransitionGround) getTransition(cp.cpTr2TrMap()[i]);
+                if (transition.getSemantics().equals((Transition.Semantics.ACTION)))
+                    reachableTransitionsInstances.add((TransitionGround) getTransition(cp.cpTr2TrMap()[i]));
             }
             reachableTransitionsInstances = new ArrayList<>(reachableTransitionsInstances);
             return reachableTransitionsInstances;
@@ -799,7 +706,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
         return res;
     }
 
-   
+
     public void addDeleter(int i, int actId) {
         if (deleters[i] == null) {
             deleters[i] = new IntArraySet();
@@ -810,7 +717,6 @@ public class H1WithBucketEXP implements SearchHeuristic {
     void updateDeleters(int t, int actionId) {
         addDeleter(t, actionId);
     }
-
 
 
     public Condition getGoalFormulation() {
@@ -842,7 +748,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
                     }
                 }
             }
-            Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), (Set<Integer>)cp.propEffectFunction()[actionId]);
+            Sets.SetView<Integer> intersection = Sets.intersection(getAllConditions(), (Set<Integer>) cp.propEffectFunction()[actionId]);
             achievableTerms.addAll(intersection);
             for (final int o : intersection) {
                 updateAchievers(o, actionId);
@@ -855,34 +761,24 @@ public class H1WithBucketEXP implements SearchHeuristic {
         return getConditionsAchievableBy()[actionId];
     }
 
-   
 
     private float computeRepetition(Terminal t, double v, State s) {
         final double eval = ((Comparison) t).getLeft().eval(s);
-        if (Double.isNaN(eval)){
+        if (Double.isNaN(eval)) {
             return 1.0f;
         }
-        if (((Comparison) t).isStrict && this.isAdditive()){
-            return (float) (-1f * eval / v)+Float.MIN_VALUE;
+        if (((Comparison) t).isStrict && this.isAdditive()) {
+            return (float) (-1f * eval / v) + Float.MIN_VALUE;
         }
         return (float) (-1f * eval / v);
     }
 
 
-
-    protected void cacheValue(float rep, int actionId, Terminal t) {
-        
-    }
-
-    protected boolean update(Terminal t, boolean update, int actionId) {
-        return update;
-    }
-
     /**
      * @return the allAchievers
      */
     public IntArraySet[] getAllAchievers() {
-        if (allAchievers == null){
+        if (allAchievers == null) {
             allAchievers = new IntArraySet[getTotNumberOfTerms()];
         }
         return allAchievers;
@@ -943,8 +839,8 @@ public class H1WithBucketEXP implements SearchHeuristic {
     public IntArraySet getAllConditions() {
         return allConditions;
     }
-    
-        /**
+
+    /**
      * @return the reachableAchievers
      */
     public IntArraySet[] getReachableAchievers() {
@@ -956,6 +852,13 @@ public class H1WithBucketEXP implements SearchHeuristic {
      */
     public IntArraySet getAllComparisons() {
         return allComparisons;
+    }
+
+    /**
+     * @return the nodeOf
+     */
+    public FibonacciHeapNode[] getNodeOf() {
+        return nodeOf;
     }
 
     /**
@@ -976,7 +879,7 @@ public class H1WithBucketEXP implements SearchHeuristic {
      * @return the actionCost
      */
     public float[] getActionCost() {
-        return cp.actionCost();
+        return tempActionCost;
     }
 
     /**
@@ -1021,21 +924,8 @@ public class H1WithBucketEXP implements SearchHeuristic {
         return actionInit;
     }
 
-
-    public class h1Node implements BucketPriorityQueueNode{
-
-
-        final int idAction;
-        final float rank[];
-        public h1Node(int i,float rank){
-            this.rank = new float[1];
-            this.rank[0] = rank;
-            idAction = i;
-        }
-        @Override
-        public float[] getRanks() {
-            return rank;
-        }
+    public void setComputeHelpfulActionsMap() {
+        // LM-Cut does not compute a dedicated helpful-actions bitmap.
     }
 
 }

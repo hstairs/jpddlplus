@@ -73,11 +73,11 @@ public class H1 implements SearchHeuristic {
     private final boolean conjunctionsMax;
 
     final float[] actionHCost;
-    private final float[] conditionCost;
+    protected final float[] conditionCost;
     protected final boolean[] closed;
 
     final boolean additive;
-    private final boolean[] conditionInit;
+    protected final boolean[] conditionInit;
     private final boolean[] actionInit;
     private final boolean helpfulTransitions;
     private final boolean hardcoreVersion;
@@ -340,7 +340,7 @@ public class H1 implements SearchHeuristic {
         final boolean dontstop = reachability || reachableTransitions == null;
         while (!h.isEmpty()) {
             final int actionId = (int) h.removeMin().getData();
-//            System.out.println(Transition.getTransition(actionId));
+//            System.out.println(Transition.getTransition(act));
 //            for (int i=0;i<=Transition.totNumberOfTransitions;i++)
 //                System.out.println(cp.actionCost()[i]);
             if (actionId == cp.goal() && !dontstop) {
@@ -456,7 +456,7 @@ public class H1 implements SearchHeuristic {
                             repetitionsInThePlan[trActionId].add(rep);
                             maxNumRepetition[trActionId] = Math.max(maxNumRepetition[trActionId],rep);
                         }
-//                        plan.add(actionId);
+//                        plan.add(act);
                         plan.add(cp.cpTr2TrMap()[actionId]);
                         stack.push(getActivatingConditions(cp.preconditionFunction()[actionId]));
                     }
@@ -1115,7 +1115,7 @@ public class H1 implements SearchHeuristic {
     /**
      * @return the actionInit
      */
-    public boolean[] getActionInit() {
+    protected boolean[] getActionInit() {
         return actionInit;
     }
 
