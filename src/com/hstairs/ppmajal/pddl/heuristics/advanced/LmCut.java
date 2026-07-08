@@ -379,7 +379,7 @@ public class LmCut extends H1 {
 
     private float computeRepetitions(Comparison comparison, float contribution, State state) {
         final double eval = comparison.getLeft().eval(state);
-        if (Double.isNaN(eval)) {
+        if (Double.isNaN(eval) || contribution == UNKNOWNEFFECT) {
             return 1.0f;
         }
         final float repetitions = (float) (-eval / contribution);
