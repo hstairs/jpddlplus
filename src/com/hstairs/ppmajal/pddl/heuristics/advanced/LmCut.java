@@ -19,6 +19,7 @@ public class LmCut extends H1 {
     private final int[] pcf;
     private final IntArraySet[] pcf2Actions;
     private float[] reducedCosts;
+    private float minCostAction;
 
     record Cut(int act, int cond) {
     }
@@ -45,6 +46,7 @@ public class LmCut extends H1 {
         this.pcf = new int[cp.numActions()];
         Arrays.fill(this.pcf, -1);
         pcf2Actions = new IntArraySet[getTotNumberOfTerms()+1];
+        minCostAction = Float.POSITIVE_INFINITY;
     }
 
     Float updateJG(JGraph jg, State gs, Collection<Cut> cuts) {
@@ -385,11 +387,20 @@ public class LmCut extends H1 {
     private float computeRepetitions(Comparison comparison, float contribution, State state) {
         final double eval = comparison.getLeft().eval(state);
         if (Double.isNaN(eval) || contribution == UNKNOWNEFFECT) {
-            return 1.0f;
+            return getMinCostAction();
         }
         final float repetitions = (float) (-eval / contribution);
         return comparison.isStrict && isAdditive()
                 ? repetitions + Float.MIN_VALUE
                 : repetitions;
+    }
+
+    private float getMinCostAction() {
+        if (minCostAction == Float.POSITIVE_INFINITY){
+            for (var v: allActions){
+                minCostAction = Math.min(minCostAction, getActionCost()[v]);
+            }
+        }
+        return minCostAction;
     }
 }
