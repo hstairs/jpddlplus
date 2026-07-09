@@ -243,7 +243,7 @@ public class LmCut extends H1 {
 
             firstTime = false;
 
-            markGoalZone(justificationGraph, pcf[cp.goal()], goalZone);
+            markGoalZone(justificationGraph, pcf[cp.goal()], goalZone, new IntArraySet());
             final Collection<Cut> cuts = computeCuts(justificationGraph, goalZone);
             if (cuts.isEmpty()) {
                 return cost;
@@ -287,14 +287,16 @@ public class LmCut extends H1 {
         return reducedCosts;
     }
 
-    private void markGoalZone(JGraph graph, int starting, boolean[] goalZone) {
+    private void markGoalZone(JGraph graph, int starting, boolean[] goalZone, IntArraySet seen) {
         goalZone[starting] = true;
-        if (starting == root){
+        if (seen.contains(starting)) {
             return;
+        }else{
+            seen.add(starting);
         }
         for (final int actionId : graph.ERev[starting]) {
             if (getActionCost()[actionId] <= 0f) {
-                markGoalZone(graph, pcf[actionId], goalZone);
+                markGoalZone(graph, pcf[actionId], goalZone,seen);
             }
         }
     }
