@@ -289,6 +289,9 @@ public class LmCut extends H1 {
 
     private void markGoalZone(JGraph graph, int starting, boolean[] goalZone) {
         goalZone[starting] = true;
+        if (starting == root){
+            return;
+        }
         for (final int actionId : graph.ERev[starting]) {
             if (getActionCost()[actionId] <= 0f) {
                 markGoalZone(graph, pcf[actionId], goalZone);
