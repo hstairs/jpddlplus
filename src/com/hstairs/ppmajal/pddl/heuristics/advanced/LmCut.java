@@ -368,7 +368,7 @@ public class LmCut extends H1 {
 
     private float computeSupporterCost(int conditionId, int actionId, State gs, boolean includeHeuristicCost) {
         final Terminal terminal = Terminal.getTerminal(conditionId);
-        final float actionCost = getActionCost()[actionId];
+        float actionCost = getActionCost()[actionId];
         final float heuristicCost = includeHeuristicCost ? getActionHCost()[actionId] : 0f;
 
         if (!(terminal instanceof Comparison comparison)) {
@@ -381,13 +381,15 @@ public class LmCut extends H1 {
         }
 
         final float repetitions = computeRepetitions(comparison, contribution, gs);
+        if (contribution == UNKNOWNEFFECT)
+            actionCost = 0f;
         return heuristicCost + repetitions * actionCost;
     }
 
     private float computeRepetitions(Comparison comparison, float contribution, State state) {
         final double eval = comparison.getLeft().eval(state);
         if (Double.isNaN(eval) || contribution == UNKNOWNEFFECT) {
-            return getMinCostAction();
+            return 1f;
         }
         final float repetitions = (float) (-eval / contribution);
         return comparison.isStrict && isAdditive()
