@@ -49,6 +49,8 @@ import org.jgrapht.alg.util.Pair;
 
 public class BOAStar extends SearchEngine{
 
+	protected long previous;
+
 	public BOAStar(boolean helpfulActionsPruning) {
         super(false);
     }
@@ -93,6 +95,7 @@ public class BOAStar extends SearchEngine{
 			this.tryLog(init, ExternalLoggerLogType.Generating);
 		}
 		
+		previous = 0; // Inizializza il timer prima di iniziare la ricerca
 
 		while(!frontier.isEmpty()){
 			if (shouldStop(timeAtStart)) {
@@ -111,6 +114,12 @@ public class BOAStar extends SearchEngine{
 			}
 			g2min.put(currentNode.s.getRepresentative(), currentNode.g2);
 			nodesExpanded++;
+			
+			// ---> INIZIO CHIAMATA HEARTBEAT <---
+			long fromTheBeginning = (System.currentTimeMillis() - timeAtStart);
+			printInfoDuringSearch(timeAtStart, out, fromTheBeginning, nodesExpanded, nodesEvaluated, frontier, currentNode);
+			// ---> FINE CHIAMATA HEARTBEAT <---
+
 			final Boolean res = problem.goalSatisfied(currentNode.s);
 			if (res == null) {
 				deadEndsDetected++;
@@ -165,6 +174,19 @@ public class BOAStar extends SearchEngine{
 		}
 		totalTime = System.currentTimeMillis() - timeAtStart;
 		return !paretoFrontier.isEmpty() ? new BoaStarSearchNode(paretoFrontier) : null;
+	}
+
+	protected void printInfoDuringSearch(long timeAtStart, PrintStream out, long fromTheBeginning,
+                                         int nodesExpanded, int nodesEvaluated, Object frontier,
+                                         BoaStarSearchNode currentNode) {
+		if (fromTheBeginning >= previous + 10000) {
+			final float speed = (fromTheBeginning > 0) ? nodesExpanded / (fromTheBeginning / 1000f) : 0;
+			out.println("-------------Time: " + (fromTheBeginning / 1000)
+					+ "s ; Expanded Nodes: " + nodesExpanded +
+					" (Avg-Speed " + String.format("%.2f", speed) + " n/s); Evaluated States: " + nodesEvaluated +
+					" ; Pruned Duplicates: " + duplicatedDetected);
+			previous = fromTheBeginning;
+		}
 	}
 
 	// ordina la openList per f1; a parità di f1 guarda f2; a parità di f2 favorisce il g2 maggiore.
