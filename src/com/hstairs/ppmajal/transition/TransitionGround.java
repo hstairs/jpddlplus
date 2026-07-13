@@ -21,11 +21,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import java.util.Collections;
 
 
 public class TransitionGround extends Transition {
     final protected List<PDDLObject> parameters;
     private ArrayList sdac;
+    private Map<Metric, List> sdacCacheMap = new HashMap<>(); // multi-cache per i costi delle azioni multi-obiettivo.
 
     
     public TransitionGround(String name, Semantics semantics, List<PDDLObject> parameters, Condition preconditions, ConditionalEffects conditionalPropositionalEffects, ConditionalEffects conditionalNumericEffects) {
@@ -140,26 +142,28 @@ public class TransitionGround extends Transition {
             return n;
         }
     }
-    private List<Pair<Condition, Float>> getSdac(PDDLState state, Metric metric, Sdac sdacConfiguration) {
+    private List<Pair<Condition, Float>> getSdac(PDDLState state, Metric metric, Sdac sdacConfiguration) { // State-Dependent Action Costs.
 
         if (sdacConfiguration == Sdac.byRHS) {
-            if (this.sdac == null){
-                this.sdac = new ArrayList();
+            List cached = sdacCacheMap.get(metric); // estrazione la metrica
+            if (cached == null){
+                cached = new ArrayList();
                 final ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
                 //first numeric effect normal
-                for (final NumEffect effNum :  this.getConditionalNumericEffects().getAllEffects()) {
+                for (final NumEffect effNum : this.getConditionalNumericEffects().getAllEffects()) {
                     for (final ExtendedAddendum ad : expr.summations) {
                         if (ad.f != null) {
                             if (effNum.getFluentAffected().equals(ad.f)){
-                                this.sdac.add(effNum);
+                                cached.add(effNum);
                             }
                         }
                     }
                 }
+                sdacCacheMap.put(metric, cached);
             }
             Float exprImpact = 0f;
             ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
-            for (var eff : this.sdac){
+            for (Object eff : cached){ // calcolo del costo dell'impatto usando 'cached'.
                 for (ExtendedAddendum ad : expr.summations){
                     if (ad.f != null){
                         exprImpact += ad.n.floatValue() * this.getExprImpact(state, (NumEffect)eff, ad.f);
@@ -169,22 +173,22 @@ public class TransitionGround extends Transition {
             if ((exprImpact <= 0 && metric.getOptimization().equals("maximize"))
                     || (exprImpact >= 0 && metric.getOptimization().equals("minimize"))) {
                 BoolPredicate truePredicate = BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE);
-                return java.util.Collections.singletonList(
+                return Collections.singletonList(
                         Pair.of(truePredicate, getImpact(exprImpact, metric.getOptimization())));
             }else{
                 throw new RuntimeException("Metric not supported in that it induces negative costs");
             }
-
         }
 
-        if (this.sdac == null) {
-            this.sdac = new ArrayList<>();
+        List cached = sdacCacheMap.get(metric);
+        if (cached == null) {
+            cached = new ArrayList<>();
             if (metric != null && metric.getMetExpr() != null) {
                 if (sdacConfiguration == Sdac.disabled){
                     ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
                     //first numeric effect normal
                     Float exprImpact = 0f;
-                    for (NumEffect effNum :  this.getConditionalNumericEffects().getAllEffects()) {
+                    for (NumEffect effNum : this.getConditionalNumericEffects().getAllEffects()) {
                         for (ExtendedAddendum ad : expr.summations) {
                             if (ad.f != null) {
                                 exprImpact += ad.n.floatValue() * this.getExprImpact(state, effNum, ad.f);
@@ -195,7 +199,7 @@ public class TransitionGround extends Transition {
                     if ((exprImpact < 0 && metric.getOptimization().equals("maximize"))
                             || (exprImpact > 0 && metric.getOptimization().equals("minimize"))) {
                         BoolPredicate truePredicate = BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE);
-                        this.sdac.add(Pair.of(truePredicate, getImpact(exprImpact,metric.getOptimization())));
+                        cached.add(Pair.of(truePredicate, getImpact(exprImpact,metric.getOptimization())));
                     }
                 }else if (sdacConfiguration == Sdac.byCondition){
                     final ConditionalEffects<NumEffect> conditionalNumericEffects1 = this.getConditionalNumericEffects();
@@ -213,7 +217,7 @@ public class TransitionGround extends Transition {
                         
                         if ((exprImpact < 0 && metric.getOptimization().equals("maximize"))
                                 || (exprImpact > 0 && metric.getOptimization().equals("minimize"))) {
-                            this.sdac.add(Pair.of(ele.getKey(), getImpact(exprImpact,metric.getOptimization())));
+                            cached.add(Pair.of(ele.getKey(), getImpact(exprImpact,metric.getOptimization())));
                         }
                     }
                     final ExtendedNormExpression expr = (ExtendedNormExpression) metric.getMetExpr();
@@ -228,15 +232,17 @@ public class TransitionGround extends Transition {
 
                     if ((exprImpact < 0 && metric.getOptimization().equals("maximize"))
                             || (exprImpact > 0 && metric.getOptimization().equals("minimize"))) {
-                        this.sdac.add(Pair.of(BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE), getImpact(exprImpact,metric.getOptimization())));
+                        cached.add(Pair.of(BoolPredicate.getPredicate(BoolPredicate.trueFalse.TRUE), getImpact(exprImpact,metric.getOptimization())));
                     }
                     
                 } else{
                     throw new UnsupportedOperationException("Sdac option not supported"+ sdacConfiguration);
                 }
             }
+            sdacCacheMap.put(metric, cached);
         }
-        return this.sdac;
+        List<Pair<Condition, Float>> result = (List<Pair<Condition, Float>>) cached;
+        return result;
     }
     public Float getActionCost(State s, Metric m){
         return getActionCost(s, m, Sdac.disabled);

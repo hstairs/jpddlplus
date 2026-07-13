@@ -539,8 +539,8 @@ prefConGD
 	;
 
 metricSpec
-	: '(' ':metric' optimization metricFExp ')'
-	  -> ^(PROBLEM_METRIC optimization metricFExp)
+	: '(' ':metric' optimization metricFExp+ ')'
+	  -> ^(PROBLEM_METRIC optimization metricFExp+)
 	;
 
 optimization : 'minimize' | 'maximize' ;

@@ -2,11 +2,13 @@ package com.hstairs.ppmajal.PDDLProblem;
 
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.*;
+import com.hstairs.ppmajal.search.searchnodes.BoaStarSearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.io.PrintStream;
@@ -51,7 +53,8 @@ public class PDDLPlanner {
         {"ehs", "EHS", "Enhanced Heuristic Search"},
         {"ida", "IDA", "Iterative Deepening A*"},
         {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
-        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"}
+        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"},
+        {"boa", "BOAStar", "Bi-Objective A* Search"}
     };
 
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
@@ -60,7 +63,8 @@ public class PDDLPlanner {
         Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
         Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, planner.searchOutput)),
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
-        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+        Map.entry(SE_INFOS[6][0], (planner, tb) -> new BOAStar(planner.helpfulActions))
     );
 
     final private boolean bucketBasedQueueSearch;
@@ -161,6 +165,14 @@ public class PDDLPlanner {
         searchEngine.afterExecution();
         if (solutionHandle == null)
             return new PDDLSolution(null, null, searchEngine.getStats(), -1);
+        if (solutionHandle instanceof BoaStarSearchNode boaStarNode) {
+            List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> paretoPlans = this.extractParetoPlans(boaStarNode, p);
+            List<PDDLState> paretoLastStates = this.extractParetoLastStates(boaStarNode);
+            List<Pair<Float, Float>> paretoCosts = this.extractParetoCosts(boaStarNode);
+            LinkedList<ImmutablePair<BigDecimal, TransitionGround>> representativePlan = paretoPlans.isEmpty() ? null : paretoPlans.get(0);
+            return new PDDLSolution(representativePlan, paretoPlans, paretoLastStates, paretoCosts,
+                    boaStarNode, searchEngine.getStats(), boaStarNode.gValue);
+        }
         float objectiveValue = solutionHandle.gValue;
         SearchEngine.SearchStats stats = searchEngine.getStats();
         if (stats.iterativeMetricSummary() != null) {
@@ -168,6 +180,33 @@ public class PDDLPlanner {
         }
         return new PDDLSolution(this.extractPlan(solutionHandle, p),
                 solutionHandle, stats, objectiveValue);
+    }
+
+    private List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> extractParetoPlans(BoaStarSearchNode frontierNode, PDDLProblem p) {
+        List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> plans = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan = this.extractPlan(node, p);
+            if (plan != null) {
+                plans.add(plan);
+            }
+        }
+        return plans;
+    }
+    private List<PDDLState> extractParetoLastStates(BoaStarSearchNode frontierNode) {
+        List<PDDLState> states = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            if (node.s instanceof PDDLState state) {
+                states.add(state);
+            }
+        }
+        return states;
+    }
+    private List<Pair<Float, Float>> extractParetoCosts(BoaStarSearchNode frontierNode) {
+        List<Pair<Float, Float>> costs = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            costs.add(new ImmutablePair<>(node.gValue, node.g2));
+        }
+        return costs;
     }
 
     public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {

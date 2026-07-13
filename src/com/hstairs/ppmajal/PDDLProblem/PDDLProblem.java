@@ -118,6 +118,7 @@ public class PDDLProblem implements SearchProblem {
     protected Integer indexInit;
     protected Integer indexGoals;
     protected Metric metric;
+    public Metric[] multiMetrics;
     protected String pddlFilRef;
     protected String domainName;
     protected long propositionalTime;
@@ -404,6 +405,15 @@ public class PDDLProblem implements SearchProblem {
         } else {
             this.metric = null;
         }
+
+        // applica la normalizzazione algebrica (normalize) a tutte le metriche multi-obiettivo.
+        if (this.multiMetrics != null) {
+            for (int i = 0; i < this.multiMetrics.length; i++) {
+                if (this.multiMetrics[i] != null && this.multiMetrics[i].getMetExpr() != null) {
+                    this.multiMetrics[i] = new Metric(this.multiMetrics[i].getOptimization(), this.multiMetrics[i].getMetExpr().normalize());
+                }
+            }
+        }
     }
 
 
@@ -541,6 +551,22 @@ public class PDDLProblem implements SearchProblem {
         } else {
             this.metric = null;
         }
+
+        // valuta parzialmente (weakEval) e normalizza ogni metrica multi-obiettivo rispetto ai fluenti invarianti.
+        if (this.multiMetrics != null) {
+            for (int i = 0; i < this.multiMetrics.length; i++) {
+                Metric m = this.multiMetrics[i];
+                if (m != null && m.getMetExpr() != null) {
+                    Expression evalExpr = m.getMetExpr().weakEval(this, this.getActualFluents());
+                    if (evalExpr == null) {
+                        this.multiMetrics[i] = null;
+                    } else {
+                        this.multiMetrics[i] = new Metric(m.getOptimization(), evalExpr.normalize());
+                    }
+                }
+            }
+        }
+
         return true;
     }
 
@@ -671,6 +697,18 @@ public class PDDLProblem implements SearchProblem {
                 setCostRelevant(v);
             }
         }
+
+        // salva le variabili di tutti gli obiettivi in multiMetrics per evitarne l'eliminazione.
+        if (this.multiMetrics != null) {
+            for (Metric m : this.multiMetrics) {
+                if (m != null && m.getMetExpr() != null) {
+                    for (var v : m.getMetExpr().getInvolvedNumericFluents()) {
+                        setCostRelevant(v);
+                    }
+                }
+            }
+        }
+
         for (var t : getTransitions()) {
             for (NumEffect e : t.getConditionalNumericEffects().getAllEffects()) {
                 //if (this.isSubgoalsRelevant(e.getFluentAffected())) {
@@ -1019,7 +1057,14 @@ public class PDDLProblem implements SearchProblem {
         str.append("(:goal ");
         str.append(this.getLiftedGoals().pddlPrint(false));
         str.append(" )\n");
-        if (this.metric != null) {
+        // esporta nel file PDDL di salvataggio la sintassi corretta contenente tutte le metriche multi-obiettivo.
+        if (this.multiMetrics != null && this.multiMetrics.length > 1) {
+            str.append("(:metric ").append(this.multiMetrics[0].getOptimization());
+            for (Metric m : this.multiMetrics) {
+                str.append(" ").append(m.getMetExpr().pddlPrint(false));
+            }
+            str.append(")");
+        } else if (this.metric != null) {
             str.append(this.metric.pddlPrint());
         }
         str.append("\n )");
@@ -1268,7 +1313,12 @@ public class PDDLProblem implements SearchProblem {
     protected void addMetric(Tree t) {
         //System.out.println(t.toStringTree());
         metric = new Metric(t.getChild(0).getText(), createExpression(t.getChild(1)));
-
+        // modifica per supportare più metriche.
+        int numMetrics = t.getChildCount() - 1;
+        multiMetrics = new Metric[numMetrics];
+        for (int i = 0; i < numMetrics; i++) {
+            multiMetrics[i] = new Metric(t.getChild(0).getText(), createExpression(t.getChild(i + 1)));
+        }
     }
 
     /**
@@ -1454,10 +1504,23 @@ public class PDDLProblem implements SearchProblem {
         this.actions.add(action);
     }
 
-
+    // gValue originale.
     @Override
     public Float gValue(State s, Object act, State temp, float gValue) {
         Metric m = this.getMetric();
+        return computeCost(s, act, gValue, m);
+    }
+
+    // overloading di gValue per il multi-obiettivo che richiama computeCost in base alla metrica
+    @Override
+    public Float gValue(State s, Object act, State temp, float gValue, int metricIndex) {
+        Metric activeMetric = this.multiMetrics[metricIndex];
+        float cost = computeCost(s, act, gValue, activeMetric);
+        return cost;
+        }
+
+    // implemena la logica presente nel gValue originale. 
+    private Float computeCost(State s, Object act, float gValue, Metric m) {
         if (act instanceof Transition) {
             TransitionGround gr = (TransitionGround) act;
             if (gr == null) {
@@ -1487,6 +1550,7 @@ public class PDDLProblem implements SearchProblem {
         }
 
     }
+    public void setMetric(Metric metric) { this.metric = metric; }
 
     float getTransitionCost(State s, TransitionGround gr, Float previousG, boolean ignoreCost, Metric m) {
         return this.getTransitionCost(s, gr, previousG, ignoreCost, m, 1);
