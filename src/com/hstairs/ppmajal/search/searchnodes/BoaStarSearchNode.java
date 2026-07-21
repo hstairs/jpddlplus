@@ -8,6 +8,7 @@ public class BoaStarSearchNode extends SimpleSearchNode {
     public final float g2;
     public final float f1;
     public final float f2;
+    public long timeFound = -1;
     private List<BoaStarSearchNode> paretoFrontier = null;
 
     public BoaStarSearchNode(State state, Object action, BoaStarSearchNode father, float g1, float g2, float f1, float f2){

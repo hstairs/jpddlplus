@@ -11,25 +11,27 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 
 public record PDDLSolution(LinkedList<ImmutablePair<BigDecimal, TransitionGround>> rawPlan,
-                            List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> paretoPlans,
-                            List<PDDLState> paretoLastStates,
-                            List<Pair<Float, Float>> paretoCosts,
-                            SimpleSearchNode lastNode,
-                            SearchEngine.SearchStats stats,
-                            float gValueAtTheEnd){
+        List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> paretoPlans,
+        List<PDDLState> paretoLastStates,
+        List<Pair<Float, Float>> paretoCosts,
+        List<Long> paretoTimes,
+        SimpleSearchNode lastNode,
+        SearchEngine.SearchStats stats,
+        float gValueAtTheEnd) {
 
     // costruttore originale.
     public PDDLSolution(LinkedList<ImmutablePair<BigDecimal, TransitionGround>> rawPlan,
-                        SimpleSearchNode lastNode,
-                        SearchEngine.SearchStats stats,
-                        float gValueAtTheEnd) {
+            SimpleSearchNode lastNode,
+            SearchEngine.SearchStats stats,
+            float gValueAtTheEnd) {
         this(rawPlan,
-             rawPlan == null ? List.of() : List.of(rawPlan),
-             List.of(),
-             List.of(),
-             lastNode,
-             stats,
-             gValueAtTheEnd);
+                rawPlan == null ? List.of() : List.of(rawPlan),
+                List.of(),
+                List.of(),
+                List.of(),
+                lastNode,
+                stats,
+                gValueAtTheEnd);
     }
 
     // nuovo costruttore multi-obiettivo.
@@ -37,6 +39,7 @@ public record PDDLSolution(LinkedList<ImmutablePair<BigDecimal, TransitionGround
         paretoPlans = paretoPlans == null ? List.of() : List.copyOf(paretoPlans);
         paretoLastStates = paretoLastStates == null ? List.of() : List.copyOf(paretoLastStates);
         paretoCosts = paretoCosts == null ? List.of() : List.copyOf(paretoCosts);
+        paretoTimes = paretoTimes == null ? List.of() : List.copyOf(paretoTimes);
     }
 
     public PDDLState lastState() {

@@ -794,7 +794,10 @@ public class ENHSP {
                     costStr.append(" (g1=").append(String.format("%.2f", cost.getLeft()))
                             .append(", g2=").append(String.format("%.2f", cost.getRight())).append(")");
                 }
-                System.out.println("Frontier plan " + (i + 1) + costStr + ":");
+                System.out.println("Frontier plan " + (i + 1) + costStr);
+                if (plan.paretoTimes() != null && i < plan.paretoTimes().size()) {
+                    System.out.println("Time (msec): " + plan.paretoTimes().get(i));
+                }
                 PDDLState frontierLastState = i < plan.paretoLastStates().size() ? plan.paretoLastStates().get(i) : lastState;
                 printPlan(plan.paretoPlans().get(i), pddlPlus, frontierLastState, savePlan);
                 System.out.println();

@@ -169,9 +169,10 @@ public class PDDLPlanner {
             List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> paretoPlans = this.extractParetoPlans(boaStarNode, p);
             List<PDDLState> paretoLastStates = this.extractParetoLastStates(boaStarNode);
             List<Pair<Float, Float>> paretoCosts = this.extractParetoCosts(boaStarNode);
+            List<Long> paretoTimes = this.extractParetoTimes(boaStarNode);
             LinkedList<ImmutablePair<BigDecimal, TransitionGround>> representativePlan = paretoPlans.isEmpty() ? null : paretoPlans.get(0);
-            return new PDDLSolution(representativePlan, paretoPlans, paretoLastStates, paretoCosts,
-                    boaStarNode, searchEngine.getStats(), boaStarNode.gValue);
+            return new PDDLSolution(representativePlan, paretoPlans, paretoLastStates,
+                    paretoCosts, paretoTimes, boaStarNode, searchEngine.getStats(), boaStarNode.gValue);
         }
         float objectiveValue = solutionHandle.gValue;
         SearchEngine.SearchStats stats = searchEngine.getStats();
@@ -207,6 +208,15 @@ public class PDDLPlanner {
             costs.add(new ImmutablePair<>(node.gValue, node.g2));
         }
         return costs;
+    }
+
+    // estrae il tempo in cui è stata trovata la soluzione per ogni piano.
+    private List<Long> extractParetoTimes(BoaStarSearchNode frontierNode) {
+        List<Long> times = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            times.add(node.timeFound);
+        }
+        return times;
     }
 
     public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {
