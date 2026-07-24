@@ -92,6 +92,10 @@ public class PDDLHeuristic {
                 return new lmcutOld(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "lmcut":
                 return new LmCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+            case "cpcut":
+                return new CriticalPathCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+            case "cpcutBot":
+                return new CriticalPathCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction,true);
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "h1res":

@@ -66,6 +66,8 @@ public class CriticalPathCut extends LmCut {
                     return firstTime ? goalValue : cost;
                 }
             }
+            firstTime = false;
+
             cost += actionHCost[cp.goal()];
             Arrays.fill(close, Boolean.FALSE);
 //
