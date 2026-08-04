@@ -90,6 +90,7 @@ public class LmCut extends H1 {
                                 : computeSupporterCost(conditionId, actionId, gs,true);
                         if (updateIfNeeded(conditionId, supporterCost)) {
                             updateActions(conditionId, heap);
+                            updateBestAchiever(conditionId,actionId);
                         }
                     }
                 }
@@ -161,6 +162,7 @@ public class LmCut extends H1 {
                                     : computeSupporterCost(conditionId, actionId, gs, true);
                             if (updateIfNeeded(conditionId, supporterCost)) {
                                 updateActions(conditionId, heap);
+                                updateBestAchiever(conditionId,actionId);
                             }
                         }
                     }
@@ -172,6 +174,9 @@ public class LmCut extends H1 {
         return Pair.of(new JGraph(vertices, edges, reverseEdges), getActionHCost()[cp.goal()]);
     }
 
+    protected void updateBestAchiever(int conditionId, int actionId) {
+    }
+
     private void setPCF(int root, int actionId) {
         pcf[actionId] = root;
         if (pcf2Actions[root] == null){
@@ -180,7 +185,7 @@ public class LmCut extends H1 {
         pcf2Actions[root].add(actionId);
     }
 
-    private void addConditionToEdges(IntArrayList[][] edges, int i, int actionId, int conditionId) {
+    void addConditionToEdges(IntArrayList[][] edges, int i, int actionId, int conditionId) {
         if (edges[i][actionId] == null) {
             edges[i][actionId] = new IntArrayList();
         }
@@ -374,7 +379,7 @@ public class LmCut extends H1 {
         throw new RuntimeException("This is not supported:" + c);
     }
 
-    private float computeSupporterCost(int conditionId, int actionId, State gs, boolean includeHeuristicCost) {
+    float computeSupporterCost(int conditionId, int actionId, State gs, boolean includeHeuristicCost) {
         final Terminal terminal = Terminal.getTerminal(conditionId);
         float actionCost = getActionCost()[actionId];
         final float heuristicCost = includeHeuristicCost ? getActionHCost()[actionId] : 0f;
