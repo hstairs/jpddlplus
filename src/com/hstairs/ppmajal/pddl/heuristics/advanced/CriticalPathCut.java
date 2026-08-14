@@ -4,13 +4,10 @@ import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.conditions.Comparison;
 import com.hstairs.ppmajal.conditions.Terminal;
 import com.hstairs.ppmajal.problem.State;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.jgrapht.alg.util.Pair;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 
 public class CriticalPathCut extends LmCut {
 
@@ -38,6 +35,8 @@ public class CriticalPathCut extends LmCut {
         float cost = 0f;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
         final boolean[] expandedActions = new boolean[cp.numActions()];
+        final boolean[] changedAction = new boolean[cp.numActions()];
+        final IntArrayList changedActions = new IntArrayList();
 
         final Pair<JGraph, Float> jGraphAndValue = constructJG(state);
         final JGraph justificationGraph = jGraphAndValue.getFirst();
@@ -50,16 +49,22 @@ public class CriticalPathCut extends LmCut {
 
             cost += actionHCost[cp.goal()];
             Arrays.fill(expandedActions, false);
+            for (final int actionId : changedActions) {
+                changedAction[actionId] = false;
+            }
+            changedActions.clear();
 
-            final Collection<Cut> cuts = collectProportionalCuts(
+            collectProportionalCuts(
                     pcf[cp.goal()],
                     reducedCosts.clone(),
                     justificationGraph,
                     expandedActions,
                     actionHCost[cp.goal()],
-                    state
+                    state,
+                    changedActions,
+                    changedAction
             );
-            final Float res = updateJG(justificationGraph, state, cuts);
+            final Float res = updateJG(justificationGraph, state, changedActions);
             if (res == 0f) {
                 return cost;
             }
@@ -67,18 +72,19 @@ public class CriticalPathCut extends LmCut {
         }
     }
 
-    private List<Cut> collectProportionalCuts(
+    private void collectProportionalCuts(
             int conditionId,
             float[] previousReducedCosts,
             JGraph justificationGraph,
             boolean[] expandedActions,
             float pendingCostShare,
-            State state
+            State state,
+            IntArrayList changedActions,
+            boolean[] changedAction
     ) {
         if (pendingCostShare == 0f) {
-            return Collections.emptyList();
+            return;
         }
-        final ArrayList<Cut> cuts = new ArrayList<>();
         for (final int actionId : justificationGraph.ERev()[conditionId]) {
             if (reducedCosts[actionId] > 0f) {
                 final float previousCost = previousReducedCosts[actionId];
@@ -90,34 +96,40 @@ public class CriticalPathCut extends LmCut {
                 );
                 if (updatedReducedCost != reducedCosts[actionId]) {
                     reducedCosts[actionId] = updatedReducedCost;
-                    cuts.add(new Cut(actionId, conditionId));
+                    if (!changedAction[actionId]) {
+                        changedAction[actionId] = true;
+                        changedActions.add(actionId);
+                    }
                 }
                 final float residualCostShare = pendingCostShare
                         - (previousCost - reducedCosts[actionId]) * supporterApplications;
                 if (residualCostShare > 0f && !expandedActions[actionId]) {
                     expandedActions[actionId] = true;
-                    cuts.addAll(collectProportionalCuts(
+                    collectProportionalCuts(
                             pcf[actionId],
                             previousReducedCosts,
                             justificationGraph,
                             expandedActions,
                             residualCostShare,
-                            state
-                    ));
+                            state,
+                            changedActions,
+                            changedAction
+                    );
                 }
             } else if (pendingCostShare > 0f && !expandedActions[actionId]) {
                 expandedActions[actionId] = true;
-                cuts.addAll(collectProportionalCuts(
+                collectProportionalCuts(
                         pcf[actionId],
                         previousReducedCosts,
                         justificationGraph,
                         expandedActions,
                         pendingCostShare,
-                        state
-                ));
+                        state,
+                        changedActions,
+                        changedAction
+                );
             }
         }
-        return cuts;
     }
 
     private float computeRequiredSupporterApplications(int conditionId, int actionId, State state) {
