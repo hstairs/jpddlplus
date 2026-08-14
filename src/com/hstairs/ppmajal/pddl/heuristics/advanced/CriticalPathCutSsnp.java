@@ -52,10 +52,11 @@ public class CriticalPathCutSsnp extends LmCut {
 
     @Override
     public float computeEstimate(State state) {
+
         float cost = 0f;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
         final boolean[] expandedActions = new boolean[cp.numActions()];
-
+        resetEvalComparison(); //This is for caching evaluations of comparisons, since here we need to use it multiple times
         prepareFirstRunMinCostPerProgress();
         final Pair<JGraph, Float> jGraphAndValue = constructJG(state);
         final JGraph justificationGraph = jGraphAndValue.getFirst();
@@ -84,6 +85,8 @@ public class CriticalPathCutSsnp extends LmCut {
         }
     }
 
+
+
     @Override
     float computeSupporterCost(int conditionId, int actionId, State state, boolean includeHeuristicCost) {
         final Terminal terminal = Terminal.getTerminal(conditionId);
@@ -92,13 +95,15 @@ public class CriticalPathCutSsnp extends LmCut {
             return heuristicCost + getActionCost()[actionId];
         }
 
-        final IntArraySet achievers = numericAchieversByCondition[conditionId];
-        if (achievers == null || achievers.size() <= 1) {
-            return super.computeSupporterCost(conditionId, actionId, state, includeHeuristicCost);
-        }
-
         final float contribution = numericContribution(actionId, comparison);
-        if (contribution <= 0f || minCostPerProgress[conditionId] == Float.POSITIVE_INFINITY) {
+        if (contribution > 0f && initialMinCostPerProgress[conditionId] == Float.POSITIVE_INFINITY ) {
+            final float repetitions = computeRepetitions(comparison, contribution, state);
+            return heuristicCost + repetitions * getActionCost()[actionId];
+        }
+        if (contribution == UNKNOWNEFFECT) {
+            return heuristicCost;
+        }
+        if (contribution == 0f || minCostPerProgress[conditionId] == Float.POSITIVE_INFINITY) {
             return Float.MAX_VALUE;
         }
 
@@ -120,7 +125,7 @@ public class CriticalPathCutSsnp extends LmCut {
             final IntArraySet achievers = new IntArraySet();
             for (final int actionId : allActions) {
                 final float contribution = numericContribution(actionId, comparison);
-                if (contribution > 0f) {
+                if (contribution > 0f || contribution == UNKNOWNEFFECT) {
                     achievers.add(actionId);
                 }
             }

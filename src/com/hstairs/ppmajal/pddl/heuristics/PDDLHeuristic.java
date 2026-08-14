@@ -93,9 +93,19 @@ public class PDDLHeuristic {
             case "lmcut":
                 return new LmCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "cpcut":
-                return new CriticalPathCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
-            case "cpcutBot":
-                return new CriticalPathCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction,true);
+                return CriticalPathCut.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction
+                );
+            case "cpcutssnp":
+                return CriticalPathCutSsnp.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction
+                );
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "h1res":
@@ -148,6 +158,7 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hradd", "HRAdd", "Additive version of subgoaling heuristic plus redundant constraints."),
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
                 new HeuristicInfo("hrmaxssnp", "HRMaxSSNP", "HRMax with SSNP-aware additive twist enabled."),
+                new HeuristicInfo("cpcutssnp", "CPCutSSNP", "Critical path cost partitioning using the minimum action-cost-to-numeric-progress ratio."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
                 new HeuristicInfo("lmcut_new", "LMCutNew", "LM-Cut variant implemented as an H1 extension."),
                 new HeuristicInfo("h1res", "H1Res", "Resolution-based heuristic without optimizations."),

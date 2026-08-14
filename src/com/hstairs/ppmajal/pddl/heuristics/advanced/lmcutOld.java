@@ -257,16 +257,14 @@ public class lmcutOld implements SearchHeuristic  {
 
     ;
 
-    private record JGraph(Set<Integer> V, Set<Supp>[] E, Set<Integer>[] ERev) {
+    private record JGraph(Set<Supp>[] E, Set<Integer>[] ERev) {
     }
 
     ;
 
     public Pair<JGraph, Float> constructJG(State gs) {
-        IntArraySet V = new IntArraySet();
         Set<Supp>[] E = new HashSet[getTotNumberOfTerms() + 1];
         Set<Integer>[] ERev = new HashSet[getTotNumberOfTerms() + 1];
-        V.add(root);
         E[root] = new HashSet<>();
         ERev[root] = new HashSet<>();
 
@@ -282,7 +280,6 @@ public class lmcutOld implements SearchHeuristic  {
                 conditionCost[i] = 0f;
                 conditionInit[i] = true;
             }
-            V.add(i);
             E[i] = new HashSet();
             ERev[i] = new HashSet();
         }
@@ -290,7 +287,6 @@ public class lmcutOld implements SearchHeuristic  {
             actionHCost[freePreconditionAction] = 0f;
             actionInit[freePreconditionAction] = true;
             addActionsInPriority(freePreconditionAction, h, 0f);
-            V.add(root);
             pcf[freePreconditionAction] = root;
         }
 
@@ -308,7 +304,6 @@ public class lmcutOld implements SearchHeuristic  {
             final int actionId = (int) h.removeMin().getData();
             if (!closed[actionId]) {
                 closed[actionId] = true;
-                V.add(this.pcf[actionId]);
                 if (actionId != cp.goal()) {
                     final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
                     for (final int conditionId : conditionsAchievableByAction) {
@@ -332,7 +327,7 @@ public class lmcutOld implements SearchHeuristic  {
                 }
             }
         }
-        return Pair.of(new JGraph(V, E, ERev), actionHCost[cp.goal()]);
+        return Pair.of(new JGraph(E, ERev), actionHCost[cp.goal()]);
     }
 
     float computeRepetition(int conditionId, int actionId, State gs) {
