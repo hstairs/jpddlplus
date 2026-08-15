@@ -78,7 +78,7 @@ public class LmCut extends H1 {
             jg.E[pcf[actionId]][actionId] = new IntArrayList();
             closed[actionId] = true;
             if (actionId != cp.goal()) {
-                final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
+                final Collection<Integer>  conditionsAchievableByAction = getConditionsAchievableById(actionId);
                 for (final int conditionId : conditionsAchievableByAction) {
                     if (!getConditionInit()[conditionId]) {
                         addConditionToEdges(jg.E,pcf[actionId],actionId,conditionId);
@@ -134,7 +134,7 @@ public class LmCut extends H1 {
                 getClosed()[actionId] = true;
                 nodeOf[actionId] = null;
                 if (actionId != cp.goal()) {
-                    final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
+                    final Collection<Integer>  conditionsAchievableByAction = getConditionsAchievableById(actionId);
                     for (final int conditionId : conditionsAchievableByAction) {
                         if (!getConditionInit()[conditionId]) {
                             addConditionToEdges(edges, pcf[actionId], actionId, conditionId);

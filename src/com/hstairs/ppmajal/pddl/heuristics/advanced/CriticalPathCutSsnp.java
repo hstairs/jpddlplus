@@ -10,13 +10,15 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import org.jgrapht.alg.util.Pair;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 public class CriticalPathCutSsnp extends LmCut {
 
-    private final IntArraySet[] numericAchieversByCondition;
+    private final Collection<Integer>[] numericAchieversByCondition;
     private final float[] initialMinCostPerProgress;
     private final float[] minCostPerProgress;
-    private final IntArraySet nonSuperSimpleComparisons;
+    private final Collection<Integer> nonSuperSimpleComparisons;
 
     public static CriticalPathCutSsnp create(
             PDDLProblem problem,
@@ -40,9 +42,9 @@ public class CriticalPathCutSsnp extends LmCut {
     ) {
         super(problem, false, false, false, redConstraints,
                 false, false, false, false, unitaryCost, linearEffectsAbstraction);
-        final NumericProgressIndex numericProgressIndex = buildNumericProgressIndex();
+        final NumericProgressIndex numericProgressIndex = buildNumeriProgressionInfo();
         numericAchieversByCondition = numericProgressIndex.achieversByCondition();
-        nonSuperSimpleComparisons = numericProgressIndex.nonSuperSimpleComparisons();
+        nonSuperSimpleComparisons = new IntArrayList(numericProgressIndex.nonSuperSimpleComparisons());
         initialMinCostPerProgress = numericProgressIndex.initialMinCostPerProgress();
         minCostPerProgress = initialMinCostPerProgress.clone();
     }
@@ -71,7 +73,6 @@ public class CriticalPathCutSsnp extends LmCut {
                 changedAction[actionId] = false;
             }
             changedActions.clear();
-
             collectProportionalCuts(
                     pcf[cp.goal()],
                     reducedCosts.clone(),
@@ -117,8 +118,8 @@ public class CriticalPathCutSsnp extends LmCut {
         return heuristicCost + costToReachCondition;
     }
 
-    private NumericProgressIndex buildNumericProgressIndex() {
-        final IntArraySet[] achieversByCondition = new IntArraySet[getTotNumberOfTerms()];
+    private NumericProgressIndex buildNumeriProgressionInfo() {
+        final IntArrayList[] achieversByCondition = new IntArrayList[getTotNumberOfTerms()];
         final IntArraySet nonSuperSimple = new IntArraySet();
         final float[] initialMinima = new float[getTotNumberOfTerms()];
         Arrays.fill(initialMinima, Float.POSITIVE_INFINITY);
@@ -136,7 +137,7 @@ public class CriticalPathCutSsnp extends LmCut {
             }
 
             if (!achievers.isEmpty()) {
-                achieversByCondition[conditionId] = achievers;
+                achieversByCondition[conditionId] = new IntArrayList(achievers);
             }
             if (achievers.size() > 1) {
                 nonSuperSimple.add(conditionId);
@@ -166,7 +167,7 @@ public class CriticalPathCutSsnp extends LmCut {
 
     private void updateMinCostPerProgressAfterCut() {
         for (final int conditionId : nonSuperSimpleComparisons) {
-            final IntArraySet achievers = numericAchieversByCondition[conditionId];
+            final Collection<Integer> achievers = numericAchieversByCondition[conditionId];
             minCostPerProgress[conditionId] = computeMinCostPerProgress(
                     conditionId,
                     achievers,
@@ -177,7 +178,7 @@ public class CriticalPathCutSsnp extends LmCut {
 
     private float computeMinCostPerProgress(
             int conditionId,
-            IntArraySet achievers,
+            Collection<Integer> achievers,
             float[] actionCosts
     ) {
         final Comparison comparison = (Comparison) Terminal.getTerminal(conditionId);
@@ -189,9 +190,9 @@ public class CriticalPathCutSsnp extends LmCut {
         return minimum;
     }
 
-    @Override
-    protected IntSet getConditionsAchievableById(int actionId) {
-        final IntSet achievableConditions = super.getConditionsAchievableById(actionId);
+//    @Override
+    protected IntSet getConditionsAchievableByIdRemake(int actionId) {
+        final Collection<Integer>  achievableConditions = super.getConditionsAchievableById(actionId);
         final IntArraySet positiveAchievableConditions = new IntArraySet();
         for (final int conditionId : achievableConditions) {
             final Terminal terminal = Terminal.getTerminal(conditionId);
@@ -276,8 +277,8 @@ public class CriticalPathCutSsnp extends LmCut {
     }
 
     private record NumericProgressIndex(
-            IntArraySet[] achieversByCondition,
-            IntArraySet nonSuperSimpleComparisons,
+            Collection<Integer>[] achieversByCondition,
+            Collection<Integer> nonSuperSimpleComparisons,
             float[] initialMinCostPerProgress
     ) {
     }

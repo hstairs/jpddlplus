@@ -36,6 +36,7 @@ import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.Transition;
 import static com.hstairs.ppmajal.transition.Transition.getTransition;
 import com.hstairs.ppmajal.transition.TransitionGround;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import static java.lang.Math.ceil;
@@ -63,8 +64,8 @@ public class H1 implements SearchHeuristic {
 
     protected final PDDLProblem problem;
     final private boolean helpfulActionsComputation;
-    final IntArraySet[] conditionsAchievableBy;
-    final IntArraySet[] conditionsDeletableBy;
+    final Collection<Integer> [] conditionsAchievableBy;
+    final Collection<Integer> [] conditionsDeletableBy;
     final IntArraySet[] conditionToAction;
     final IntArraySet allConditions;
     private final IntArraySet allComparisons;
@@ -170,7 +171,7 @@ public class H1 implements SearchHeuristic {
         useSmartConstraints = "smart".equals(redConstraints);
 
         totNumberOfTerms = Terminal.getTotCounter();
-        conditionsAchievableBy = new IntArraySet[cp.numActions()];
+        conditionsAchievableBy = new IntArrayList[cp.numActions()];
         conditionToAction = new IntArraySet[totNumberOfTerms];
         allConditions = new IntArraySet();
         allActions = new IntArraySet();
@@ -495,7 +496,7 @@ public class H1 implements SearchHeuristic {
 
     private void expand(int actionId, FibonacciHeap p, State s) {
 
-        final IntSet conditionsAchievableByAction = getConditionsAchievableById(actionId);
+        final Collection<Integer>  conditionsAchievableByAction = getConditionsAchievableById(actionId);
         for (final int conditionId : conditionsAchievableByAction) {//This is for all terminal conditions
             if (!getConditionInit()[conditionId] && (!isReachability() || getConditionCost()[conditionId] == Float.MAX_VALUE)) {
                 final Terminal t = Terminal.getTerminal(conditionId);
@@ -908,10 +909,10 @@ public class H1 implements SearchHeuristic {
         return cp.preconditionFunction()[cp.goal()];
     }
 
-    protected IntSet getConditionsAchievableById(int actionId) {
+    protected Collection<Integer> getConditionsAchievableById(int actionId) {
         if (getConditionsAchievableBy()[actionId] == null) {
-            final IntArraySet achievableTerms = new IntArraySet();
-            final IntArraySet deletableTerms = new IntArraySet();
+            final Collection<Integer> achievableTerms = new IntArraySet();
+            final Collection<Integer>  deletableTerms = new IntArraySet();
             for (final int t : getAllComparisons()) {
                 final float v = this.numericContribution(actionId, (Comparison) Terminal.getTerminal(t));
                 if (v > 0 || v == UNKNOWNEFFECT) {
@@ -938,7 +939,7 @@ public class H1 implements SearchHeuristic {
             for (final int o : intersection) {
                 updateAchievers(o, actionId);
             }
-            conditionsAchievableBy[actionId] = achievableTerms;
+            conditionsAchievableBy[actionId] = new IntArrayList(achievableTerms);
             if (useSmartConstraints)
                 conditionsDeletableBy[actionId] = deletableTerms;
 
@@ -1010,14 +1011,14 @@ public class H1 implements SearchHeuristic {
     /**
      * @return the conditionsAchievableBy
      */
-    public IntArraySet[] getConditionsAchievableBy() {
+    public Collection<Integer> [] getConditionsAchievableBy() {
         return conditionsAchievableBy;
     }
 
     /**
      * @return the conditionsDeletableBy
      */
-    public IntArraySet[] getConditionsDeletableBy() {
+    public Collection<Integer> [] getConditionsDeletableBy() {
         return conditionsDeletableBy;
     }
 
