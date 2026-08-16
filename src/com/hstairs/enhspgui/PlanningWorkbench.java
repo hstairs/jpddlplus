@@ -2524,7 +2524,7 @@ public class PlanningWorkbench {
             this.working = current.copy();
 
             planner = combo(plannerPresetValues());
-            heuristic = combo("hadd", "blind", "hmax", "hmrp", "aibr", "hradd", "hrmax", "hrmaxssnp", "hlm-lp");
+            heuristic = combo("hadd", "blind", "hmax", "hmrp", "aibr", "hradd", "hrmax", "hrmaxssnp", "hrmaxssnphybrid", "hlm-lp");
             search = combo("gbfs", "wastar", "ehs", "ida", "lazygbfs", "lazywastar");
             novelty = combo("", "aqb", "aw", "iqb", "iw");
             kNov = new JTextField();

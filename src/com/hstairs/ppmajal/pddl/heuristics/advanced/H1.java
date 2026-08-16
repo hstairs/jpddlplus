@@ -100,7 +100,7 @@ public class H1 implements SearchHeuristic {
 //    private List<Pair<Integer, IntArraySet>> plan;
     private IntArraySet plan;
     final protected IntArraySet[] repetitionsInThePlan;
-    private float[] minAchieverPreconditionCost;
+    protected float[] minAchieverPreconditionCost;
     protected IntArraySet allActions;
 
     final boolean useSmartConstraints;
@@ -513,19 +513,10 @@ public class H1 implements SearchHeuristic {
 
                         float rep = computeRepetition(t,v,s);
                         final float newCost = rep * getActionCost()[actionId];
-                        boolean localUpdate = false;
-                        if (isAdditive()) {
-                            localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
-                        } else {
-                            if (getActionHCost()[actionId] < minAchieverPreconditionCost[conditionId]) {
-                                minAchieverPreconditionCost[conditionId] = getActionHCost()[actionId];
-                            }
-                            if (isAdditive(actionId,conditionId)) {
-                                localUpdate = updateIfNeeded(conditionId, getActionHCost()[actionId] + newCost);
-                            }else{
-                                localUpdate = updateIfNeeded(conditionId, minAchieverPreconditionCost[conditionId] + newCost);
-                            }
-                        }
+                        final boolean localUpdate = updateIfNeeded(
+                                conditionId,
+                                computeNumericAchieverCost(conditionId, actionId, newCost)
+                        );
                         if (localUpdate) {
                             cacheValue(newCost,actionId,t);
                             update = true;
@@ -560,7 +551,25 @@ public class H1 implements SearchHeuristic {
 
     }
 
-    private boolean isAdditive(int actionId, int conditionId) {
+    protected float computeNumericAchieverCost(
+            int conditionId,
+            int actionId,
+            float numericEffectCost
+    ) {
+        final float preconditionCost = getActionHCost()[actionId];
+        if (isAdditive()) {
+            return preconditionCost + numericEffectCost;
+        }
+        minAchieverPreconditionCost[conditionId] = Math.min(
+                minAchieverPreconditionCost[conditionId],
+                preconditionCost
+        );
+        return isAdditive(actionId, conditionId)
+                ? preconditionCost + numericEffectCost
+                : minAchieverPreconditionCost[conditionId] + numericEffectCost;
+    }
+
+    protected boolean isAdditive(int actionId, int conditionId) {
         if (ssnpAwareVersion){
             if (this.actionHCost[actionId] == 0f || getAchievers(conditionId).size() == 1){
                 return true;

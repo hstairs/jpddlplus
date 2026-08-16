@@ -4,6 +4,7 @@ import com.hstairs.ppmajal.domain.PDDLDomain;
 import com.hstairs.ppmajal.pddl.heuristics.GoalSensitiveHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.Aibr;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.H1Hybrid;
 import com.hstairs.ppmajal.PDDLProblem.PDDLProblem;
 import com.hstairs.ppmajal.PDDLProblem.PDDLSearchEngine;
 import com.hstairs.ppmajal.search.SearchHeuristic;
@@ -69,6 +70,9 @@ public class PlannerUtils {
                 break;
             case "hrmaxssnp":
                 h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true);
+                break;
+            case "hrmaxssnphybrid":
+                h = new H1Hybrid(p, "brute", null, false, -1);
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + heuristic);

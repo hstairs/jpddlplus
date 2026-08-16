@@ -86,6 +86,14 @@ public class PDDLHeuristic {
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "hrmaxssnp":
                 return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
+            case "hrmaxssnphybrid":
+                return new H1Hybrid(
+                        heuristicProblem,
+                        "brute",
+                        redConstraint,
+                        toOneTransformation,
+                        linearEffectsAbstraction
+                );
             case "hmaxssnp":
                 return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
             case "lmcut_old":
@@ -158,6 +166,7 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hradd", "HRAdd", "Additive version of subgoaling heuristic plus redundant constraints."),
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
                 new HeuristicInfo("hrmaxssnp", "HRMaxSSNP", "HRMax with SSNP-aware additive twist enabled."),
+                new HeuristicInfo("hrmaxssnphybrid", "HRMaxSSNPHybrid", "SSNP-aware HRMax with a witness-local activation floor."),
                 new HeuristicInfo("cpcutssnp", "CPCutSSNP", "Critical path cost partitioning using the minimum action-cost-to-numeric-progress ratio."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
                 new HeuristicInfo("lmcut_new", "LMCutNew", "LM-Cut variant implemented as an H1 extension."),
