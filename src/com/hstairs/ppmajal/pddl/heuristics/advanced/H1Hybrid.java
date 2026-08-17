@@ -21,7 +21,8 @@ public final class H1Hybrid extends H1 {
             String redundantConstraints,
             Map<AndCond, Collection<IntArraySet>> redundantMap,
             boolean unitaryCost,
-            int linearEffectsAbstraction
+            int linearEffectsAbstraction,
+            boolean ssnpaware
     ) {
         super(
                 problem,
@@ -36,7 +37,7 @@ public final class H1Hybrid extends H1 {
                 redundantMap,
                 unitaryCost,
                 linearEffectsAbstraction,
-                true
+                ssnpaware
         );
     }
 

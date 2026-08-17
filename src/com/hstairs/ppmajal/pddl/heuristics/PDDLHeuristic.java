@@ -92,7 +92,17 @@ public class PDDLHeuristic {
                         "brute",
                         redConstraint,
                         toOneTransformation,
-                        linearEffectsAbstraction
+                        linearEffectsAbstraction,
+                        true
+                );
+            case "hrmaxhybrid":
+                return new H1Hybrid(
+                        heuristicProblem,
+                        "brute",
+                        redConstraint,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        false
                 );
             case "hmaxssnp":
                 return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);

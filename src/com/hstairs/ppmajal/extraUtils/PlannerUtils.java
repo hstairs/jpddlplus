@@ -72,7 +72,7 @@ public class PlannerUtils {
                 h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true);
                 break;
             case "hrmaxssnphybrid":
-                h = new H1Hybrid(p, "brute", null, false, -1);
+                h = new H1Hybrid(p, "brute", null, false, -1, true);
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + heuristic);
