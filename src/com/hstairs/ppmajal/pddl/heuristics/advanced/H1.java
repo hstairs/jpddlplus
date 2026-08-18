@@ -100,7 +100,7 @@ public class H1 implements SearchHeuristic {
 //    private List<Pair<Integer, IntArraySet>> plan;
     private IntArraySet plan;
     final protected IntArraySet[] repetitionsInThePlan;
-    protected float[] minAchieverPreconditionCost;
+    private float[] minAchieverPreconditionCost;
     protected IntArraySet allActions;
 
     final boolean useSmartConstraints;
@@ -116,6 +116,7 @@ public class H1 implements SearchHeuristic {
 
     private boolean isHelpfulMap = false;
     private boolean ssnpAwareVersion;
+    private final boolean useNumericActivationFloor;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
@@ -152,7 +153,17 @@ public class H1 implements SearchHeuristic {
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
             Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean ssnpAwareVersion) {
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+                helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
+                redundantMap, unitaryCost, compNumericStrategy, ssnpAwareVersion, false);
+    }
+
+    public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
+            boolean ssnpAwareVersion, boolean useNumericActivationFloor) {
         this.ssnpAwareVersion = ssnpAwareVersion;
+        this.useNumericActivationFloor = useNumericActivationFloor;
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
@@ -551,25 +562,30 @@ public class H1 implements SearchHeuristic {
 
     }
 
-    protected float computeNumericAchieverCost(
+    private float computeNumericAchieverCost(
             int conditionId,
             int actionId,
             float numericEffectCost
     ) {
         final float preconditionCost = getActionHCost()[actionId];
+        final float legacyEstimate;
         if (isAdditive()) {
-            return preconditionCost + numericEffectCost;
+            legacyEstimate = preconditionCost + numericEffectCost;
+        } else {
+            minAchieverPreconditionCost[conditionId] = Math.min(
+                    minAchieverPreconditionCost[conditionId],
+                    preconditionCost
+            );
+            legacyEstimate = isAdditive(actionId, conditionId)
+                    ? preconditionCost + numericEffectCost
+                    : minAchieverPreconditionCost[conditionId] + numericEffectCost;
         }
-        minAchieverPreconditionCost[conditionId] = Math.min(
-                minAchieverPreconditionCost[conditionId],
-                preconditionCost
-        );
-        return isAdditive(actionId, conditionId)
-                ? preconditionCost + numericEffectCost
-                : minAchieverPreconditionCost[conditionId] + numericEffectCost;
+        return useNumericActivationFloor
+                ? Math.max(preconditionCost + getActionCost()[actionId], legacyEstimate)
+                : legacyEstimate;
     }
 
-    protected boolean isAdditive(int actionId, int conditionId) {
+    private boolean isAdditive(int actionId, int conditionId) {
         if (ssnpAwareVersion){
             if (this.actionHCost[actionId] == 0f || getAchievers(conditionId).size() == 1){
                 return true;

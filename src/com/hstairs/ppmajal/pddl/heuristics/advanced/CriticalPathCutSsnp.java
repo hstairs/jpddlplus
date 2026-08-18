@@ -104,7 +104,11 @@ public class CriticalPathCutSsnp extends LmCut {
         final float contribution = numericContribution(actionId, comparison);
         if (contribution > 0f && initialMinCostPerProgress[conditionId] == Float.POSITIVE_INFINITY ) {
             final float repetitions = computeRepetitions(comparison, contribution, state);
-            return heuristicCost + repetitions * getActionCost()[actionId];
+            final float supporterApplications = applyDirectSsnpActivationFloor(
+                    conditionId,
+                    repetitions
+            );
+            return heuristicCost + supporterApplications * getActionCost()[actionId];
         }
         if (contribution == UNKNOWNEFFECT) {
             return heuristicCost;
@@ -273,7 +277,16 @@ public class CriticalPathCutSsnp extends LmCut {
         if (contribution <= 0f) {
             throw new IllegalStateException("Invalid supporter repetition in justification graph");
         }
-        return computeRepetitions(comparison, contribution, state);
+        return applyDirectSsnpActivationFloor(
+                conditionId,
+                computeRepetitions(comparison, contribution, state)
+        );
+    }
+
+    private float applyDirectSsnpActivationFloor(int conditionId, float repetitions) {
+        return initialMinCostPerProgress[conditionId] == Float.POSITIVE_INFINITY
+                ? Math.max(1f, repetitions)
+                : repetitions;
     }
 
     private record NumericProgressIndex(
