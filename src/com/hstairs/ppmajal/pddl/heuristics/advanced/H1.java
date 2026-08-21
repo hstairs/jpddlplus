@@ -84,10 +84,12 @@ public class H1 implements SearchHeuristic {
     private final boolean hardcoreVersion;
     private final float[][] numericContributionRaw;
     private final Map<Pair<Integer, Integer>, Float> numericContribution;
+    private static final int NO_INTERFERING_ACHIEVER = -1;
     protected final ArrayShifter termsArrayShifter;
     protected final ArrayShifter actionsArrayShifter;
     protected final int totNumberOfActionsRefactored;
     IntArraySet[] allAchievers;
+    private IntArrayList[] achieversByExpansionOrder;
     final private IntArraySet[] deleters;
     protected int[] establishedAchiever;
     protected float[] numRepetition;
@@ -242,7 +244,7 @@ public class H1 implements SearchHeuristic {
             numRepetition = new float[totNumberOfTerms];
         }
         this.helpfulTransitions = helpfulTransitions;
-        if (!additive) {
+        if (!additive && !ssnpAwareVersion) {
             minAchieverPreconditionCost = new float[totNumberOfTerms];
         }
 
@@ -312,8 +314,9 @@ public class H1 implements SearchHeuristic {
         if (ssnpAwareVersion){
             indAchievers = new IntArraySet[cp.numActions()];
             allAchievers = new IntArraySet[totNumberOfTerms];
+            achieversByExpansionOrder = new IntArrayList[totNumberOfTerms];
         }
-        if (!isAdditive()) {
+        if (minAchieverPreconditionCost != null) {
             Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
         }
 
@@ -508,6 +511,11 @@ public class H1 implements SearchHeuristic {
     private void expand(int actionId, FibonacciHeap p, State s) {
 
         final Collection<Integer>  conditionsAchievableByAction = getConditionsAchievableById(actionId);
+        if (ssnpAwareVersion) {
+            for (final int conditionId : conditionsAchievableByAction) {
+                registerExpandedAchiever(conditionId, actionId);
+            }
+        }
         for (final int conditionId : conditionsAchievableByAction) {//This is for all terminal conditions
             if (!getConditionInit()[conditionId] && (!isReachability() || getConditionCost()[conditionId] == Float.MAX_VALUE)) {
                 final Terminal t = Terminal.getTerminal(conditionId);
@@ -571,43 +579,65 @@ public class H1 implements SearchHeuristic {
         final float legacyEstimate;
         if (isAdditive()) {
             legacyEstimate = preconditionCost + numericEffectCost;
+        } else if (ssnpAwareVersion) {
+            final int interferingAchiever = getCheapestInterferingAchiever(
+                    actionId,
+                    conditionId
+            );
+            final float causalPreconditionCost = interferingAchiever == NO_INTERFERING_ACHIEVER
+                    ? preconditionCost
+                    : actionHCost[interferingAchiever];
+            legacyEstimate = causalPreconditionCost + numericEffectCost;
         } else {
             minAchieverPreconditionCost[conditionId] = Math.min(
                     minAchieverPreconditionCost[conditionId],
                     preconditionCost
             );
-            legacyEstimate = isAdditive(actionId, conditionId)
-                    ? preconditionCost + numericEffectCost
-                    : minAchieverPreconditionCost[conditionId] + numericEffectCost;
+            legacyEstimate = minAchieverPreconditionCost[conditionId] + numericEffectCost;
         }
         return useNumericActivationFloor
                 ? Math.max(preconditionCost + getActionCost()[actionId], legacyEstimate)
                 : legacyEstimate;
     }
 
-    private boolean isAdditive(int actionId, int conditionId) {
-        if (ssnpAwareVersion){
-            if (this.actionHCost[actionId] == 0f || getAchievers(conditionId).size() == 1){
-                return true;
-            }
-            IntArraySet s = this.getIndAchievers(actionId);
-            if (s==null || s.isEmpty()){
-                return true;
-            }
-            for (var actId : getAchievers(conditionId)){
-                if (actionHCost[actId]< actionHCost[actionId])
-                    if (s.contains(actId) ){
-                        return false;
-                    }
-
-            }
-            return true;
-        }else{
-            return this.isAdditive();
+    private int getCheapestInterferingAchiever(int actionId, int conditionId) {
+        final IntArrayList achievers = getAchieversByExpansionOrder(conditionId);
+        if (actionHCost[actionId] == 0f || achievers.size() <= 1) {
+            return NO_INTERFERING_ACHIEVER;
         }
 
+        final IntArraySet indirectAchievers = getIndAchievers(actionId);
+        if (indirectAchievers.isEmpty()) {
+            return NO_INTERFERING_ACHIEVER;
+        }
 
+        final float actionPreconditionCost = actionHCost[actionId];
+        int cheapestInterferingAchiever = NO_INTERFERING_ACHIEVER;
+        float cheapestInterferingPreconditionCost = Float.POSITIVE_INFINITY;
+        // The activation floor makes generated labels no smaller than the
+        // action being expanded, so expansion order is non-decreasing and the
+        // first conflict is the cheapest one. The legacy SSNP recurrence does
+        // not have that property and therefore requires a complete scan.
+        for (int i = 0; i < achievers.size(); i++) {
+            final int achieverId = achievers.getInt(i);
+            final float achieverPreconditionCost = actionHCost[achieverId];
+            if (useNumericActivationFloor
+                    && achieverPreconditionCost >= actionPreconditionCost) {
+                break;
+            }
+            if (achieverPreconditionCost < actionPreconditionCost
+                    && achieverPreconditionCost < cheapestInterferingPreconditionCost
+                    && indirectAchievers.contains(achieverId)) {
+                if (useNumericActivationFloor) {
+                    return achieverId;
+                }
+                cheapestInterferingAchiever = achieverId;
+                cheapestInterferingPreconditionCost = achieverPreconditionCost;
+            }
+        }
+        return cheapestInterferingAchiever;
     }
+
     IntArraySet[] indAchievers;
     private IntArraySet getIndAchievers(int actionId) {
         if (indAchievers[actionId] == null){
@@ -615,7 +645,7 @@ public class H1 implements SearchHeuristic {
             Condition condition = cp.preconditionFunction()[actionId];
             for (Condition v: condition.getTerminalConditions()){
                 if (v instanceof Terminal) {
-                    for (var actId : getAchievers(((Terminal) v).getId())) {
+                    for (var actId : getAchieversByExpansionOrder(((Terminal) v).getId())) {
                         indAchievers[actionId].add(actId);
                         indAchievers[actionId].addAll(getIndAchievers(actId));
                     }
@@ -623,6 +653,24 @@ public class H1 implements SearchHeuristic {
             }
         }
         return indAchievers[actionId];
+    }
+
+    private IntArrayList getAchieversByExpansionOrder(int conditionId) {
+        IntArrayList achievers = achieversByExpansionOrder[conditionId];
+        if (achievers == null) {
+            achievers = new IntArrayList();
+            achieversByExpansionOrder[conditionId] = achievers;
+        }
+        return achievers;
+    }
+
+    private void registerExpandedAchiever(int conditionId, int actionId) {
+        final IntArrayList achievers = getAchieversByExpansionOrder(conditionId);
+        assert !useNumericActivationFloor
+                || achievers.isEmpty()
+                || actionHCost[achievers.getInt(achievers.size() - 1)] <= actionHCost[actionId];
+        achievers.add(actionId);
+        getAchievers(conditionId).add(actionId);
     }
 
     protected void updateAchievers(int conditionId, int actionId) {
