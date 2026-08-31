@@ -90,6 +90,7 @@ public class H1 implements SearchHeuristic {
     protected final int totNumberOfActionsRefactored;
     IntArraySet[] allAchievers;
     private IntArrayList[] achieversByExpansionOrder;
+    private final IntArrayList[] preconditionTerminalIds;
     final private IntArraySet[] deleters;
     protected int[] establishedAchiever;
     protected float[] numRepetition;
@@ -188,7 +189,8 @@ public class H1 implements SearchHeuristic {
         conditionToAction = new IntArraySet[totNumberOfTerms];
         allConditions = new IntArraySet();
         allActions = new IntArraySet();
-        indAchievers = new IntArraySet[cp.numActions()];
+        indAchievers = new BitSet[cp.numActions()];
+        preconditionTerminalIds = new IntArrayList[cp.numActions()];
 
         nodeOf = new FibonacciHeapNode[cp.numActions()];
         fillPreEffFunctions(new LinkedHashSet(problem.actions));
@@ -312,7 +314,7 @@ public class H1 implements SearchHeuristic {
             Arrays.fill(numRepetition, Float.MAX_VALUE);
         }
         if (ssnpAwareVersion){
-            indAchievers = new IntArraySet[cp.numActions()];
+            indAchievers = new BitSet[cp.numActions()];
             allAchievers = new IntArraySet[totNumberOfTerms];
             achieversByExpansionOrder = new IntArrayList[totNumberOfTerms];
         }
@@ -606,7 +608,7 @@ public class H1 implements SearchHeuristic {
             return NO_INTERFERING_ACHIEVER;
         }
 
-        final IntArraySet indirectAchievers = getIndAchievers(actionId);
+        final BitSet indirectAchievers = getIndAchievers(actionId);
         if (indirectAchievers.isEmpty()) {
             return NO_INTERFERING_ACHIEVER;
         }
@@ -627,7 +629,7 @@ public class H1 implements SearchHeuristic {
             }
             if (achieverPreconditionCost < actionPreconditionCost
                     && achieverPreconditionCost < cheapestInterferingPreconditionCost
-                    && indirectAchievers.contains(achieverId)) {
+                    && indirectAchievers.get(achieverId)) {
                 if (useNumericActivationFloor) {
                     return achieverId;
                 }
@@ -638,21 +640,50 @@ public class H1 implements SearchHeuristic {
         return cheapestInterferingAchiever;
     }
 
-    IntArraySet[] indAchievers;
-    private IntArraySet getIndAchievers(int actionId) {
-        if (indAchievers[actionId] == null){
-            indAchievers[actionId] = new IntArraySet();
-            Condition condition = cp.preconditionFunction()[actionId];
-            for (Condition v: condition.getTerminalConditions()){
-                if (v instanceof Terminal) {
-                    for (var actId : getAchieversByExpansionOrder(((Terminal) v).getId())) {
-                        indAchievers[actionId].add(actId);
-                        indAchievers[actionId].addAll(getIndAchievers(actId));
-                    }
+    BitSet[] indAchievers;
+    private BitSet getIndAchievers(int actionId) {
+        BitSet indirectAchievers = indAchievers[actionId];
+        if (indirectAchievers != null) {
+            return indirectAchievers;
+        }
+
+        indirectAchievers = new BitSet(cp.numActions());
+        // Publish the empty set before descending so cycles terminate on the
+        // already-created entry, as in the previous recursive implementation.
+        indAchievers[actionId] = indirectAchievers;
+
+        final IntArrayList preconditionIds = getPreconditionTerminalIds(actionId);
+        for (int conditionIndex = 0; conditionIndex < preconditionIds.size(); conditionIndex++) {
+            final IntArrayList achievers = getAchieversByExpansionOrder(
+                    preconditionIds.getInt(conditionIndex)
+            );
+            for (int achieverIndex = 0; achieverIndex < achievers.size(); achieverIndex++) {
+                final int achieverId = achievers.getInt(achieverIndex);
+                indirectAchievers.set(achieverId);
+                if (achieverId != actionId) {
+                    indirectAchievers.or(getIndAchievers(achieverId));
                 }
             }
         }
-        return indAchievers[actionId];
+        return indirectAchievers;
+    }
+
+    private IntArrayList getPreconditionTerminalIds(int actionId) {
+        IntArrayList terminalIds = preconditionTerminalIds[actionId];
+        if (terminalIds != null) {
+            return terminalIds;
+        }
+
+        final List<Condition> terminalConditions = cp.preconditionFunction()[actionId]
+                .getTerminalConditionsInArray();
+        terminalIds = new IntArrayList(terminalConditions.size());
+        for (final Condition terminalCondition : terminalConditions) {
+            if (terminalCondition instanceof Terminal terminal) {
+                terminalIds.add(terminal.getId());
+            }
+        }
+        preconditionTerminalIds[actionId] = terminalIds;
+        return terminalIds;
     }
 
     private IntArrayList getAchieversByExpansionOrder(int conditionId) {
