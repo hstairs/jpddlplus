@@ -46,7 +46,7 @@ public class H1Res extends H1 {
 
     @Override
     protected void updateAchievers(int conditionId, int actionId) {
-        getAchievers(conditionId).add(actionId);
+        getOrCreateAchievers(conditionId).add(actionId);
     }
     
     protected BitSet getDep(int term1) {
@@ -54,7 +54,7 @@ public class H1Res extends H1 {
 //        System.out.println(Terminal.getTerminal(conditionId));
         if (depActions[term1] == null) {
             depActions[term1] = new BitSet(cp.numActions());
-            for (var actionId : getAchievers(term1)) {
+            for (var actionId : getOrCreateAchievers(term1)) {
                 final BitSet dep = depActions[term1];
     //            System.out.println(TransitionGround.getTransition(actionId));
                 if (!dep.get(actionId)) {
@@ -95,7 +95,7 @@ public class H1Res extends H1 {
             final Terminal t = (Terminal) ele;
             float minA = Float.MAX_VALUE;
             float minP = Float.MAX_VALUE;
-            for (var v : getAchievers(t.getId())) {
+            for (var v : getOrCreateAchievers(t.getId())) {
 //                System.out.println("Under Analysis---"+TransitionGround.getTransition(v));
                 if (getActionHCost()[v] != Float.MAX_VALUE){
 //                if (actionHCost[v] <= conditionCost[t.getId()]){
@@ -126,7 +126,7 @@ public class H1Res extends H1 {
         }else if (ele instanceof BoolPredicate){
              final Terminal t = (Terminal) ele;
             float minA = Float.MAX_VALUE;
-            for (var v : getAchievers(t.getId())) {
+            for (var v : getOrCreateAchievers(t.getId())) {
 //                System.out.println("Under Analysis---"+TransitionGround.getTransition(v));
                 if (getActionHCost()[v] != Float.MAX_VALUE){
 //                if (actionHCost[v] <= conditionCost[t.getId()]){
@@ -168,7 +168,7 @@ public class H1Res extends H1 {
                 if (getConditionInit()[((Terminal) c).getId()]){
                     min = 0;
                 }else{
-                    for (var a : getAchievers(((Terminal) c).getId())) {
+                    for (var a : getOrCreateAchievers(((Terminal) c).getId())) {
                         if (getActionHCost()[a] != Float.MAX_VALUE) {
 //                        if (actionHCost[a] <= conditionCost[((Terminal) c).getId()]){
                             

@@ -10,15 +10,13 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import org.jgrapht.alg.util.Pair;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
-import java.util.List;
 
 public class CriticalPathCutSsnp extends LmCut {
 
     private final Collection<Integer>[] numericAchieversByCondition;
-    private final float[] initialMinCostPerProgress;
-    private final float[] minCostPerProgress;
-    private final Collection<Integer> nonSuperSimpleComparisons;
+    private final BitSet[] relaxedCausalAncestors;
 
     public static CriticalPathCutSsnp create(
             PDDLProblem problem,
@@ -42,11 +40,8 @@ public class CriticalPathCutSsnp extends LmCut {
     ) {
         super(problem, false, false, false, redConstraints,
                 false, false, false, false, unitaryCost, linearEffectsAbstraction);
-        final NumericProgressIndex numericProgressIndex = buildNumeriProgressionInfo();
-        numericAchieversByCondition = numericProgressIndex.achieversByCondition();
-        nonSuperSimpleComparisons = new IntArrayList(numericProgressIndex.nonSuperSimpleComparisons());
-        initialMinCostPerProgress = numericProgressIndex.initialMinCostPerProgress();
-        minCostPerProgress = initialMinCostPerProgress.clone();
+        numericAchieversByCondition = buildNumericAchieversByCondition();
+        relaxedCausalAncestors = buildRelaxedCausalAncestors();
     }
 
     @Override
@@ -58,7 +53,6 @@ public class CriticalPathCutSsnp extends LmCut {
         final boolean[] changedAction = new boolean[cp.numActions()];
         final IntArrayList changedActions = new IntArrayList();
         resetEvalComparison(); //This is for caching evaluations of comparisons, since here we need to use it multiple times
-        prepareFirstRunMinCostPerProgress();
         final Pair<JGraph, Float> jGraphAndValue = constructJG(state);
         final JGraph justificationGraph = jGraphAndValue.getFirst();
         final float goalValue = jGraphAndValue.getSecond();
@@ -83,7 +77,6 @@ public class CriticalPathCutSsnp extends LmCut {
                     changedActions,
                     changedAction
             );
-            updateMinCostPerProgressAfterCut();
             final Float res = updateJG(justificationGraph, state, changedActions);
             if (res == 0f) {
                 return cost;
@@ -102,94 +95,109 @@ public class CriticalPathCutSsnp extends LmCut {
         }
 
         final float contribution = numericContribution(actionId, comparison);
-        if (contribution > 0f && initialMinCostPerProgress[conditionId] == Float.POSITIVE_INFINITY ) {
-            final float repetitions = computeRepetitions(comparison, contribution, state);
-            final float supporterApplications = applyDirectSsnpActivationFloor(
-                    conditionId,
-                    repetitions
-            );
-            return heuristicCost + supporterApplications * getActionCost()[actionId];
-        }
         if (contribution == UNKNOWNEFFECT) {
             return heuristicCost;
         }
-        if (contribution == 0f || minCostPerProgress[conditionId] == Float.POSITIVE_INFINITY) {
+        if (contribution <= 0f) {
             return Float.MAX_VALUE;
         }
+        if (!hasCausalInference(conditionId, actionId)) {
+            final float repetitions = computeRepetitions(comparison, contribution, state);
+            return heuristicCost + Math.max(1f, repetitions) * getActionCost()[actionId];
+        }
 
-        final float bestProgressPerCost = 1f / minCostPerProgress[conditionId];
+        final float minCostPerProgress = computeMinCostPerProgress(conditionId, actionId);
+        if (minCostPerProgress == 0f) {
+            return heuristicCost;
+        }
+        final float bestProgressPerCost = 1f / minCostPerProgress;
         final float costToReachCondition = computeRepetitions(comparison, bestProgressPerCost, state);
         return heuristicCost + costToReachCondition;
     }
 
-    private NumericProgressIndex buildNumeriProgressionInfo() {
+    private Collection<Integer>[] buildNumericAchieversByCondition() {
         final IntArrayList[] achieversByCondition = new IntArrayList[getTotNumberOfTerms()];
-        final IntArraySet nonSuperSimple = new IntArraySet();
-        final float[] initialMinima = new float[getTotNumberOfTerms()];
-        Arrays.fill(initialMinima, Float.POSITIVE_INFINITY);
 
         for (final int conditionId : getAllComparisons()) {
             if (!(Terminal.getTerminal(conditionId) instanceof Comparison comparison)) {
                 continue;
             }
-            final IntArraySet achievers = new IntArraySet();
+            final IntArrayList achievers = new IntArrayList();
             for (final int actionId : allActions) {
                 final float contribution = numericContribution(actionId, comparison);
-                if (contribution > 0f || contribution == UNKNOWNEFFECT) {
+                if (contribution > 0f) {
                     achievers.add(actionId);
                 }
             }
 
             if (!achievers.isEmpty()) {
-                achieversByCondition[conditionId] = new IntArrayList(achievers);
-            }
-            if (achievers.size() > 1) {
-                nonSuperSimple.add(conditionId);
-                initialMinima[conditionId] = computeMinCostPerProgress(
-                        conditionId,
-                        achievers,
-                        cp.actionCost()
-                );
+                achieversByCondition[conditionId] = achievers;
             }
         }
-        return new NumericProgressIndex(
-                achieversByCondition,
-                nonSuperSimple,
-                initialMinima
-        );
+        return achieversByCondition;
     }
 
-    private void prepareFirstRunMinCostPerProgress() {
-        System.arraycopy(
-                initialMinCostPerProgress,
-                0,
-                minCostPerProgress,
-                0,
-                initialMinCostPerProgress.length
-        );
-    }
-
-    private void updateMinCostPerProgressAfterCut() {
-        for (final int conditionId : nonSuperSimpleComparisons) {
-            final Collection<Integer> achievers = numericAchieversByCondition[conditionId];
-            minCostPerProgress[conditionId] = computeMinCostPerProgress(
-                    conditionId,
-                    achievers,
-                    getActionCost()
-            );
+    private BitSet[] buildRelaxedCausalAncestors() {
+        final BitSet[] ancestors = new BitSet[cp.numActions()];
+        for (int actionId = 0; actionId < ancestors.length; actionId++) {
+            ancestors[actionId] = new BitSet(cp.numActions());
         }
+
+        for (final int achieverId : allActions) {
+            if (achieverId == cp.goal()) {
+                continue;
+            }
+            for (final int conditionId : getConditionsAchievableById(achieverId)) {
+                final IntArraySet consumers = getConditionToAction()[conditionId];
+                if (consumers != null) {
+                    for (final int actionId : consumers) {
+                        ancestors[actionId].set(achieverId);
+                    }
+                }
+            }
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (final int actionId : allActions) {
+                final BitSet expanded = (BitSet) ancestors[actionId].clone();
+                for (int ancestorId = ancestors[actionId].nextSetBit(0);
+                     ancestorId >= 0;
+                     ancestorId = ancestors[actionId].nextSetBit(ancestorId + 1)) {
+                    expanded.or(ancestors[ancestorId]);
+                }
+                if (!expanded.equals(ancestors[actionId])) {
+                    ancestors[actionId] = expanded;
+                    changed = true;
+                }
+            }
+        } while (changed);
+
+        return ancestors;
     }
 
-    private float computeMinCostPerProgress(
-            int conditionId,
-            Collection<Integer> achievers,
-            float[] actionCosts
-    ) {
+    private boolean hasCausalInference(int conditionId, int actionId) {
+        final Collection<Integer> achievers = numericAchieversByCondition[conditionId];
+        if (achievers == null) {
+            return false;
+        }
+        for (final int achieverId : achievers) {
+            if (achieverId != actionId && relaxedCausalAncestors[achieverId].get(actionId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private float computeMinCostPerProgress(int conditionId, int actionId) {
         final Comparison comparison = (Comparison) Terminal.getTerminal(conditionId);
         float minimum = Float.POSITIVE_INFINITY;
-        for (final int actionId : achievers) {
-            final float contribution = numericContribution(actionId, comparison);
-            minimum = Math.min(minimum, actionCosts[actionId] / contribution);
+        for (final int achieverId : numericAchieversByCondition[conditionId]) {
+            if (achieverId == actionId || relaxedCausalAncestors[achieverId].get(actionId)) {
+                final float contribution = numericContribution(achieverId, comparison);
+                minimum = Math.min(minimum, getActionCost()[achieverId] / contribution);
+            }
         }
         return minimum;
     }
@@ -277,22 +285,9 @@ public class CriticalPathCutSsnp extends LmCut {
         if (contribution <= 0f) {
             throw new IllegalStateException("Invalid supporter repetition in justification graph");
         }
-        return applyDirectSsnpActivationFloor(
-                conditionId,
-                computeRepetitions(comparison, contribution, state)
-        );
-    }
-
-    private float applyDirectSsnpActivationFloor(int conditionId, float repetitions) {
-        return initialMinCostPerProgress[conditionId] == Float.POSITIVE_INFINITY
-                ? Math.max(1f, repetitions)
-                : repetitions;
-    }
-
-    private record NumericProgressIndex(
-            Collection<Integer>[] achieversByCondition,
-            Collection<Integer> nonSuperSimpleComparisons,
-            float[] initialMinCostPerProgress
-    ) {
+        final float repetitions = computeRepetitions(comparison, contribution, state);
+        return hasCausalInference(conditionId, actionId)
+                ? repetitions
+                : Math.max(1f, repetitions);
     }
 }

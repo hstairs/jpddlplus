@@ -64,7 +64,7 @@ public class LandmarkGenerator extends LM{
                 ArrayList<String> achievers = new ArrayList<>();
                 ArrayList<Double> contributions = new ArrayList<>();
                 
-                for (int a : getAchievers(lm)) {
+                for (int a : getOrCreateAchievers(lm)) {
                     double c = 1f;
                     if (t instanceof Comparison) {
                         c = getNumericContribution(a, lm);

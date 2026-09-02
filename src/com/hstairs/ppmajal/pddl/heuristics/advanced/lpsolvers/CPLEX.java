@@ -51,7 +51,7 @@ public class CPLEX extends LPSolver{
                 for (int p : universe) {
                     final Terminal terminal = Terminal.getTerminal(p);
                     final IloLinearNumExpr expr = lp.linearNumExpr();
-                    for (int a : h.getAchievers(p)) {
+                    for (int a : h.getOrCreateAchievers(p)) {
                         Float numericContribution = 1f;
                         if (terminal instanceof Comparison) {
                             numericContribution = h.getNumericContribution(a, p);

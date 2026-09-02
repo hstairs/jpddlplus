@@ -151,7 +151,7 @@ public class H1Fix extends H1 {
                         if (T < 0) {
                         if (saferVersion) {
                             if (false){
-                                IntArraySet achieverSet = getAllAchievers()[conditionId];
+                                IntArraySet achieverSet = getAchieversByCondition()[conditionId];
                                 if (achieverSet!= null && !achieverSet.isEmpty()) {
                                     int min = Integer.MAX_VALUE;
                                     int best = -1;
@@ -181,7 +181,7 @@ public class H1Fix extends H1 {
                                     maxNumRepetition[achiever] = maxNumRepetition[achiever] + repetition;
                                 } else {
                                     if (superFix) {//mmmmmmm
-                                        IntArraySet achieverSet = getAllAchievers()[conditionId];
+                                        IntArraySet achieverSet = getAchieversByCondition()[conditionId];
                                         if (!achieverSet.isEmpty()) {
                                             int min = Integer.MAX_VALUE;
                                             int best = -1;

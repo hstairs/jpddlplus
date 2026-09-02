@@ -315,7 +315,6 @@ public class H1 implements SearchHeuristic {
         }
         if (ssnpAwareVersion){
             indAchievers = new BitSet[cp.numActions()];
-            allAchievers = new IntArraySet[totNumberOfTerms];
             achieversByExpansionOrder = new IntArrayList[totNumberOfTerms];
         }
         if (minAchieverPreconditionCost != null) {
@@ -448,10 +447,10 @@ public class H1 implements SearchHeuristic {
                 if (!visited[conditionId]) {
                     if (!getConditionInit()[conditionId]) {
                         if (isHelpfulActionsComputation()) {
-                            if (getAchievers(conditionId).isEmpty()) {
+                            if (getOrCreateAchievers(conditionId).isEmpty()) {
                                 throw new RuntimeException("Houston we have problem here. Condition \n" + Terminal.getTerminal(conditionId) + " has never been achieved");
                             }
-                            for (final int id : getAchievers(conditionId)) {
+                            for (final int id : getOrCreateAchievers(conditionId)) {
                                 if (getActionInit()[id]) {
 
                                     helpfulActions.add((TransitionGround) getTransition(cp.cpTr2TrMap()[id]));
@@ -502,26 +501,26 @@ public class H1 implements SearchHeuristic {
     
     
 
-    public IntArraySet getAchievers(int conditionId) {
-        final IntArraySet achievers = getAllAchievers()[conditionId];
+    public IntArraySet getOrCreateAchievers(int conditionId) {
+        final IntArraySet[] achieversByCondition = getAchieversByCondition();
+        IntArraySet achievers = achieversByCondition[conditionId];
         if (achievers == null) {
-            getAllAchievers()[conditionId] = new IntArraySet();
+            achievers = new IntArraySet();
+            achieversByCondition[conditionId] = achievers;
         }
-        return getAllAchievers()[conditionId];
+        return achievers;
     }
 
     private void expand(int actionId, FibonacciHeap p, State s) {
 
         final Collection<Integer>  conditionsAchievableByAction = getConditionsAchievableById(actionId);
-        if (ssnpAwareVersion) {
-            for (final int conditionId : conditionsAchievableByAction) {
-                registerExpandedAchiever(conditionId, actionId);
-            }
-        }
         for (final int conditionId : conditionsAchievableByAction) {//This is for all terminal conditions
             if (!getConditionInit()[conditionId] && (!isReachability() || getConditionCost()[conditionId] == Float.MAX_VALUE)) {
                 final Terminal t = Terminal.getTerminal(conditionId);
                 boolean update = false;
+                if (ssnpAwareVersion)
+                    registerExpandedAchiever(conditionId, actionId);
+
                 if (t instanceof BoolPredicate || t instanceof NotCond) {//affecting a prop variable
                     if (updateIfNeeded(conditionId, getActionHCost()[actionId] + getActionCost()[actionId])) {
                         update = true;
@@ -701,12 +700,11 @@ public class H1 implements SearchHeuristic {
                 || achievers.isEmpty()
                 || actionHCost[achievers.getInt(achievers.size() - 1)] <= actionHCost[actionId];
         achievers.add(actionId);
-        getAchievers(conditionId).add(actionId);
     }
 
     protected void updateAchievers(int conditionId, int actionId) {
-        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() || ssnpAwareVersion ) {
-            getAchievers(conditionId).add(actionId);
+        if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
+            getOrCreateAchievers(conditionId).add(actionId);
         }
     }
 
@@ -1075,9 +1073,9 @@ public class H1 implements SearchHeuristic {
     }
 
     /**
-     * @return the allAchievers
+     * @return achievers indexed by condition ID
      */
-    public IntArraySet[] getAllAchievers() {
+    public IntArraySet[] getAchieversByCondition() {
         if (allAchievers == null){
             allAchievers = new IntArraySet[getTotNumberOfTerms()];
         }
