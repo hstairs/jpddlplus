@@ -115,6 +115,7 @@ public class CriticalPathCut extends LmCut {
                             changedActions,
                             changedAction
                     );
+                    expandedActions[actionId] = false;
                 }
             } else if (pendingCostShare > 0f && !expandedActions[actionId]) {
                 expandedActions[actionId] = true;
@@ -128,6 +129,7 @@ public class CriticalPathCut extends LmCut {
                         changedActions,
                         changedAction
                 );
+                expandedActions[actionId] = false;
             }
         }
     }
