@@ -49,7 +49,7 @@ public class CriticalPathCutSsnp extends LmCut {
 
         float cost = 0f;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
-        final boolean[] expandedActions = new boolean[cp.numActions()];
+        final float[] maxResidualSeen = new float[getTotNumberOfTerms() + 1];
         final boolean[] changedAction = new boolean[cp.numActions()];
         final IntArrayList changedActions = new IntArrayList();
         resetEvalComparison(); //This is for caching evaluations of comparisons, since here we need to use it multiple times
@@ -62,7 +62,7 @@ public class CriticalPathCutSsnp extends LmCut {
         }
         while (true) {
             cost += actionHCost[cp.goal()];
-            Arrays.fill(expandedActions, false);
+            Arrays.fill(maxResidualSeen, 0f);
             for (final int actionId : changedActions) {
                 changedAction[actionId] = false;
             }
@@ -71,7 +71,7 @@ public class CriticalPathCutSsnp extends LmCut {
                     pcf[cp.goal()],
                     reducedCosts.clone(),
                     justificationGraph,
-                    expandedActions,
+                    maxResidualSeen,
                     actionHCost[cp.goal()],
                     state,
                     changedActions,
@@ -220,15 +220,18 @@ public class CriticalPathCutSsnp extends LmCut {
             int conditionId,
             float[] previousReducedCosts,
             JGraph justificationGraph,
-            boolean[] expandedActions,
+            float[] maxResidualSeen,
             float pendingCostShare,
             State state,
             IntArrayList changedActions,
             boolean[] changedAction
     ) {
-        if (pendingCostShare == 0f) {
+        // Residual cost shares never increase along a recursive path. A visit
+        // with an equal or larger share therefore subsumes this entire call.
+        if (pendingCostShare <= maxResidualSeen[conditionId]) {
             return;
         }
+        maxResidualSeen[conditionId] = pendingCostShare;
         for (final int actionId : justificationGraph.ERev()[conditionId]) {
             if (reducedCosts[actionId] > 0f) {
                 final float previousCost = previousReducedCosts[actionId];
@@ -247,33 +250,29 @@ public class CriticalPathCutSsnp extends LmCut {
                 }
                 final float residualCostShare = pendingCostShare
                         - (previousCost - reducedCosts[actionId]) * supporterApplications;
-                if (residualCostShare > 0f && !expandedActions[actionId]) {
-                    expandedActions[actionId] = true;
+                if (residualCostShare > 0f) {
                     collectProportionalCuts(
                             pcf[actionId],
                             previousReducedCosts,
                             justificationGraph,
-                            expandedActions,
+                            maxResidualSeen,
                             residualCostShare,
                             state,
                             changedActions,
                             changedAction
                     );
-                    expandedActions[actionId] = false;
                 }
-            } else if (pendingCostShare > 0f && !expandedActions[actionId]) {
-                expandedActions[actionId] = true;
+            } else if (pendingCostShare > 0f) {
                 collectProportionalCuts(
                         pcf[actionId],
                         previousReducedCosts,
                         justificationGraph,
-                        expandedActions,
+                        maxResidualSeen,
                         pendingCostShare,
                         state,
                         changedActions,
                         changedAction
                 );
-                expandedActions[actionId] = false;
             }
         }
     }
