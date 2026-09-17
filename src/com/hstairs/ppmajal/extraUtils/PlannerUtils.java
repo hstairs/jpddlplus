@@ -73,6 +73,12 @@ public class PlannerUtils {
             case "hrmaxssnphybrid":
                 h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true,true);
                 break;
+            case "hrmaxssnpstate":
+                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,H1.SsnpCausalMode.STATE_BASED,false);
+                break;
+            case "hrmaxssnpstatehybrid":
+                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,H1.SsnpCausalMode.STATE_BASED,true);
+                break;
             case "hrmaxhybrid":
                 h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,false,true);
                 break;

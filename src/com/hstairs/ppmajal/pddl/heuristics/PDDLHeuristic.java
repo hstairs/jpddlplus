@@ -103,6 +103,40 @@ public class PDDLHeuristic {
                         true,
                         true
                 );
+            case "hrmaxssnpstate":
+                return new H1(
+                        heuristicProblem,
+                        false,
+                        false,
+                        false,
+                        "brute",
+                        false,
+                        false,
+                        false,
+                        false,
+                        redConstraint,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.STATE_BASED,
+                        false
+                );
+            case "hrmaxssnpstatehybrid":
+                return new H1(
+                        heuristicProblem,
+                        false,
+                        false,
+                        false,
+                        "brute",
+                        false,
+                        false,
+                        false,
+                        false,
+                        redConstraint,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.STATE_BASED,
+                        true
+                );
             case "hrmaxhybrid":
                 return new H1(
                         heuristicProblem,
@@ -122,6 +156,10 @@ public class PDDLHeuristic {
                 );
             case "hmaxssnp":
                 return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
+            case "hmaxssnpstate":
+                return new H1(heuristicProblem, false, false, false, redundantConstraints,
+                        false, false, false, false, redConstraint, toOneTransformation,
+                        linearEffectsAbstraction, H1.SsnpCausalMode.STATE_BASED, false);
             case "lmcut_old":
                 return new lmcutOld(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "lmcut":
@@ -193,6 +231,8 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
                 new HeuristicInfo("hrmaxssnp", "HRMaxSSNP", "HRMax with SSNP-aware additive twist enabled."),
                 new HeuristicInfo("hrmaxssnphybrid", "HRMaxSSNPHybrid", "SSNP-aware HRMax with a witness-local activation floor."),
+                new HeuristicInfo("hrmaxssnpstate", "HRMaxSSNPState", "State-refined SSNP HRMax using causal achievers of unsatisfied preconditions."),
+                new HeuristicInfo("hrmaxssnpstatehybrid", "HRMaxSSNPStateHybrid", "State-refined SSNP HRMax with a witness-local activation floor."),
                 new HeuristicInfo("hrmaxhybrid", "HRMaxHybrid", "HRMax with a witness-local activation floor."),
                 new HeuristicInfo("cpcutssnp", "CPCutSSNP", "Critical path cost partitioning using the minimum action-cost-to-numeric-progress ratio."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),

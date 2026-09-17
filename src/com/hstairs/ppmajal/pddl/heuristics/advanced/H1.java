@@ -36,7 +36,6 @@ import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.transition.Transition;
 import static com.hstairs.ppmajal.transition.Transition.getTransition;
 import com.hstairs.ppmajal.transition.TransitionGround;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -116,9 +115,15 @@ public class H1 implements SearchHeuristic {
     private final boolean storeInitActions;
 
     private boolean isHelpfulMap = false;
-    private boolean ssnpAwareVersion;
+    public enum SsnpCausalMode {
+        NONE,
+        STATIC,
+        STATE_BASED
+    }
+
+    private final SsnpCausalMode ssnpCausalMode;
     private final boolean useNumericActivationFloor;
-    private CA IndAch;
+    private CausalAchievers causalAchievers;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
@@ -164,7 +169,18 @@ public class H1 implements SearchHeuristic {
             boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
             Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
             boolean ssnpAwareVersion, boolean useNumericActivationFloor) {
-        this.ssnpAwareVersion = ssnpAwareVersion;
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+                helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
+                redundantMap, unitaryCost, compNumericStrategy,
+                ssnpAwareVersion ? SsnpCausalMode.STATIC : SsnpCausalMode.NONE,
+                useNumericActivationFloor);
+    }
+
+    public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+            boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
+            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
+            SsnpCausalMode ssnpCausalMode, boolean useNumericActivationFloor) {
+        this.ssnpCausalMode = Objects.requireNonNull(ssnpCausalMode);
         this.useNumericActivationFloor = useNumericActivationFloor;
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
@@ -348,7 +364,7 @@ public class H1 implements SearchHeuristic {
     @Override
     public float computeEstimate(State gs) {
         final FibonacciHeap h = this.smallSetup(gs);
-        final boolean buildCausalAncestry = ssnpAwareVersion && IndAch == null;
+        final boolean buildCausalAncestry = ssnpCausalMode != SsnpCausalMode.NONE && causalAchievers == null;
         final boolean initializeReachability = reachableTransitions == null;
         final boolean collectReachableActions = reachability
                 || initializeReachability
@@ -357,7 +373,7 @@ public class H1 implements SearchHeuristic {
         // still lower a numeric condition.  That variant therefore requires a
         // complete expansion even after the static reachability pass.
         final boolean dontstop = collectReachableActions
-                || (ssnpAwareVersion && !useNumericActivationFloor);
+                || (ssnpCausalMode != SsnpCausalMode.NONE && !useNumericActivationFloor);
         if (collectReachableActions && reachableTransitions == null) {
             reachableTransitions = new IntArraySet();
         }
@@ -377,7 +393,7 @@ public class H1 implements SearchHeuristic {
 
 
         if (buildCausalAncestry) {
-            IndAch = computeIA();
+            causalAchievers = computeCausalAchievers();
             reachability = false;
             if (getActionHCost()[cp.goal()] != Float.MAX_VALUE) {
                 return computeEstimate(gs);
@@ -542,7 +558,7 @@ public class H1 implements SearchHeuristic {
                         final float newCost = rep * getActionCost()[actionId];
                         final boolean localUpdate = updateIfNeeded(
                                 conditionId,
-                                computeNumericAchieverCost(conditionId, actionId, newCost)
+                                computeNumericAchieverCost(conditionId, actionId, newCost, s)
                         );
                         if (localUpdate) {
                             cacheValue(newCost,actionId,t);
@@ -578,92 +594,86 @@ public class H1 implements SearchHeuristic {
 
     }
 
-    private record CA (
-            Int2ObjectOpenHashMap<IntArrayList>[] iac
+    private record CausalAchievers (
+            BitSet[] directAchieversByCondition,
+            BitSet[] causalAchieversByCondition
     ) {}
 
-    @SuppressWarnings("unchecked")
-    private CA computeIA(){
-        final BitSet reachableActions = new BitSet(cp.numActions());
-        final BitSet[] ancestors = new BitSet[cp.numActions()];
-
+    private CausalAchievers computeCausalAchievers(){
+        final BitSet[] directAchievers = new BitSet[totNumberOfTerms];
         for (final int actionId : reachableTransitions) {
-            reachableActions.set(actionId);
-            ancestors[actionId] = new BitSet(cp.numActions());
+            for (final int conditionId : getConditionsAchievableById(actionId)) {
+                if (directAchievers[conditionId] == null) {
+                    directAchievers[conditionId] = new BitSet(cp.numActions());
+                }
+                directAchievers[conditionId].set(actionId);
+            }
         }
 
-        while (true) {
-            boolean changed = false;
-            for (final int achieverId : reachableTransitions) {
-                for (final int conditionId : getConditionsAchievableById(achieverId)) {
-                    final IntArraySet consumingActions = getConditionToAction()[conditionId];
-                    if (consumingActions == null) {
-                        continue;
-                    }
-                    for (final int consumerId : consumingActions) {
-                        if (reachableActions.get(consumerId)) {
-                            final BitSet consumerAncestors = ancestors[consumerId];
-                            final int previousCardinality = consumerAncestors.cardinality();
-                            consumerAncestors.set(achieverId);
-                            consumerAncestors.or(ancestors[achieverId]);
-                            if (consumerAncestors.cardinality() != previousCardinality) {
-                                changed = true;
+        // CA(d) is indexed by the terminal condition d, rather than by the
+        // action whose precondition eventually consumes d.  This is the least
+        // fixed point CA(d) = Ach(d) U CA(pre(Ach(d))).
+        final BitSet[] causalAchievers = new BitSet[totNumberOfTerms];
+        for (int conditionId = 0; conditionId < directAchievers.length; conditionId++) {
+            if (directAchievers[conditionId] != null) {
+                causalAchievers[conditionId] = (BitSet) directAchievers[conditionId].clone();
+            }
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (int conditionId = 0; conditionId < directAchievers.length; conditionId++) {
+                final BitSet achievers = directAchievers[conditionId];
+                if (achievers == null) {
+                    continue;
+                }
+                final BitSet closure = causalAchievers[conditionId];
+                final int previousCardinality = closure.cardinality();
+                for (int achieverId = achievers.nextSetBit(0);
+                     achieverId >= 0;
+                     achieverId = achievers.nextSetBit(achieverId + 1)) {
+                    for (final Condition precondition :
+                            cp.preconditionFunction()[achieverId].getTerminalConditionsInArray()) {
+                        if (precondition instanceof Terminal terminal) {
+                            final BitSet preconditionClosure = causalAchievers[terminal.getId()];
+                            if (preconditionClosure != null) {
+                                closure.or(preconditionClosure);
                             }
                         }
                     }
                 }
-            }
-            if (!changed) {
-                break;
-            }
-        }
-
-        final Int2ObjectOpenHashMap<IntArrayList>[] interferingAchievers =
-                (Int2ObjectOpenHashMap<IntArrayList>[]) new Int2ObjectOpenHashMap<?>[cp.numActions()];
-        for (final int actionId : reachableTransitions) {
-            final BitSet actionAncestors = ancestors[actionId];
-            for (int ancestorId = actionAncestors.nextSetBit(0);
-                 ancestorId >= 0;
-                 ancestorId = actionAncestors.nextSetBit(ancestorId + 1)) {
-                for (final int conditionId : getConditionsAchievableById(ancestorId)) {
-                    if (!(Terminal.getTerminal(conditionId) instanceof Comparison)) {
-                        continue;
-                    }
-                    if (interferingAchievers[actionId] == null) {
-                        interferingAchievers[actionId] = new Int2ObjectOpenHashMap<>();
-                    }
-                    IntArrayList conditionAchievers =
-                            interferingAchievers[actionId].get(conditionId);
-                    if (conditionAchievers == null) {
-                        conditionAchievers = new IntArrayList();
-                        interferingAchievers[actionId].put(conditionId, conditionAchievers);
-                    }
-                    conditionAchievers.add(ancestorId);
+                if (closure.cardinality() != previousCardinality) {
+                    changed = true;
                 }
             }
-        }
-        return new CA(interferingAchievers);
+        } while (changed);
+
+        return new CausalAchievers(directAchievers, causalAchievers);
     }
 
 
     private float computeNumericAchieverCost(
             int conditionId,
             int actionId,
-            float numericEffectCost
+            float numericEffectCost,
+            State state
     ) {
         final float preconditionCost = getActionHCost()[actionId];
         final float legacyEstimate;
         if (isAdditive()) {
             legacyEstimate = preconditionCost + numericEffectCost;
-        } else if (ssnpAwareVersion && IndAch != null) {
+        } else if (ssnpCausalMode != SsnpCausalMode.NONE && causalAchievers != null) {
             float causalPreconditionCost = actionHCost[actionId];
-            final Int2ObjectOpenHashMap<IntArrayList> interferenceByCondition =
-                    IndAch.iac[actionId];
-            final IntArrayList interferingAchievers = interferenceByCondition == null
-                    ? null
-                    : interferenceByCondition.get(conditionId);
-            if (interferingAchievers != null) {
-                for (final int interferingActionId : interferingAchievers) {
+            final BitSet interferingAchievers = interferingAchievers(
+                    actionId,
+                    conditionId,
+                    state
+            );
+            if (!interferingAchievers.isEmpty()) {
+                for (int interferingActionId = interferingAchievers.nextSetBit(0);
+                     interferingActionId >= 0;
+                     interferingActionId = interferingAchievers.nextSetBit(interferingActionId + 1)) {
                     if (getActionHCost()[interferingActionId] < causalPreconditionCost) {
                         causalPreconditionCost = getActionHCost()[interferingActionId];
                     }
@@ -680,6 +690,31 @@ public class H1 implements SearchHeuristic {
         return useNumericActivationFloor
                 ? Math.max(preconditionCost + getActionCost()[actionId], legacyEstimate)
                 : legacyEstimate;
+    }
+
+    private BitSet interferingAchievers(int actionId, int conditionId, State state) {
+        final BitSet ancestors = new BitSet(cp.numActions());
+        for (final Condition precondition :
+                cp.preconditionFunction()[actionId].getTerminalConditionsInArray()) {
+            if (!(precondition instanceof Terminal terminal)) {
+                continue;
+            }
+            if (ssnpCausalMode == SsnpCausalMode.STATE_BASED && state.satisfy(terminal)) {
+                continue;
+            }
+            final BitSet conditionClosure = causalAchievers.causalAchieversByCondition[terminal.getId()];
+            if (conditionClosure != null) {
+                ancestors.or(conditionClosure);
+            }
+        }
+
+        final BitSet achievers = causalAchievers.directAchieversByCondition[conditionId];
+        if (achievers == null) {
+            ancestors.clear();
+        } else {
+            ancestors.and(achievers);
+        }
+        return ancestors;
     }
 
     protected void updateAchievers(int conditionId, int actionId) {
