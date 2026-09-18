@@ -171,6 +171,13 @@ public class PDDLHeuristic {
                         toOneTransformation,
                         linearEffectsAbstraction
                 );
+            case "h1dec":
+                return SimpleH1BasedCP.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction
+                );
             case "cpcutssnp":
                 return CriticalPathCutSsnp.create(
                         heuristicProblem,
@@ -234,6 +241,7 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hrmaxssnpstate", "HRMaxSSNPState", "State-refined SSNP HRMax using causal achievers of unsatisfied preconditions."),
                 new HeuristicInfo("hrmaxssnpstatehybrid", "HRMaxSSNPStateHybrid", "State-refined SSNP HRMax with a witness-local activation floor."),
                 new HeuristicInfo("hrmaxhybrid", "HRMaxHybrid", "HRMax with a witness-local activation floor."),
+                new HeuristicInfo("h1dec", "SimpleH1BasedCP", "Simple h1-based critical-path heuristic that zeroes the complete support closure."),
                 new HeuristicInfo("cpcutssnp", "CPCutSSNP", "Critical path cost partitioning using the minimum action-cost-to-numeric-progress ratio."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
                 new HeuristicInfo("lmcut_new", "LMCutNew", "LM-Cut variant implemented as an H1 extension."),

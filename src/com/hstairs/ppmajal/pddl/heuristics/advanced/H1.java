@@ -124,6 +124,7 @@ public class H1 implements SearchHeuristic {
     private final SsnpCausalMode ssnpCausalMode;
     private final boolean useNumericActivationFloor;
     private CausalAchievers causalAchievers;
+    private BitSet[] activeCausalAncestorsByAction;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
@@ -324,6 +325,7 @@ public class H1 implements SearchHeuristic {
         Arrays.fill(getClosed(), false);
         Arrays.fill(getActionInit(), false);
         Arrays.fill(getConditionInit(), false);
+        resetSsnpEvaluationCache();
         if (extractRelaxedPlan || isHelpfulActionsComputation()) {
             Arrays.fill(establishedAchiever, -1);
             Arrays.fill(numRepetition, Float.MAX_VALUE);
@@ -596,17 +598,56 @@ public class H1 implements SearchHeuristic {
 
     private record CausalAchievers (
             BitSet[] directAchieversByCondition,
-            BitSet[] causalAchieversByCondition
+            BitSet[] causalAchieversByCondition,
+            BitSet[] positiveNumericAchieversByCondition
     ) {}
+
+    /**
+     * Builds the causal-achiever relation used by the SSNP variants without
+     * retaining the costs produced by the reachability pass.  Subclasses with
+     * their own evaluation loop can call this before using
+     * {@link #interferingAchievers(int, int, State)}.
+     */
+    protected final void ensureSsnpCausalAchievers(State state) {
+        if (ssnpCausalMode == SsnpCausalMode.NONE || causalAchievers != null) {
+            return;
+        }
+
+        final FibonacciHeap heap = smallSetup(state);
+        if (reachableTransitions == null) {
+            reachableTransitions = new IntArraySet();
+        }
+        while (!heap.isEmpty()) {
+            final int actionId = (int) heap.removeMin().getData();
+            closed[actionId] = true;
+            if (actionId != cp.goal()) {
+                reachableTransitions.add(actionId);
+                expand(actionId, heap, state);
+            }
+        }
+
+        causalAchievers = computeCausalAchievers();
+        Arrays.fill(actionInit, false);
+        reachability = false;
+    }
 
     private CausalAchievers computeCausalAchievers(){
         final BitSet[] directAchievers = new BitSet[totNumberOfTerms];
+        final BitSet[] positiveNumericAchievers = new BitSet[totNumberOfTerms];
         for (final int actionId : reachableTransitions) {
             for (final int conditionId : getConditionsAchievableById(actionId)) {
                 if (directAchievers[conditionId] == null) {
                     directAchievers[conditionId] = new BitSet(cp.numActions());
                 }
                 directAchievers[conditionId].set(actionId);
+                final Terminal terminal = Terminal.getTerminal(conditionId);
+                if (terminal instanceof Comparison comparison
+                        && numericContribution(actionId, comparison) > 0f) {
+                    if (positiveNumericAchievers[conditionId] == null) {
+                        positiveNumericAchievers[conditionId] = new BitSet(cp.numActions());
+                    }
+                    positiveNumericAchievers[conditionId].set(actionId);
+                }
             }
         }
 
@@ -649,7 +690,11 @@ public class H1 implements SearchHeuristic {
             }
         } while (changed);
 
-        return new CausalAchievers(directAchievers, causalAchievers);
+        return new CausalAchievers(
+                directAchievers,
+                causalAchievers,
+                positiveNumericAchievers
+        );
     }
 
 
@@ -692,8 +737,24 @@ public class H1 implements SearchHeuristic {
                 : legacyEstimate;
     }
 
-    private BitSet interferingAchievers(int actionId, int conditionId, State state) {
-        final BitSet ancestors = new BitSet(cp.numActions());
+    protected final void resetSsnpEvaluationCache() {
+        if (ssnpCausalMode == SsnpCausalMode.NONE) {
+            return;
+        }
+        if (activeCausalAncestorsByAction == null) {
+            activeCausalAncestorsByAction = new BitSet[cp.numActions()];
+        } else {
+            Arrays.fill(activeCausalAncestorsByAction, null);
+        }
+    }
+
+    protected final BitSet activeCausalAncestors(int actionId, State state) {
+        BitSet ancestors = activeCausalAncestorsByAction[actionId];
+        if (ancestors != null) {
+            return ancestors;
+        }
+
+        ancestors = new BitSet(cp.numActions());
         for (final Condition precondition :
                 cp.preconditionFunction()[actionId].getTerminalConditionsInArray()) {
             if (!(precondition instanceof Terminal terminal)) {
@@ -707,6 +768,17 @@ public class H1 implements SearchHeuristic {
                 ancestors.or(conditionClosure);
             }
         }
+
+        activeCausalAncestorsByAction[actionId] = ancestors;
+        return ancestors;
+    }
+
+    protected final BitSet positiveNumericAchievers(int conditionId) {
+        return causalAchievers.positiveNumericAchieversByCondition[conditionId];
+    }
+
+    protected final BitSet interferingAchievers(int actionId, int conditionId, State state) {
+        final BitSet ancestors = (BitSet) activeCausalAncestors(actionId, state).clone();
 
         final BitSet achievers = causalAchievers.directAchieversByCondition[conditionId];
         if (achievers == null) {

@@ -34,6 +34,7 @@ public class CriticalPathCut extends LmCut {
     public float computeEstimate(State state) {
         float cost = 0f;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
+        resetEvalComparison();
         final boolean[] expandedActions = new boolean[cp.numActions()];
         final boolean[] changedAction = new boolean[cp.numActions()];
         final IntArrayList changedActions = new IntArrayList();
