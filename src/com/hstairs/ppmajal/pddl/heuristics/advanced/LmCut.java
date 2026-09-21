@@ -51,9 +51,20 @@ public class LmCut extends H1 {
                   String redConstraints, boolean helpfulActionsComputation, boolean reachability,
                   boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap,
                   boolean unitaryCost, int compNumericStrategy, SsnpCausalMode ssnpCausalMode) {
-        super(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+        this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
                 helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
                 redundantMap, unitaryCost, compNumericStrategy, ssnpCausalMode, false);
+    }
+
+    protected LmCut(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions,
+                  String redConstraints, boolean helpfulActionsComputation, boolean reachability,
+                  boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap,
+                  boolean unitaryCost, int compNumericStrategy, SsnpCausalMode ssnpCausalMode,
+                  boolean useNumericActivationFloor) {
+        super(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
+                helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
+                redundantMap, unitaryCost, compNumericStrategy, ssnpCausalMode,
+                useNumericActivationFloor);
         this.root = getTotNumberOfTerms();
         this.pcf = new int[cp.numActions()];
         Arrays.fill(this.pcf, -1);

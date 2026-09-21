@@ -164,26 +164,58 @@ public class PDDLHeuristic {
                 return new lmcutOld(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "lmcut":
                 return new LmCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
-            case "cpcut":
-                return CriticalPathCut.create(
-                        heuristicProblem,
-                        redundantConstraints,
-                        toOneTransformation,
-                        linearEffectsAbstraction
-                );
             case "h1dec":
-                return SimpleH1BasedCP.create(
+            case "cpzerocut":
+                return CPZeroCut.create(
                         heuristicProblem,
                         redundantConstraints,
                         toOneTransformation,
                         linearEffectsAbstraction
                 );
-            case "cpcutssnp":
-                return CriticalPathCutSsnp.create(
+            case "cpzerocuthybrid":
+                return CPZeroCut.create(
                         heuristicProblem,
                         redundantConstraints,
                         toOneTransformation,
-                        linearEffectsAbstraction
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.NONE,
+                        true
+                );
+            case "cpzerocutssnp":
+                return CPZeroCut.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.STATIC,
+                        false
+                );
+            case "cpzerocutssnphybrid":
+                return CPZeroCut.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.STATIC,
+                        true
+                );
+            case "cpzerocutssnpstate":
+                return CPZeroCut.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.STATE_BASED,
+                        false
+                );
+            case "cpzerocutssnpstatehybrid":
+                return CPZeroCut.create(
+                        heuristicProblem,
+                        redundantConstraints,
+                        toOneTransformation,
+                        linearEffectsAbstraction,
+                        H1.SsnpCausalMode.STATE_BASED,
+                        true
                 );
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
@@ -241,8 +273,13 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hrmaxssnpstate", "HRMaxSSNPState", "State-refined SSNP HRMax using causal achievers of unsatisfied preconditions."),
                 new HeuristicInfo("hrmaxssnpstatehybrid", "HRMaxSSNPStateHybrid", "State-refined SSNP HRMax with a witness-local activation floor."),
                 new HeuristicInfo("hrmaxhybrid", "HRMaxHybrid", "HRMax with a witness-local activation floor."),
-                new HeuristicInfo("h1dec", "SimpleH1BasedCP", "Simple h1-based critical-path heuristic that zeroes the complete support closure."),
-                new HeuristicInfo("cpcutssnp", "CPCutSSNP", "Critical path cost partitioning using the minimum action-cost-to-numeric-progress ratio."),
+                new HeuristicInfo("h1dec", "CPZeroCut", "Legacy alias for the basic CPZeroCut heuristic."),
+                new HeuristicInfo("cpzerocut", "CPZeroCut", "Critical-path heuristic that zeroes the complete support closure."),
+                new HeuristicInfo("cpzerocuthybrid", "CPZeroCutHybrid", "CPZeroCut with a witness-local activation floor."),
+                new HeuristicInfo("cpzerocutssnp", "CPZeroCutSSNP", "CPZeroCut with static SSNP causal achievers."),
+                new HeuristicInfo("cpzerocutssnphybrid", "CPZeroCutSSNPHybrid", "Static SSNP CPZeroCut with a witness-local activation floor."),
+                new HeuristicInfo("cpzerocutssnpstate", "CPZeroCutSSNPState", "CPZeroCut with state-refined SSNP causal achievers."),
+                new HeuristicInfo("cpzerocutssnpstatehybrid", "CPZeroCutSSNPStateHybrid", "State-refined SSNP CPZeroCut with a witness-local activation floor."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
                 new HeuristicInfo("lmcut_new", "LMCutNew", "LM-Cut variant implemented as an H1 extension."),
                 new HeuristicInfo("h1res", "H1Res", "Resolution-based heuristic without optimizations."),

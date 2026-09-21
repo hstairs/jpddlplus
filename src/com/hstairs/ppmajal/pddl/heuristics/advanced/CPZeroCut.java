@@ -11,34 +11,57 @@ import java.util.Arrays;
 import java.util.BitSet;
 
 /**
- * Simple h1-based critical-path heuristic that sets the whole support closure
- * of the current goal condition to zero at every iteration.
+ * Critical-path heuristic that sets the whole support closure of the current
+ * goal condition to zero at every iteration.
  */
-public class SimpleH1BasedCP extends LmCut {
+public class CPZeroCut extends LmCut {
 
-    public static SimpleH1BasedCP create(
+    public static CPZeroCut create(
             PDDLProblem problem,
             String redundantConstraints,
             boolean unitaryCost,
             int linearEffectsAbstraction
     ) {
-        return new SimpleH1BasedCP(
+        return create(
                 problem,
                 redundantConstraints,
                 unitaryCost,
-                linearEffectsAbstraction
+                linearEffectsAbstraction,
+                SsnpCausalMode.NONE,
+                false
         );
     }
 
-    private SimpleH1BasedCP(
+    public static CPZeroCut create(
             PDDLProblem problem,
             String redundantConstraints,
             boolean unitaryCost,
-            int linearEffectsAbstraction
+            int linearEffectsAbstraction,
+            SsnpCausalMode ssnpCausalMode,
+            boolean useNumericActivationFloor
+    ) {
+        return new CPZeroCut(
+                problem,
+                redundantConstraints,
+                unitaryCost,
+                linearEffectsAbstraction,
+                ssnpCausalMode,
+                useNumericActivationFloor
+        );
+    }
+
+    private CPZeroCut(
+            PDDLProblem problem,
+            String redundantConstraints,
+            boolean unitaryCost,
+            int linearEffectsAbstraction,
+            SsnpCausalMode ssnpCausalMode,
+            boolean useNumericActivationFloor
     ) {
         super(problem, false, false, false, redundantConstraints,
                 false, false, false, false, null, unitaryCost,
-                linearEffectsAbstraction, SsnpCausalMode.STATE_BASED);
+                linearEffectsAbstraction, ssnpCausalMode,
+                useNumericActivationFloor);
     }
 
     @Override
@@ -46,7 +69,7 @@ public class SimpleH1BasedCP extends LmCut {
         float estimate = 0f;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
         ensureSsnpCausalAchievers(state);
-        resetSsnpEvaluationCache();
+        resetNumericAchieverCostCache();
         resetEvalComparison();
 
         final Pair<JGraph, Float> graphAndValue = constructJG(state);
@@ -92,12 +115,6 @@ public class SimpleH1BasedCP extends LmCut {
         }
     }
 
-    /**
-     * Uses the CPCutSSNP cost-per-progress calculation with H1's state-based
-     * SSNP interference relation.  The current action remains a candidate and
-     * the numeric part uses the cheapest reduced-cost/progress ratio among it
-     * and its interfering achievers.
-     */
     @Override
     float computeSupporterCost(
             int conditionId,
@@ -105,64 +122,27 @@ public class SimpleH1BasedCP extends LmCut {
             State state,
             boolean includeHeuristicCost
     ) {
+        if (!includeHeuristicCost) {
+            return super.computeSupporterCost(conditionId, actionId, state, false);
+        }
+
         final Terminal terminal = Terminal.getTerminal(conditionId);
-        final float heuristicCost = includeHeuristicCost ? getActionHCost()[actionId] : 0f;
         if (!(terminal instanceof Comparison comparison)) {
-            return heuristicCost + getActionCost()[actionId];
+            return super.computeSupporterCost(conditionId, actionId, state, true);
         }
 
         final float contribution = numericContribution(actionId, comparison);
-        if (contribution == UNKNOWNEFFECT) {
-            return heuristicCost;
-        }
         if (contribution <= 0f) {
-            return Float.MAX_VALUE;
+            return super.computeSupporterCost(conditionId, actionId, state, true);
         }
 
-        final BitSet activeAncestors = activeCausalAncestors(actionId, state);
-        final BitSet positiveAchievers = positiveNumericAchievers(conditionId);
-        float minCostPerProgress = getActionCost()[actionId] / contribution;
-        boolean hasPositiveInterferingAchiever = false;
-        if (positiveAchievers != null && !activeAncestors.isEmpty()) {
-            final boolean scanPositiveAchievers = positiveAchievers.cardinality()
-                    <= activeAncestors.cardinality();
-            final BitSet actionsToScan = scanPositiveAchievers
-                    ? positiveAchievers
-                    : activeAncestors;
-            final BitSet requiredMembership = scanPositiveAchievers
-                    ? activeAncestors
-                    : positiveAchievers;
-            for (int interferingActionId = actionsToScan.nextSetBit(0);
-                 interferingActionId >= 0;
-                 interferingActionId = actionsToScan.nextSetBit(interferingActionId + 1)) {
-                if (interferingActionId == actionId
-                        || !requiredMembership.get(interferingActionId)) {
-                    continue;
-                }
-                hasPositiveInterferingAchiever = true;
-                if (getActionCost()[interferingActionId] == 0f) {
-                    return heuristicCost;
-                }
-                final float interferingContribution = numericContribution(
-                        interferingActionId,
-                        comparison
-                );
-                minCostPerProgress = Math.min(
-                        minCostPerProgress,
-                        getActionCost()[interferingActionId] / interferingContribution
-                );
-            }
-        }
-
-        if (!hasPositiveInterferingAchiever) {
-            final float repetitions = computeRepetitions(comparison, contribution, state);
-            return heuristicCost + Math.max(1f, repetitions) * getActionCost()[actionId];
-        }
-        if (minCostPerProgress == 0f) {
-            return heuristicCost;
-        }
-        final float bestProgressPerCost = 1f / minCostPerProgress;
-        return heuristicCost + computeRepetitions(comparison, bestProgressPerCost, state);
+        final float repetitions = computeRepetitions(comparison, contribution, state);
+        return computeNumericAchieverCost(
+                conditionId,
+                actionId,
+                repetitions * getActionCost()[actionId],
+                state
+        );
     }
 
     private void setToZero(

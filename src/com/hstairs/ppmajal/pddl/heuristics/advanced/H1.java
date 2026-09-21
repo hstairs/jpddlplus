@@ -325,14 +325,10 @@ public class H1 implements SearchHeuristic {
         Arrays.fill(getClosed(), false);
         Arrays.fill(getActionInit(), false);
         Arrays.fill(getConditionInit(), false);
-        resetSsnpEvaluationCache();
+        resetNumericAchieverCostCache();
         if (extractRelaxedPlan || isHelpfulActionsComputation()) {
             Arrays.fill(establishedAchiever, -1);
             Arrays.fill(numRepetition, Float.MAX_VALUE);
-        }
-
-        if (minAchieverPreconditionCost != null) {
-            Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
         }
 
 //        Printer.pddlPrint(problem, (PDDLState) gs);
@@ -698,7 +694,7 @@ public class H1 implements SearchHeuristic {
     }
 
 
-    private float computeNumericAchieverCost(
+    protected final float computeNumericAchieverCost(
             int conditionId,
             int actionId,
             float numericEffectCost,
@@ -735,6 +731,18 @@ public class H1 implements SearchHeuristic {
         return useNumericActivationFloor
                 ? Math.max(preconditionCost + getActionCost()[actionId], legacyEstimate)
                 : legacyEstimate;
+    }
+
+    /**
+     * Resets the per-evaluation state used by the numeric-achiever cost
+     * variants. Subclasses with a custom evaluation loop must invoke this
+     * before starting a new estimate.
+     */
+    protected final void resetNumericAchieverCostCache() {
+        if (minAchieverPreconditionCost != null) {
+            Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
+        }
+        resetSsnpEvaluationCache();
     }
 
     protected final void resetSsnpEvaluationCache() {
