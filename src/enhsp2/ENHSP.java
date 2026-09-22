@@ -663,23 +663,6 @@ public class ENHSP {
         aibrPreprocessing = cfg.aibrPreprocessing;
     }
 
-    /* metodo originale
-    private void setHeuristic() {
-        final CPZeroCut.ZeroingMode selectedZeroingMode = selectedZeroingMode();
-        if(novelty!=null){
-            SearchHeuristic h_temp;
-            h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction, false, floor, crdMode,
-                    selectedZeroingMode);
-            h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
-        }
-        else {
-            h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, floor, crdMode,
-                    selectedZeroingMode);
-        }
-    }*/
-
     private SearchHeuristic createHeuristic() {
         if(novelty!=null){
             SearchHeuristic h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions, unitCostHeuristic, linearEffectsAbstraction, false);
