@@ -50,6 +50,8 @@ import org.jgrapht.util.FibonacciHeapNode;
  */
 public class H1 implements SearchHeuristic {
 
+    protected static final double NUMERIC_PRECISION = 1e-6;
+
     /**
      * @return the heuristicNumberOfActions
      */
@@ -84,6 +86,7 @@ public class H1 implements SearchHeuristic {
     private final boolean hardcoreVersion;
     private final float[][] numericContributionRaw;
     private final Map<Pair<Integer, Integer>, Float> numericContribution;
+    private final double[] strictComparisonEpsilon;
     protected final ArrayShifter termsArrayShifter;
     protected final ArrayShifter actionsArrayShifter;
     protected final int totNumberOfActionsRefactored;
@@ -223,6 +226,8 @@ public class H1 implements SearchHeuristic {
         actionHCost = new float[cp.numActions()];
         conditionCost = new float[totNumberOfTerms];
         closed = new boolean[cp.numActions()];
+        strictComparisonEpsilon = new double[totNumberOfTerms];
+        Arrays.fill(strictComparisonEpsilon, Double.NaN);
 
         hardcoreVersion = cp.numActions() * totNumberOfTermsRefactored < 1999999999;
 //        System.out.println("Heuristic Number of Actions:" + heuristicNumberOfActions);
@@ -552,7 +557,7 @@ public class H1 implements SearchHeuristic {
                     final double v = this.numericContribution(actionId, (Comparison) t);
                     if (v > 0) {
 
-                        float rep = computeRepetition(t,v,s);
+                        float rep = computeNumericRepetitions((Comparison) t, v, s);
                         final float newCost = rep * getActionCost()[actionId];
                         final boolean localUpdate = updateIfNeeded(
                                 conditionId,
@@ -566,7 +571,10 @@ public class H1 implements SearchHeuristic {
                     } else if (v == UNKNOWNEFFECT) {//this is a hard condition basically
 
                         float newCost = 0f;
-                        float rep = computeRepetition(t, 1f, s);
+                        // A state-dependent effect has no statically known
+                        // granularity.  Keep the legacy fallback instead of
+                        // applying an epsilon inferred from other actions.
+                        float rep = computeUnknownNumericRepetitions((Comparison) t, s);
                         if (rep < 0){
                             rep = 0f;
                         }
@@ -1146,15 +1154,97 @@ public class H1 implements SearchHeuristic {
 
    
 
-    private float computeRepetition(Terminal t, double v, State s) {
-        final double eval = ((Comparison) t).getLeft().eval(s);
-        if (Double.isNaN(eval)){
-            return 1.0f;
+    protected final float computeNumericRepetitions(
+            Comparison comparison,
+            double contribution,
+            State state
+    ) {
+        return computeNumericRepetitions(
+                comparison,
+                contribution,
+                comparison.getLeft().eval(state)
+        );
+    }
+
+    protected final float computeNumericRepetitions(
+            Comparison comparison,
+            double contribution,
+            double evaluation
+    ) {
+        if (Double.isNaN(evaluation) || contribution == UNKNOWNEFFECT) {
+            return 1f;
         }
-        if (((Comparison) t).isStrict && this.isAdditive()){
-            return (float) (-1f * eval / v)+Float.MIN_VALUE;
+
+        double deficit = -evaluation;
+        if (comparison.isStrict) {
+            deficit += strictComparisonEpsilon(comparison);
         }
-        return (float) (-1f * eval / v);
+        return (float) (deficit / contribution);
+    }
+
+    private float computeUnknownNumericRepetitions(Comparison comparison, State state) {
+        final double evaluation = comparison.getLeft().eval(state);
+        if (Double.isNaN(evaluation)) {
+            return 1f;
+        }
+        final float repetitions = (float) -evaluation;
+        return comparison.isStrict && isAdditive()
+                ? repetitions + Float.MIN_VALUE
+                : repetitions;
+    }
+
+    private double strictComparisonEpsilon(Comparison comparison) {
+        final int conditionId = comparison.getId();
+        if (!Double.isNaN(strictComparisonEpsilon[conditionId])) {
+            return strictComparisonEpsilon[conditionId];
+        }
+
+        double epsilon = Double.NaN;
+        if (comparison.getLeft() instanceof ExtendedNormExpression left && left.linear) {
+            double constant = 0d;
+            for (final ExtendedAddendum addendum : left.summations) {
+                if (addendum.bin != null) {
+                    strictComparisonEpsilon[conditionId] = 0d;
+                    return 0d;
+                }
+                if (addendum.f == null && addendum.n != null) {
+                    constant += addendum.n;
+                }
+            }
+            epsilon = decimalQuantum(constant);
+        }
+
+        for (final int actionId : allActions) {
+            final float actionContribution = numericContribution(actionId, comparison);
+            if (actionContribution == UNKNOWNEFFECT
+                    || !Float.isFinite(actionContribution)
+                    || Math.abs(actionContribution) < NUMERIC_PRECISION) {
+                continue;
+            }
+            final double contributionEpsilon = decimalQuantum(actionContribution);
+            epsilon = Double.isNaN(epsilon)
+                    ? contributionEpsilon
+                    : Math.min(epsilon, contributionEpsilon);
+        }
+
+        if (Double.isNaN(epsilon)) {
+            epsilon = 0d;
+        }
+        strictComparisonEpsilon[conditionId] = epsilon;
+        return epsilon;
+    }
+
+    private double decimalQuantum(double value) {
+        double epsilon = 1d;
+        double scaledValue = Math.abs(value);
+        int decimalPlaces = 0;
+        while (Math.abs(Math.rint(scaledValue) - scaledValue) >= NUMERIC_PRECISION
+                && decimalPlaces < 15) {
+            scaledValue *= 10d;
+            epsilon /= 10d;
+            decimalPlaces++;
+        }
+        return epsilon;
     }
 
 

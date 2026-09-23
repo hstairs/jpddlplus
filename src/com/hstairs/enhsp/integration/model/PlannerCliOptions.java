@@ -48,6 +48,7 @@ public final class PlannerCliOptions {
     public boolean bucketBasedQueueSearch;
     public boolean tunnelling;
     public boolean saveSearchJson;
+    public boolean hybrid = true;
 
     public static PlannerCliOptions defaults() {
         return new PlannerCliOptions();
@@ -99,6 +100,7 @@ public final class PlannerCliOptions {
         c.bucketBasedQueueSearch = bucketBasedQueueSearch;
         c.tunnelling = tunnelling;
         c.saveSearchJson = saveSearchJson;
+        c.hybrid = hybrid;
         return c;
     }
 
@@ -126,6 +128,7 @@ public final class PlannerCliOptions {
         addArgWithValue(args, "-sp", savePlan);
         addArgWithValue(args, "-with_posthoc_logger", posthocLogger);
         addArgWithValue(args, "-ea", effectAbstraction);
+        addArgWithValue(args, "-hybrid", Boolean.toString(hybrid));
 
         addFlag(args, "-ha", helpfulActions);
         addFlag(args, "-ht", helpfulTransitions);

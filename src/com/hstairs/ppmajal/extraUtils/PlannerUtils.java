@@ -62,25 +62,18 @@ public class PlannerUtils {
                 h = new H1(p,true);
                 break;
             case "hmax":
-                h = new H1(p,false);
+                h = new H1(p,false,false,false,"no",false,false,false,
+                        false,null,false,-1,false,true);
                 break;
             case "hrmax":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,false);
+                h = new H1(p,false,false,false,"brute",false,false,false,
+                        false,null,false,-1,false,true);
                 break;
             case "hrmaxssnp":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true);
-                break;
-            case "hrmaxssnphybrid":
                 h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true,true);
                 break;
             case "hrmaxssnpstate":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,H1.SsnpCausalMode.STATE_BASED,false);
-                break;
-            case "hrmaxssnpstatehybrid":
                 h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,H1.SsnpCausalMode.STATE_BASED,true);
-                break;
-            case "hrmaxhybrid":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,false,true);
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + heuristic);

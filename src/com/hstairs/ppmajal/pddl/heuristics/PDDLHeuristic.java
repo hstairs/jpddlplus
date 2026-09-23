@@ -53,6 +53,30 @@ public class PDDLHeuristic {
             int linearEffectsAbstraction,
             boolean aibrDebugging
     ) {
+        return getHeuristic(
+                heuristic,
+                heuristicProblem,
+                redundantConstraints,
+                helpfulActionsPruning,
+                helpfulTransitions,
+                toOneTransformation,
+                linearEffectsAbstraction,
+                aibrDebugging,
+                true
+        );
+    }
+
+    public static SearchHeuristic getHeuristic(
+            String heuristic,
+            PDDLProblem heuristicProblem,
+            String redundantConstraints,
+            boolean helpfulActionsPruning,
+            boolean helpfulTransitions,
+            boolean toOneTransformation,
+            int linearEffectsAbstraction,
+            boolean aibrDebugging,
+            boolean hybrid
+    ) {
         if (redundantConstraints == null) {
             redundantConstraints = "";
         }
@@ -82,27 +106,14 @@ public class PDDLHeuristic {
                 return new ManhattanHeuristic(heuristicProblem);
             case "hradd":
                 return new H1(heuristicProblem, true, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
-           case "hrmax":
-                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+            case "hrmax":
+                return new H1(heuristicProblem, false, false, false, "brute",
+                        false, false, false, false, redConstraint,
+                        toOneTransformation, linearEffectsAbstraction, false, hybrid);
             case "hrmaxssnp":
-                return new H1(heuristicProblem, false, false, false, "brute", false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
-            case "hrmaxssnphybrid":
-                return new H1(
-                        heuristicProblem,
-                        false,
-                        false,
-                        false,
-                        "brute",
-                        false,
-                        false,
-                        false,
-                        false,
-                        redConstraint,
-                        toOneTransformation,
-                        linearEffectsAbstraction,
-                        true,
-                        true
-                );
+                return new H1(heuristicProblem, false, false, false, "brute",
+                        false, false, false, false, redConstraint,
+                        toOneTransformation, linearEffectsAbstraction, true, hybrid);
             case "hrmaxssnpstate":
                 return new H1(
                         heuristicProblem,
@@ -118,68 +129,32 @@ public class PDDLHeuristic {
                         toOneTransformation,
                         linearEffectsAbstraction,
                         H1.SsnpCausalMode.STATE_BASED,
-                        false
-                );
-            case "hrmaxssnpstatehybrid":
-                return new H1(
-                        heuristicProblem,
-                        false,
-                        false,
-                        false,
-                        "brute",
-                        false,
-                        false,
-                        false,
-                        false,
-                        redConstraint,
-                        toOneTransformation,
-                        linearEffectsAbstraction,
-                        H1.SsnpCausalMode.STATE_BASED,
-                        true
-                );
-            case "hrmaxhybrid":
-                return new H1(
-                        heuristicProblem,
-                        false,
-                        false,
-                        false,
-                        "brute",
-                        false,
-                        false,
-                        false,
-                        false,
-                        redConstraint,
-                        toOneTransformation,
-                        linearEffectsAbstraction,
-                        false,
-                        true
+                        hybrid
                 );
             case "hmaxssnp":
-                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, toOneTransformation, linearEffectsAbstraction, true);
+                return new H1(heuristicProblem, false, false, false,
+                        redundantConstraints, false, false, false, false,
+                        redConstraint, toOneTransformation, linearEffectsAbstraction,
+                        true, hybrid);
             case "hmaxssnpstate":
                 return new H1(heuristicProblem, false, false, false, redundantConstraints,
                         false, false, false, false, redConstraint, toOneTransformation,
-                        linearEffectsAbstraction, H1.SsnpCausalMode.STATE_BASED, false);
+                        linearEffectsAbstraction, H1.SsnpCausalMode.STATE_BASED, hybrid);
             case "lmcut_old":
                 return new lmcutOld(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
             case "lmcut":
-                return new LmCut(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, toOneTransformation, linearEffectsAbstraction);
+                return new LmCut(heuristicProblem, false, false, false,
+                        redundantConstraints, false, false, false, false,
+                        toOneTransformation, linearEffectsAbstraction, hybrid);
             case "h1dec":
             case "cpzerocut":
                 return CPZeroCut.create(
                         heuristicProblem,
                         redundantConstraints,
                         toOneTransformation,
-                        linearEffectsAbstraction
-                );
-            case "cpzerocuthybrid":
-                return CPZeroCut.create(
-                        heuristicProblem,
-                        redundantConstraints,
-                        toOneTransformation,
                         linearEffectsAbstraction,
                         H1.SsnpCausalMode.NONE,
-                        true
+                        hybrid
                 );
             case "cpzerocutssnp":
                 return CPZeroCut.create(
@@ -188,16 +163,7 @@ public class PDDLHeuristic {
                         toOneTransformation,
                         linearEffectsAbstraction,
                         H1.SsnpCausalMode.STATIC,
-                        false
-                );
-            case "cpzerocutssnphybrid":
-                return CPZeroCut.create(
-                        heuristicProblem,
-                        redundantConstraints,
-                        toOneTransformation,
-                        linearEffectsAbstraction,
-                        H1.SsnpCausalMode.STATIC,
-                        true
+                        hybrid
                 );
             case "cpzerocutssnpstate":
                 return CPZeroCut.create(
@@ -206,16 +172,7 @@ public class PDDLHeuristic {
                         toOneTransformation,
                         linearEffectsAbstraction,
                         H1.SsnpCausalMode.STATE_BASED,
-                        false
-                );
-            case "cpzerocutssnpstatehybrid":
-                return CPZeroCut.create(
-                        heuristicProblem,
-                        redundantConstraints,
-                        toOneTransformation,
-                        linearEffectsAbstraction,
-                        H1.SsnpCausalMode.STATE_BASED,
-                        true
+                        hybrid
                 );
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);
@@ -228,7 +185,10 @@ public class PDDLHeuristic {
             case "h1res4":
                 return new H1Res(heuristicProblem, redundantConstraints, false, true);
             case "hmax":
-                return new H1(heuristicProblem, false, false, false, redundantConstraints, false, false, false, false, redConstraint, false, linearEffectsAbstraction);
+                return new H1(heuristicProblem, false, false, false,
+                        redundantConstraints, false, false, false, false,
+                        redConstraint, false, linearEffectsAbstraction,
+                        false, hybrid);
             case "hmrp":
                 return new H1(heuristicProblem, true, true, false, redundantConstraints, helpfulActionsPruning, false, helpfulTransitions, true, redConstraint, toOneTransformation, linearEffectsAbstraction);
             case "hmrpb":
@@ -269,19 +229,13 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hradd", "HRAdd", "Additive version of subgoaling heuristic plus redundant constraints."),
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
                 new HeuristicInfo("hrmaxssnp", "HRMaxSSNP", "HRMax with SSNP-aware additive twist enabled."),
-                new HeuristicInfo("hrmaxssnphybrid", "HRMaxSSNPHybrid", "SSNP-aware HRMax with a witness-local activation floor."),
                 new HeuristicInfo("hrmaxssnpstate", "HRMaxSSNPState", "State-refined SSNP HRMax using causal achievers of unsatisfied preconditions."),
-                new HeuristicInfo("hrmaxssnpstatehybrid", "HRMaxSSNPStateHybrid", "State-refined SSNP HRMax with a witness-local activation floor."),
-                new HeuristicInfo("hrmaxhybrid", "HRMaxHybrid", "HRMax with a witness-local activation floor."),
                 new HeuristicInfo("h1dec", "CPZeroCut", "Legacy alias for the basic CPZeroCut heuristic."),
                 new HeuristicInfo("cpzerocut", "CPZeroCut", "Critical-path heuristic that zeroes the complete support closure."),
-                new HeuristicInfo("cpzerocuthybrid", "CPZeroCutHybrid", "CPZeroCut with a witness-local activation floor."),
                 new HeuristicInfo("cpzerocutssnp", "CPZeroCutSSNP", "CPZeroCut with static SSNP causal achievers."),
-                new HeuristicInfo("cpzerocutssnphybrid", "CPZeroCutSSNPHybrid", "Static SSNP CPZeroCut with a witness-local activation floor."),
                 new HeuristicInfo("cpzerocutssnpstate", "CPZeroCutSSNPState", "CPZeroCut with state-refined SSNP causal achievers."),
-                new HeuristicInfo("cpzerocutssnpstatehybrid", "CPZeroCutSSNPStateHybrid", "State-refined SSNP CPZeroCut with a witness-local activation floor."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
-                new HeuristicInfo("lmcut_new", "LMCutNew", "LM-Cut variant implemented as an H1 extension."),
+                new HeuristicInfo("lmcut", "LMCut", "LM-Cut variant implemented as an H1 extension."),
                 new HeuristicInfo("h1res", "H1Res", "Resolution-based heuristic without optimizations."),
                 new HeuristicInfo("h1res2", "H1Res2", "Resolution-based heuristic with relaxed operator relevance pruning."),
                 new HeuristicInfo("h1res3", "H1Res3", "Resolution-based heuristic with both relevance and transition pruning."),

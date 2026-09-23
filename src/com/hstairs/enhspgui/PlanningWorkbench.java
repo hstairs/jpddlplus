@@ -2518,13 +2518,16 @@ public class PlanningWorkbench {
         private final JCheckBox bbqs;
         private final JCheckBox tun;
         private final JCheckBox sjr;
+        private final JCheckBox hybrid;
 
         PlannerOptionsDialog(Window owner, PlannerCliOptions current) {
             super(owner, "Planner Options", ModalityType.APPLICATION_MODAL);
             this.working = current.copy();
 
             planner = combo(plannerPresetValues());
-            heuristic = combo("hadd", "blind", "hmax", "hmrp", "aibr", "hradd", "hrmax", "hrmaxssnp", "hrmaxssnphybrid", "hrmaxssnpstate", "hrmaxssnpstatehybrid", "hrmaxhybrid", "hlm-lp");
+            heuristic = combo("hadd", "blind", "hmax", "hmrp", "aibr", "hradd",
+                    "hrmax", "hrmaxssnp", "hrmaxssnpstate", "cpzerocut",
+                    "cpzerocutssnp", "cpzerocutssnpstate", "lmcut", "hlm-lp");
             search = combo("gbfs", "wastar", "ehs", "ida", "lazygbfs", "lazywastar");
             novelty = combo("", "aqb", "aw", "iqb", "iw");
             kNov = new JTextField();
@@ -2569,6 +2572,7 @@ public class PlanningWorkbench {
             bbqs = new JCheckBox("Bucket-based queue search");
             tun = new JCheckBox("Tunnelling");
             sjr = new JCheckBox("Save search JSON");
+            hybrid = new JCheckBox("Hybrid numeric activation floor");
             plannerPresetInfo = new JLabel(" ");
 
             loadFromWorking();
@@ -2663,7 +2667,7 @@ public class PlanningWorkbench {
             p.add(anytime); p.add(uch);
             p.add(npm); p.add(pai);
             p.add(bbqs); p.add(tun);
-            p.add(sjr); p.add(new JLabel(""));
+            p.add(sjr); p.add(hybrid);
             return wrappedPanel(p);
         }
 
@@ -2745,6 +2749,7 @@ public class PlanningWorkbench {
             bbqs.setSelected(o.bucketBasedQueueSearch);
             tun.setSelected(o.tunnelling);
             sjr.setSelected(o.saveSearchJson);
+            hybrid.setSelected(o.hybrid);
             updatePresetOverrideVisuals();
         }
 
@@ -2794,6 +2799,7 @@ public class PlanningWorkbench {
             o.bucketBasedQueueSearch = bbqs.isSelected();
             o.tunnelling = tun.isSelected();
             o.saveSearchJson = sjr.isSelected();
+            o.hybrid = hybrid.isSelected();
             return o;
         }
 
