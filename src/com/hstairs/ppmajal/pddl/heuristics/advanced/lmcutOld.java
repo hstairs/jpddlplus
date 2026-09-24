@@ -139,7 +139,7 @@ public class lmcutOld implements SearchHeuristic  {
 
     public lmcutOld(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
                     boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
-                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean ssnpAwareVersion) {
+                    Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean crdEnabled) {
         long startSetup = System.currentTimeMillis();
         this.additive = additive;
         this.problem = problem;

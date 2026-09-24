@@ -7,6 +7,7 @@ import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.IterativeMetricSearch;
 import com.hstairs.ppmajal.search.SearchEngine;
@@ -140,6 +141,8 @@ public class ENHSP {
     boolean tunnelling;
     boolean iterativeOptimization;
     boolean hybrid = true;
+    boolean selectiveZeroing;
+    H1.CrdMode crdMode = H1.CrdMode.NONE;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
@@ -367,6 +370,10 @@ public class ENHSP {
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
         options.addOption("hybrid", true,
                 "Use the witness-local numeric activation floor for hmax/hrmax, cpzerocut and lmcut (default: true)");
+        options.addOption("selzer", false,
+                "Use selective zeroing in cpzerocut (requires -hybrid true)");
+        options.addOption("crd", true,
+                "Causal reasoning decomposition for hmax/hrmax and cpzerocut: none, static, online (default: none)");
         options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
 
         return options;
@@ -444,6 +451,23 @@ public class ENHSP {
                 );
             }
             hybrid = Boolean.parseBoolean(hybridValue);
+            selectiveZeroing = cmd.hasOption("selzer");
+            if (selectiveZeroing && !hybrid) {
+                throw new ParseException("Option -selzer requires -hybrid true");
+            }
+
+            String crdValue = cmd.getOptionValue("crd", "none");
+            if ("none".equalsIgnoreCase(crdValue)) {
+                crdMode = H1.CrdMode.NONE;
+            } else if ("static".equalsIgnoreCase(crdValue)) {
+                crdMode = H1.CrdMode.STATIC;
+            } else if ("online".equalsIgnoreCase(crdValue)) {
+                crdMode = H1.CrdMode.ONLINE;
+            } else {
+                throw new ParseException(
+                        "Option -crd accepts only none, static or online, got: " + crdValue
+                );
+            }
 
 
             internalValidation = cmd.hasOption("ival");
@@ -600,12 +624,12 @@ public class ENHSP {
         if(novelty!=null){
             SearchHeuristic h_temp;
             h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction, false, hybrid);
+                    unitCostHeuristic, linearEffectsAbstraction, false, hybrid, crdMode, selectiveZeroing);
             h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
         }
         else {
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, hybrid);
+                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, hybrid, crdMode, selectiveZeroing);
         }
     }
 
@@ -621,7 +645,9 @@ public class ENHSP {
                         unitCostHeuristic,
                         linearEffectsAbstraction,
                         false,
-                        hybrid
+                        hybrid,
+                        crdMode,
+                        selectiveZeroing
                 );
                 return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblemForIteration, k_nov, base);
             }
@@ -634,7 +660,9 @@ public class ENHSP {
                     unitCostHeuristic || ignoreMetric,
                     linearEffectsAbstraction,
                     aibrDebug,
-                    hybrid
+                    hybrid,
+                    crdMode,
+                    selectiveZeroing
             );
         };
     }

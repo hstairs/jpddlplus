@@ -9,12 +9,18 @@ import org.jgrapht.alg.util.Pair;
 
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 
 /**
- * Critical-path heuristic that sets the whole support closure of the current
- * goal condition to zero at every iteration.
+ * Critical-path heuristic with complete or threshold-selective support zeroing.
  */
 public class CPZeroCut extends LmCut {
+
+    private final boolean selectiveZeroing;
+
+    private record ActionDistance(int actionId, float distance) {
+    }
 
     public static CPZeroCut create(
             PDDLProblem problem,
@@ -27,7 +33,8 @@ public class CPZeroCut extends LmCut {
                 redundantConstraints,
                 unitaryCost,
                 linearEffectsAbstraction,
-                SsnpCausalMode.NONE,
+                CrdMode.NONE,
+                false,
                 false
         );
     }
@@ -37,16 +44,37 @@ public class CPZeroCut extends LmCut {
             String redundantConstraints,
             boolean unitaryCost,
             int linearEffectsAbstraction,
-            SsnpCausalMode ssnpCausalMode,
+            CrdMode crdMode,
             boolean useNumericActivationFloor
+    ) {
+        return create(
+                problem,
+                redundantConstraints,
+                unitaryCost,
+                linearEffectsAbstraction,
+                crdMode,
+                useNumericActivationFloor,
+                false
+        );
+    }
+
+    public static CPZeroCut create(
+            PDDLProblem problem,
+            String redundantConstraints,
+            boolean unitaryCost,
+            int linearEffectsAbstraction,
+            CrdMode crdMode,
+            boolean useNumericActivationFloor,
+            boolean selectiveZeroing
     ) {
         return new CPZeroCut(
                 problem,
                 redundantConstraints,
                 unitaryCost,
                 linearEffectsAbstraction,
-                ssnpCausalMode,
-                useNumericActivationFloor
+                crdMode,
+                useNumericActivationFloor,
+                selectiveZeroing
         );
     }
 
@@ -55,20 +83,27 @@ public class CPZeroCut extends LmCut {
             String redundantConstraints,
             boolean unitaryCost,
             int linearEffectsAbstraction,
-            SsnpCausalMode ssnpCausalMode,
-            boolean useNumericActivationFloor
+            CrdMode crdMode,
+            boolean useNumericActivationFloor,
+            boolean selectiveZeroing
     ) {
         super(problem, false, false, false, redundantConstraints,
                 false, false, false, false, null, unitaryCost,
-                linearEffectsAbstraction, ssnpCausalMode,
+                linearEffectsAbstraction, crdMode,
                 useNumericActivationFloor);
+        if (selectiveZeroing && !useNumericActivationFloor) {
+            throw new IllegalArgumentException(
+                    "Selective zeroing requires the numeric activation floor"
+            );
+        }
+        this.selectiveZeroing = selectiveZeroing;
     }
 
     @Override
     public float computeEstimate(State state) {
         float estimate = 0f;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
-        ensureSsnpCausalAchievers(state);
+        ensureCrdCausalAchievers(state);
         resetNumericAchieverCostCache();
         resetEvalComparison();
 
@@ -98,13 +133,22 @@ public class CPZeroCut extends LmCut {
             estimate += value;
             closed.clear();
             changedActions.clear();
-            setToZero(
-                    goalCondition,
-                    justificationGraph,
-                    closed,
-                    changedActions,
-                    supportStack
-            );
+            if (selectiveZeroing) {
+                setToZeroSelectively(
+                        value,
+                        justificationGraph,
+                        closed,
+                        changedActions
+                );
+            } else {
+                setToZero(
+                        goalCondition,
+                        justificationGraph,
+                        closed,
+                        changedActions,
+                        supportStack
+                );
+            }
 
             if (changedActions.isEmpty()) {
                 throw new IllegalStateException(
@@ -170,6 +214,60 @@ public class CPZeroCut extends LmCut {
                 final int preferredCondition = pcf[actionId];
                 if (preferredCondition != root) {
                     supportStack.add(preferredCondition);
+                }
+            }
+        }
+    }
+
+    private void setToZeroSelectively(
+            float threshold,
+            JGraph justificationGraph,
+            BitSet closed,
+            BitSet changedActions
+    ) {
+        final float[] iterationCosts = Arrays.copyOf(reducedCosts, reducedCosts.length);
+        final float[] bestDistance = new float[cp.numActions()];
+        Arrays.fill(bestDistance, Float.POSITIVE_INFINITY);
+
+        final PriorityQueue<ActionDistance> queue = new PriorityQueue<>(
+                Comparator.comparingDouble(ActionDistance::distance)
+        );
+        bestDistance[cp.goal()] = 0f;
+        queue.add(new ActionDistance(cp.goal(), 0f));
+
+        while (!queue.isEmpty()) {
+            final ActionDistance current = queue.poll();
+            final int actionId = current.actionId();
+            final float distance = current.distance();
+
+            if (closed.get(actionId)
+                    || distance > bestDistance[actionId] + NUMERIC_PRECISION) {
+                continue;
+            }
+
+            closed.set(actionId);
+            if (reducedCosts[actionId] != 0f) {
+                reducedCosts[actionId] = 0f;
+                changedActions.set(actionId);
+            }
+            if (distance + NUMERIC_PRECISION >= threshold) {
+                continue;
+            }
+
+            final int preferredCondition = pcf[actionId];
+            if (preferredCondition == root) {
+                continue;
+            }
+
+            for (final int achieverId : justificationGraph.ERev()[preferredCondition]) {
+                if (closed.get(achieverId)) {
+                    continue;
+                }
+
+                final float candidateDistance = distance + iterationCosts[achieverId];
+                if (candidateDistance + NUMERIC_PRECISION < bestDistance[achieverId]) {
+                    bestDistance[achieverId] = candidateDistance;
+                    queue.add(new ActionDistance(achieverId, candidateDistance));
                 }
             }
         }

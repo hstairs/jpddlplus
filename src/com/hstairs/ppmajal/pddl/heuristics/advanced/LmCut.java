@@ -47,37 +47,37 @@ public class LmCut extends H1 {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions,
                 redConstraints, helpfulActionsComputation, reachability,
                 helpfulTransitions, conjunctionsMax, null, unitaryCost,
-                linearEffectsAbstraction, SsnpCausalMode.NONE,
+                linearEffectsAbstraction, CrdMode.NONE,
                 useNumericActivationFloor);
     }
 
     protected LmCut(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions,
                   String redConstraints, boolean helpfulActionsComputation, boolean reachability,
                   boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap,
-                  boolean unitaryCost, int compNumericStrategy, boolean ssnpAwareVersion) {
+                  boolean unitaryCost, int compNumericStrategy, boolean crdEnabled) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
                 helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
                 redundantMap, unitaryCost, compNumericStrategy,
-                ssnpAwareVersion ? SsnpCausalMode.STATIC : SsnpCausalMode.NONE);
+                crdEnabled ? CrdMode.STATIC : CrdMode.NONE);
     }
 
     protected LmCut(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions,
                   String redConstraints, boolean helpfulActionsComputation, boolean reachability,
                   boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap,
-                  boolean unitaryCost, int compNumericStrategy, SsnpCausalMode ssnpCausalMode) {
+                  boolean unitaryCost, int compNumericStrategy, CrdMode crdMode) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
                 helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
-                redundantMap, unitaryCost, compNumericStrategy, ssnpCausalMode, false);
+                redundantMap, unitaryCost, compNumericStrategy, crdMode, false);
     }
 
     protected LmCut(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions,
                   String redConstraints, boolean helpfulActionsComputation, boolean reachability,
                   boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond, Collection<IntArraySet>> redundantMap,
-                  boolean unitaryCost, int compNumericStrategy, SsnpCausalMode ssnpCausalMode,
+                  boolean unitaryCost, int compNumericStrategy, CrdMode crdMode,
                   boolean useNumericActivationFloor) {
         super(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
                 helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
-                redundantMap, unitaryCost, compNumericStrategy, ssnpCausalMode,
+                redundantMap, unitaryCost, compNumericStrategy, crdMode,
                 useNumericActivationFloor);
         this.root = getTotNumberOfTerms();
         this.pcf = new int[cp.numActions()];

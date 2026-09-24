@@ -69,12 +69,6 @@ public class PlannerUtils {
                 h = new H1(p,false,false,false,"brute",false,false,false,
                         false,null,false,-1,false,true);
                 break;
-            case "hrmaxssnp":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,true,true);
-                break;
-            case "hrmaxssnpstate":
-                h = new H1(p,false,false,false,"brute",false,false,false,false,null,false,-1,H1.SsnpCausalMode.STATE_BASED,true);
-                break;
             default:
                 throw new IllegalStateException("Unexpected value: " + heuristic);
         }

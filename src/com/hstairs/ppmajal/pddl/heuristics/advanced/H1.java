@@ -118,13 +118,13 @@ public class H1 implements SearchHeuristic {
     private final boolean storeInitActions;
 
     private boolean isHelpfulMap = false;
-    public enum SsnpCausalMode {
+    public enum CrdMode {
         NONE,
         STATIC,
-        STATE_BASED
+        ONLINE
     }
 
-    private final SsnpCausalMode ssnpCausalMode;
+    private final CrdMode crdMode;
     private final boolean useNumericActivationFloor;
     private CausalAchievers causalAchievers;
     private BitSet[] activeCausalAncestorsByAction;
@@ -163,28 +163,28 @@ public class H1 implements SearchHeuristic {
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
-            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean ssnpAwareVersion) {
+            Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy, boolean crdEnabled) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
                 helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
-                redundantMap, unitaryCost, compNumericStrategy, ssnpAwareVersion, false);
+                redundantMap, unitaryCost, compNumericStrategy, crdEnabled, false);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
             Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
-            boolean ssnpAwareVersion, boolean useNumericActivationFloor) {
+            boolean crdEnabled, boolean useNumericActivationFloor) {
         this(problem, additive, extractRelaxedPlan, maxHelpfulTransitions, redConstraints,
                 helpfulActionsComputation, reachability, helpfulTransitions, conjunctionsMax,
                 redundantMap, unitaryCost, compNumericStrategy,
-                ssnpAwareVersion ? SsnpCausalMode.STATIC : SsnpCausalMode.NONE,
+                crdEnabled ? CrdMode.STATIC : CrdMode.NONE,
                 useNumericActivationFloor);
     }
 
     public H1(PDDLProblem problem, boolean additive, boolean extractRelaxedPlan, boolean maxHelpfulTransitions, String redConstraints, boolean helpfulActionsComputation, boolean reachability,
             boolean helpfulTransitions, boolean conjunctionsMax, Map<AndCond,
             Collection<IntArraySet>> redundantMap, boolean unitaryCost, int compNumericStrategy,
-            SsnpCausalMode ssnpCausalMode, boolean useNumericActivationFloor) {
-        this.ssnpCausalMode = Objects.requireNonNull(ssnpCausalMode);
+            CrdMode crdMode, boolean useNumericActivationFloor) {
+        this.crdMode = Objects.requireNonNull(crdMode);
         this.useNumericActivationFloor = useNumericActivationFloor;
         this.storeInitActions = false;
         long startSetup = System.currentTimeMillis();
@@ -265,7 +265,7 @@ public class H1 implements SearchHeuristic {
             numRepetition = new float[totNumberOfTerms];
         }
         this.helpfulTransitions = helpfulTransitions;
-        // SSNP uses the ordinary global minimum during the initial
+        // CRD uses the ordinary global minimum during the initial
         // reachability pass, before the static interference map exists.
         if (!additive) {
             minAchieverPreconditionCost = new float[totNumberOfTerms];
@@ -367,7 +367,7 @@ public class H1 implements SearchHeuristic {
     @Override
     public float computeEstimate(State gs) {
         final FibonacciHeap h = this.smallSetup(gs);
-        final boolean buildCausalAncestry = ssnpCausalMode != SsnpCausalMode.NONE && causalAchievers == null;
+        final boolean buildCausalAncestry = crdMode != CrdMode.NONE && causalAchievers == null;
         final boolean initializeReachability = reachableTransitions == null;
         final boolean collectReachableActions = reachability
                 || initializeReachability
@@ -376,7 +376,7 @@ public class H1 implements SearchHeuristic {
         // still lower a numeric condition.  That variant therefore requires a
         // complete expansion even after the static reachability pass.
         final boolean dontstop = collectReachableActions
-                || (ssnpCausalMode != SsnpCausalMode.NONE && !useNumericActivationFloor);
+                || (crdMode != CrdMode.NONE && !useNumericActivationFloor);
         if (collectReachableActions && reachableTransitions == null) {
             reachableTransitions = new IntArraySet();
         }
@@ -607,13 +607,13 @@ public class H1 implements SearchHeuristic {
     ) {}
 
     /**
-     * Builds the causal-achiever relation used by the SSNP variants without
+     * Builds the causal-achiever relation used by CRD without
      * retaining the costs produced by the reachability pass.  Subclasses with
      * their own evaluation loop can call this before using
      * {@link #interferingAchievers(int, int, State)}.
      */
-    protected final void ensureSsnpCausalAchievers(State state) {
-        if (ssnpCausalMode == SsnpCausalMode.NONE || causalAchievers != null) {
+    protected final void ensureCrdCausalAchievers(State state) {
+        if (crdMode == CrdMode.NONE || causalAchievers != null) {
             return;
         }
 
@@ -712,7 +712,7 @@ public class H1 implements SearchHeuristic {
         final float legacyEstimate;
         if (isAdditive()) {
             legacyEstimate = preconditionCost + numericEffectCost;
-        } else if (ssnpCausalMode != SsnpCausalMode.NONE && causalAchievers != null) {
+        } else if (crdMode != CrdMode.NONE && causalAchievers != null) {
             float causalPreconditionCost = actionHCost[actionId];
             final BitSet interferingAchievers = interferingAchievers(
                     actionId,
@@ -750,11 +750,11 @@ public class H1 implements SearchHeuristic {
         if (minAchieverPreconditionCost != null) {
             Arrays.fill(minAchieverPreconditionCost, Float.POSITIVE_INFINITY);
         }
-        resetSsnpEvaluationCache();
+        resetCrdEvaluationCache();
     }
 
-    protected final void resetSsnpEvaluationCache() {
-        if (ssnpCausalMode == SsnpCausalMode.NONE) {
+    protected final void resetCrdEvaluationCache() {
+        if (crdMode == CrdMode.NONE) {
             return;
         }
         if (activeCausalAncestorsByAction == null) {
@@ -776,7 +776,7 @@ public class H1 implements SearchHeuristic {
             if (!(precondition instanceof Terminal terminal)) {
                 continue;
             }
-            if (ssnpCausalMode == SsnpCausalMode.STATE_BASED && state.satisfy(terminal)) {
+            if (crdMode == CrdMode.ONLINE && state.satisfy(terminal)) {
                 continue;
             }
             final BitSet conditionClosure = causalAchievers.causalAchieversByCondition[terminal.getId()];
