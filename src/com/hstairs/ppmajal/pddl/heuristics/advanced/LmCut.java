@@ -21,7 +21,6 @@ public class LmCut extends H1 {
     protected final int[] pcf;
     protected final BitSet[] pcf2Actions;
     protected float[] reducedCosts;
-    protected double[] evalComparison;
 
     record Cut(int act, int cond) {
     }
@@ -286,17 +285,12 @@ public class LmCut extends H1 {
         }
     }
 
-    protected void resetEvalComparison(){
-        evalComparison = new double[getTotNumberOfTerms()];
-        Arrays.fill(evalComparison, Double.NEGATIVE_INFINITY);
-    }
-
     @Override
     public float computeEstimate(State gs) {
         float cost = 0f;
         boolean firstTime = true;
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
-        resetEvalComparison();
+        resetNumericRepetitionCache();
         final boolean[] actionInCut = new boolean[cp.numActions()];
         final IntArrayList actionsInCut = new IntArrayList();
         JGraph justificationGraph = null;
@@ -464,18 +458,26 @@ public class LmCut extends H1 {
             return -1f;
         }
 
-        final float repetitions = computeRepetitions(comparison, contribution, gs);
+        final float repetitions = computeRepetitions(
+                actionId,
+                comparison,
+                contribution,
+                gs
+        );
         return heuristicCost + repetitions * actionCost;
     }
 
-    protected float computeRepetitions(Comparison comparison, float contribution, State state) {
-        if (evalComparison[comparison.getId()] == Double.NEGATIVE_INFINITY){
-            evalComparison[comparison.getId()] = comparison.getLeft().eval(state);
-        }
+    protected float computeRepetitions(
+            int actionId,
+            Comparison comparison,
+            float contribution,
+            State state
+    ) {
         return computeNumericRepetitions(
+                actionId,
                 comparison,
                 contribution,
-                evalComparison[comparison.getId()]
+                state
         );
     }
 }

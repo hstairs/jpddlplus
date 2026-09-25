@@ -2484,6 +2484,7 @@ public class PlanningWorkbench {
         private final JComboBox<String> grounding;
         private final JComboBox<String> sdac;
         private final JComboBox<String> crd;
+        private final JComboBox<String> zeroingMode;
         private final JTextField wh;
         private final JTextField dp;
         private final JTextField de;
@@ -2520,7 +2521,6 @@ public class PlanningWorkbench {
         private final JCheckBox tun;
         private final JCheckBox sjr;
         private final JCheckBox hybrid;
-        private final JCheckBox selectiveZeroing;
 
         PlannerOptionsDialog(Window owner, PlannerCliOptions current) {
             super(owner, "Planner Options", ModalityType.APPLICATION_MODAL);
@@ -2537,6 +2537,7 @@ public class PlanningWorkbench {
             grounding = combo("internal", "naive", "fd", "metricff", "fdi");
             sdac = combo("disabled", "rhs", "condition");
             crd = combo("none", "static", "online");
+            zeroingMode = combo("base", "floor", "num");
             wh = new JTextField();
             dp = new JTextField();
             de = new JTextField();
@@ -2575,7 +2576,6 @@ public class PlanningWorkbench {
             tun = new JCheckBox("Tunnelling");
             sjr = new JCheckBox("Save search JSON");
             hybrid = new JCheckBox("Hybrid numeric activation floor");
-            selectiveZeroing = new JCheckBox("CPZeroCut selective zeroing");
             plannerPresetInfo = new JLabel(" ");
 
             loadFromWorking();
@@ -2637,6 +2637,7 @@ public class PlanningWorkbench {
             addField(p, "Grounding", grounding);
             addField(p, "SDAC", sdac);
             addField(p, "CRD", crd);
+            addField(p, "CPZeroCut zeroing", zeroingMode);
             return wrappedPanel(p);
         }
 
@@ -2672,7 +2673,6 @@ public class PlanningWorkbench {
             p.add(npm); p.add(pai);
             p.add(bbqs); p.add(tun);
             p.add(sjr); p.add(hybrid);
-            p.add(selectiveZeroing);
             return wrappedPanel(p);
         }
 
@@ -2720,6 +2720,7 @@ public class PlanningWorkbench {
             grounding.setSelectedItem(safeOr(o.grounding, "internal"));
             sdac.setSelectedItem(safeOr(o.sdac, "disabled"));
             crd.setSelectedItem(safeOr(o.crd, "none"));
+            zeroingMode.setSelectedItem(safeOr(o.zeroingMode, "base"));
             wh.setText(safe(o.wh));
             dp.setText(safe(o.deltaPlanning));
             de.setText(safe(o.deltaExecution));
@@ -2756,7 +2757,6 @@ public class PlanningWorkbench {
             tun.setSelected(o.tunnelling);
             sjr.setSelected(o.saveSearchJson);
             hybrid.setSelected(o.hybrid);
-            selectiveZeroing.setSelected(o.selectiveZeroing);
             updatePresetOverrideVisuals();
         }
 
@@ -2772,6 +2772,7 @@ public class PlanningWorkbench {
             o.grounding = selected(grounding);
             o.sdac = selected(sdac);
             o.crd = selected(crd);
+            o.zeroingMode = selected(zeroingMode);
             o.wh = wh.getText().trim();
             o.deltaPlanning = dp.getText().trim();
             o.deltaExecution = de.getText().trim();
@@ -2808,7 +2809,6 @@ public class PlanningWorkbench {
             o.tunnelling = tun.isSelected();
             o.saveSearchJson = sjr.isSelected();
             o.hybrid = hybrid.isSelected();
-            o.selectiveZeroing = selectiveZeroing.isSelected();
             return o;
         }
 

@@ -17,7 +17,13 @@ import java.util.PriorityQueue;
  */
 public class CPZeroCut extends LmCut {
 
-    private final boolean selectiveZeroing;
+    public enum ZeroingMode {
+        BASE,
+        FLOOR,
+        NUM
+    }
+
+    private final ZeroingMode zeroingMode;
 
     private record ActionDistance(int actionId, float distance) {
     }
@@ -35,7 +41,7 @@ public class CPZeroCut extends LmCut {
                 linearEffectsAbstraction,
                 CrdMode.NONE,
                 false,
-                false
+                ZeroingMode.BASE
         );
     }
 
@@ -54,7 +60,7 @@ public class CPZeroCut extends LmCut {
                 linearEffectsAbstraction,
                 crdMode,
                 useNumericActivationFloor,
-                false
+                ZeroingMode.BASE
         );
     }
 
@@ -67,6 +73,26 @@ public class CPZeroCut extends LmCut {
             boolean useNumericActivationFloor,
             boolean selectiveZeroing
     ) {
+        return create(
+                problem,
+                redundantConstraints,
+                unitaryCost,
+                linearEffectsAbstraction,
+                crdMode,
+                useNumericActivationFloor,
+                selectiveZeroing ? ZeroingMode.FLOOR : ZeroingMode.BASE
+        );
+    }
+
+    public static CPZeroCut create(
+            PDDLProblem problem,
+            String redundantConstraints,
+            boolean unitaryCost,
+            int linearEffectsAbstraction,
+            CrdMode crdMode,
+            boolean useNumericActivationFloor,
+            ZeroingMode zeroingMode
+    ) {
         return new CPZeroCut(
                 problem,
                 redundantConstraints,
@@ -74,7 +100,7 @@ public class CPZeroCut extends LmCut {
                 linearEffectsAbstraction,
                 crdMode,
                 useNumericActivationFloor,
-                selectiveZeroing
+                zeroingMode
         );
     }
 
@@ -85,18 +111,18 @@ public class CPZeroCut extends LmCut {
             int linearEffectsAbstraction,
             CrdMode crdMode,
             boolean useNumericActivationFloor,
-            boolean selectiveZeroing
+            ZeroingMode zeroingMode
     ) {
         super(problem, false, false, false, redundantConstraints,
                 false, false, false, false, null, unitaryCost,
                 linearEffectsAbstraction, crdMode,
                 useNumericActivationFloor);
-        if (selectiveZeroing && !useNumericActivationFloor) {
+        if (zeroingMode != ZeroingMode.BASE && !useNumericActivationFloor) {
             throw new IllegalArgumentException(
                     "Selective zeroing requires the numeric activation floor"
             );
         }
-        this.selectiveZeroing = selectiveZeroing;
+        this.zeroingMode = zeroingMode;
     }
 
     @Override
@@ -105,7 +131,7 @@ public class CPZeroCut extends LmCut {
         reducedCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
         ensureCrdCausalAchievers(state);
         resetNumericAchieverCostCache();
-        resetEvalComparison();
+        resetNumericRepetitionCache();
 
         final Pair<JGraph, Float> graphAndValue = constructJG(state);
         final JGraph justificationGraph = graphAndValue.getFirst();
@@ -133,10 +159,11 @@ public class CPZeroCut extends LmCut {
             estimate += value;
             closed.clear();
             changedActions.clear();
-            if (selectiveZeroing) {
+            if (zeroingMode != ZeroingMode.BASE) {
                 setToZeroSelectively(
                         value,
                         justificationGraph,
+                        state,
                         closed,
                         changedActions
                 );
@@ -180,7 +207,12 @@ public class CPZeroCut extends LmCut {
             return super.computeSupporterCost(conditionId, actionId, state, true);
         }
 
-        final float repetitions = computeRepetitions(comparison, contribution, state);
+        final float repetitions = computeRepetitions(
+                actionId,
+                comparison,
+                contribution,
+                state
+        );
         return computeNumericAchieverCost(
                 conditionId,
                 actionId,
@@ -222,6 +254,7 @@ public class CPZeroCut extends LmCut {
     private void setToZeroSelectively(
             float threshold,
             JGraph justificationGraph,
+            State state,
             BitSet closed,
             BitSet changedActions
     ) {
@@ -264,7 +297,29 @@ public class CPZeroCut extends LmCut {
                     continue;
                 }
 
-                final float candidateDistance = distance + iterationCosts[achieverId];
+                float multiplier = 1f;
+                if (zeroingMode == ZeroingMode.NUM) {
+                    final Terminal terminal = Terminal.getTerminal(preferredCondition);
+                    if (terminal instanceof Comparison comparison) {
+                        final float contribution = numericContribution(
+                                achieverId,
+                                comparison
+                        );
+                        if (contribution > 0f) {
+                            multiplier = Math.max(
+                                    1f,
+                                    computeRepetitions(
+                                            achieverId,
+                                            comparison,
+                                            contribution,
+                                            state
+                                    )
+                            );
+                        }
+                    }
+                }
+                final float candidateDistance = distance
+                        + multiplier * iterationCosts[achieverId];
                 if (candidateDistance + NUMERIC_PRECISION < bestDistance[achieverId]) {
                     bestDistance[achieverId] = candidateDistance;
                     queue.add(new ActionDistance(achieverId, candidateDistance));

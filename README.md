@@ -112,7 +112,7 @@ java -jar enhsp25.jar \
 - `-planner <name>`: use a preconfigured planner setup such as `sat-aibr`, `sat-hadd`, `sat-hmrp`, or `opt-hrmax`
 - `-h <name>` and `-s <name>`: manually choose heuristic and search engine instead of using `-planner`
 - `-hybrid <true|false>`: enable the numeric activation floor for H1/HMax, CPZeroCut, and LM-Cut (default: `true`)
-- `-selzer`: enable selective zeroing in CPZeroCut (requires `-hybrid true`)
+- `-selzero <base|floor|num>`: choose complete, floor-selective, or numeric-repetition-selective CPZeroCut zeroing (`floor` and `num` require `-hybrid true`)
 - `-crd <none|static|online>`: select causal reasoning decomposition for H1/HMax and CPZeroCut (default: `none`)
 - `-d`, `-dp`, `-de`, `-dh`, `-dv`: control discretisation deltas for planning, execution, validation, and heuristics
 - `-sp <file>`: save the computed plan to a file

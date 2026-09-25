@@ -28,6 +28,7 @@ public final class PlannerCliOptions {
     public String posthocLogger = "";
     public String effectAbstraction = "";
     public String crd = "none";
+    public String zeroingMode = "base";
     public String customArgs = "";
 
     public boolean helpfulActions;
@@ -50,7 +51,6 @@ public final class PlannerCliOptions {
     public boolean tunnelling;
     public boolean saveSearchJson;
     public boolean hybrid = true;
-    public boolean selectiveZeroing;
 
     public static PlannerCliOptions defaults() {
         return new PlannerCliOptions();
@@ -82,6 +82,7 @@ public final class PlannerCliOptions {
         c.posthocLogger = posthocLogger;
         c.effectAbstraction = effectAbstraction;
         c.crd = crd;
+        c.zeroingMode = zeroingMode;
         c.customArgs = customArgs;
 
         c.helpfulActions = helpfulActions;
@@ -104,7 +105,6 @@ public final class PlannerCliOptions {
         c.tunnelling = tunnelling;
         c.saveSearchJson = saveSearchJson;
         c.hybrid = hybrid;
-        c.selectiveZeroing = selectiveZeroing;
         return c;
     }
 
@@ -134,6 +134,7 @@ public final class PlannerCliOptions {
         addArgWithValue(args, "-ea", effectAbstraction);
         addArgWithValue(args, "-hybrid", Boolean.toString(hybrid));
         addArgWithValue(args, "-crd", crd);
+        addArgWithValue(args, "-selzero", zeroingMode);
 
         addFlag(args, "-ha", helpfulActions);
         addFlag(args, "-ht", helpfulTransitions);
@@ -154,7 +155,6 @@ public final class PlannerCliOptions {
         addPlainFlag(args, "-bbqs", bucketBasedQueueSearch);
         addPlainFlag(args, "-tun", tunnelling);
         addPlainFlag(args, "-sjr", saveSearchJson);
-        addPlainFlag(args, "-selzer", selectiveZeroing);
 
         args.addAll(tokenizeCliArgs(customArgs));
     }

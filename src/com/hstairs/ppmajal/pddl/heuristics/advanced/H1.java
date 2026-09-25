@@ -86,6 +86,8 @@ public class H1 implements SearchHeuristic {
     private final boolean hardcoreVersion;
     private final float[][] numericContributionRaw;
     private final Map<Pair<Integer, Integer>, Float> numericContribution;
+    private final double[] numericComparisonEvaluation;
+    private final Map<Long, Float> numericRepetitionCache;
     private final double[] strictComparisonEpsilon;
     protected final ArrayShifter termsArrayShifter;
     protected final ArrayShifter actionsArrayShifter;
@@ -226,8 +228,11 @@ public class H1 implements SearchHeuristic {
         actionHCost = new float[cp.numActions()];
         conditionCost = new float[totNumberOfTerms];
         closed = new boolean[cp.numActions()];
+        numericComparisonEvaluation = new double[totNumberOfTerms];
+        numericRepetitionCache = new HashMap<>();
         strictComparisonEpsilon = new double[totNumberOfTerms];
         Arrays.fill(strictComparisonEpsilon, Double.NaN);
+        resetNumericRepetitionCache();
 
         hardcoreVersion = cp.numActions() * totNumberOfTermsRefactored < 1999999999;
 //        System.out.println("Heuristic Number of Actions:" + heuristicNumberOfActions);
@@ -331,6 +336,7 @@ public class H1 implements SearchHeuristic {
         Arrays.fill(getActionInit(), false);
         Arrays.fill(getConditionInit(), false);
         resetNumericAchieverCostCache();
+        resetNumericRepetitionCache();
         if (extractRelaxedPlan || isHelpfulActionsComputation()) {
             Arrays.fill(establishedAchiever, -1);
             Arrays.fill(numRepetition, Float.MAX_VALUE);
@@ -557,7 +563,12 @@ public class H1 implements SearchHeuristic {
                     final double v = this.numericContribution(actionId, (Comparison) t);
                     if (v > 0) {
 
-                        float rep = computeNumericRepetitions((Comparison) t, v, s);
+                        float rep = computeNumericRepetitions(
+                                actionId,
+                                (Comparison) t,
+                                v,
+                                s
+                        );
                         final float newCost = rep * getActionCost()[actionId];
                         final boolean localUpdate = updateIfNeeded(
                                 conditionId,
@@ -1155,15 +1166,34 @@ public class H1 implements SearchHeuristic {
    
 
     protected final float computeNumericRepetitions(
+            int actionId,
             Comparison comparison,
             double contribution,
             State state
     ) {
-        return computeNumericRepetitions(
+        final long key = ((long) actionId << 32)
+                | (comparison.getId() & 0xffffffffL);
+        final Float cached = numericRepetitionCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        final int conditionId = comparison.getId();
+        if (numericComparisonEvaluation[conditionId] == Double.NEGATIVE_INFINITY) {
+            numericComparisonEvaluation[conditionId] = comparison.getLeft().eval(state);
+        }
+        final float repetitions = computeNumericRepetitions(
                 comparison,
                 contribution,
-                comparison.getLeft().eval(state)
+                numericComparisonEvaluation[conditionId]
         );
+        numericRepetitionCache.put(key, repetitions);
+        return repetitions;
+    }
+
+    protected final void resetNumericRepetitionCache() {
+        Arrays.fill(numericComparisonEvaluation, Double.NEGATIVE_INFINITY);
+        numericRepetitionCache.clear();
     }
 
     protected final float computeNumericRepetitions(

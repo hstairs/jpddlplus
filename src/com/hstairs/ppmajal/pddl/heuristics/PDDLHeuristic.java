@@ -132,6 +132,36 @@ public class PDDLHeuristic {
             H1.CrdMode crdMode,
             boolean selectiveZeroing
     ) {
+        return getHeuristic(
+                heuristic,
+                heuristicProblem,
+                redundantConstraints,
+                helpfulActionsPruning,
+                helpfulTransitions,
+                toOneTransformation,
+                linearEffectsAbstraction,
+                aibrDebugging,
+                hybrid,
+                crdMode,
+                selectiveZeroing
+                        ? CPZeroCut.ZeroingMode.FLOOR
+                        : CPZeroCut.ZeroingMode.BASE
+        );
+    }
+
+    public static SearchHeuristic getHeuristic(
+            String heuristic,
+            PDDLProblem heuristicProblem,
+            String redundantConstraints,
+            boolean helpfulActionsPruning,
+            boolean helpfulTransitions,
+            boolean toOneTransformation,
+            int linearEffectsAbstraction,
+            boolean aibrDebugging,
+            boolean hybrid,
+            H1.CrdMode crdMode,
+            CPZeroCut.ZeroingMode zeroingMode
+    ) {
         if (redundantConstraints == null) {
             redundantConstraints = "";
         }
@@ -180,7 +210,7 @@ public class PDDLHeuristic {
                         linearEffectsAbstraction,
                         crdMode,
                         hybrid,
-                        selectiveZeroing
+                        zeroingMode
                 );
             case "hrmaxb":
                 return new H1WithBucketEXP(heuristicProblem, false, false, false, "brute", false, false, false, false, toOneTransformation, linearEffectsAbstraction);

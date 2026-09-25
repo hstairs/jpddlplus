@@ -7,6 +7,7 @@ import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.CPZeroCut;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.IterativeMetricSearch;
@@ -141,7 +142,7 @@ public class ENHSP {
     boolean tunnelling;
     boolean iterativeOptimization;
     boolean hybrid = true;
-    boolean selectiveZeroing;
+    CPZeroCut.ZeroingMode zeroingMode = CPZeroCut.ZeroingMode.BASE;
     H1.CrdMode crdMode = H1.CrdMode.NONE;
 
     public ENHSP(boolean copyProblem) {
@@ -370,8 +371,10 @@ public class ENHSP {
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
         options.addOption("hybrid", true,
                 "Use the witness-local numeric activation floor for hmax/hrmax, cpzerocut and lmcut (default: true)");
+        options.addOption("selzero", true,
+                "CPZeroCut zeroing mode: base, floor, num (default: base; floor/num require -hybrid true)");
         options.addOption("selzer", false,
-                "Use selective zeroing in cpzerocut (requires -hybrid true)");
+                "Legacy alias for -selzero floor");
         options.addOption("crd", true,
                 "Causal reasoning decomposition for hmax/hrmax and cpzerocut: none, static, online (default: none)");
         options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
@@ -451,9 +454,30 @@ public class ENHSP {
                 );
             }
             hybrid = Boolean.parseBoolean(hybridValue);
-            selectiveZeroing = cmd.hasOption("selzer");
-            if (selectiveZeroing && !hybrid) {
-                throw new ParseException("Option -selzer requires -hybrid true");
+            final String zeroingValue;
+            if (cmd.hasOption("selzer") && cmd.hasOption("selzero")) {
+                throw new ParseException("Use either -selzer or -selzero, not both");
+            } else if (cmd.hasOption("selzer")) {
+                zeroingValue = "floor";
+            } else {
+                zeroingValue = cmd.getOptionValue("selzero", "base");
+            }
+            if ("base".equalsIgnoreCase(zeroingValue)) {
+                zeroingMode = CPZeroCut.ZeroingMode.BASE;
+            } else if ("floor".equalsIgnoreCase(zeroingValue)) {
+                zeroingMode = CPZeroCut.ZeroingMode.FLOOR;
+            } else if ("num".equalsIgnoreCase(zeroingValue)) {
+                zeroingMode = CPZeroCut.ZeroingMode.NUM;
+            } else {
+                throw new ParseException(
+                        "Option -selzero accepts only base, floor or num, got: "
+                                + zeroingValue
+                );
+            }
+            if (zeroingMode != CPZeroCut.ZeroingMode.BASE && !hybrid) {
+                throw new ParseException(
+                        "Option -selzero " + zeroingValue + " requires -hybrid true"
+                );
             }
 
             String crdValue = cmd.getOptionValue("crd", "none");
@@ -624,12 +648,12 @@ public class ENHSP {
         if(novelty!=null){
             SearchHeuristic h_temp;
             h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction, false, hybrid, crdMode, selectiveZeroing);
+                    unitCostHeuristic, linearEffectsAbstraction, false, hybrid, crdMode, zeroingMode);
             h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
         }
         else {
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, hybrid, crdMode, selectiveZeroing);
+                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, hybrid, crdMode, zeroingMode);
         }
     }
 
@@ -647,7 +671,7 @@ public class ENHSP {
                         false,
                         hybrid,
                         crdMode,
-                        selectiveZeroing
+                        zeroingMode
                 );
                 return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblemForIteration, k_nov, base);
             }
@@ -662,7 +686,7 @@ public class ENHSP {
                     aibrDebug,
                     hybrid,
                     crdMode,
-                    selectiveZeroing
+                    zeroingMode
             );
         };
     }
