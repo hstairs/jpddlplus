@@ -305,7 +305,14 @@ public class CPZeroCut extends LmCut {
                                 achieverId,
                                 comparison
                         );
-                        if (contribution > 0f) {
+                        // Repetitions are not compositional when supporting
+                        // the action already contributes to this condition.
+                        if (contribution > 0f
+                                && isKnownInterferenceFree(
+                                        achieverId,
+                                        preferredCondition,
+                                        state
+                                )) {
                             multiplier = Math.max(
                                     1f,
                                     computeRepetitions(

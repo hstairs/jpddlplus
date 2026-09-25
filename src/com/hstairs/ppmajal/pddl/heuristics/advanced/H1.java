@@ -816,6 +816,16 @@ public class H1 implements SearchHeuristic {
         return ancestors;
     }
 
+    protected final boolean isKnownInterferenceFree(
+            int actionId,
+            int conditionId,
+            State state
+    ) {
+        return crdMode != CrdMode.NONE
+                && causalAchievers != null
+                && interferingAchievers(actionId, conditionId, state).isEmpty();
+    }
+
     protected void updateAchievers(int conditionId, int actionId) {
         if (extractRelaxedPlan || useSmartConstraints || isHelpfulActionsComputation() ) {
             getOrCreateAchievers(conditionId).add(actionId);
