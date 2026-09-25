@@ -130,6 +130,7 @@ public class H1 implements SearchHeuristic {
     private final boolean useNumericActivationFloor;
     private CausalAchievers causalAchievers;
     private BitSet[] activeCausalAncestorsByAction;
+    private final Map<Long, BitSet> interferingAchieversCache;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
@@ -230,6 +231,7 @@ public class H1 implements SearchHeuristic {
         closed = new boolean[cp.numActions()];
         numericComparisonEvaluation = new double[totNumberOfTerms];
         numericRepetitionCache = new HashMap<>();
+        interferingAchieversCache = new HashMap<>();
         strictComparisonEpsilon = new double[totNumberOfTerms];
         Arrays.fill(strictComparisonEpsilon, Double.NaN);
         resetNumericRepetitionCache();
@@ -725,7 +727,7 @@ public class H1 implements SearchHeuristic {
             legacyEstimate = preconditionCost + numericEffectCost;
         } else if (crdMode != CrdMode.NONE && causalAchievers != null) {
             float causalPreconditionCost = actionHCost[actionId];
-            final BitSet interferingAchievers = interferingAchievers(
+            final BitSet interferingAchievers = cachedInterferingAchievers(
                     actionId,
                     conditionId,
                     state
@@ -768,6 +770,7 @@ public class H1 implements SearchHeuristic {
         if (crdMode == CrdMode.NONE) {
             return;
         }
+        interferingAchieversCache.clear();
         if (activeCausalAncestorsByAction == null) {
             activeCausalAncestorsByAction = new BitSet[cp.numActions()];
         } else {
@@ -805,6 +808,25 @@ public class H1 implements SearchHeuristic {
     }
 
     protected final BitSet interferingAchievers(int actionId, int conditionId, State state) {
+        return (BitSet) cachedInterferingAchievers(
+                actionId,
+                conditionId,
+                state
+        ).clone();
+    }
+
+    private BitSet cachedInterferingAchievers(
+            int actionId,
+            int conditionId,
+            State state
+    ) {
+        final long key = ((long) actionId << 32)
+                | (conditionId & 0xffffffffL);
+        final BitSet cached = interferingAchieversCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
         final BitSet ancestors = (BitSet) activeCausalAncestors(actionId, state).clone();
 
         final BitSet achievers = causalAchievers.directAchieversByCondition[conditionId];
@@ -813,6 +835,7 @@ public class H1 implements SearchHeuristic {
         } else {
             ancestors.and(achievers);
         }
+        interferingAchieversCache.put(key, ancestors);
         return ancestors;
     }
 
@@ -823,7 +846,7 @@ public class H1 implements SearchHeuristic {
     ) {
         return crdMode != CrdMode.NONE
                 && causalAchievers != null
-                && interferingAchievers(actionId, conditionId, state).isEmpty();
+                && cachedInterferingAchievers(actionId, conditionId, state).isEmpty();
     }
 
     protected void updateAchievers(int conditionId, int actionId) {

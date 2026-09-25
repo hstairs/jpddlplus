@@ -7,7 +7,6 @@ import com.hstairs.ppmajal.extraUtils.Utils;
 import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
-import com.hstairs.ppmajal.pddl.heuristics.advanced.CPZeroCut;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.IterativeMetricSearch;
@@ -141,8 +140,7 @@ public class ENHSP {
     boolean bucketBasedQueueSearch;
     boolean tunnelling;
     boolean iterativeOptimization;
-    boolean hybrid = true;
-    CPZeroCut.ZeroingMode zeroingMode = CPZeroCut.ZeroingMode.BASE;
+    boolean floor = true;
     H1.CrdMode crdMode = H1.CrdMode.NONE;
 
     public ENHSP(boolean copyProblem) {
@@ -369,12 +367,8 @@ public class ENHSP {
         options.addOption("pls", false, "Print the very last state");
         options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
-        options.addOption("hybrid", true,
+        options.addOption("floor", true,
                 "Use the witness-local numeric activation floor for hmax/hrmax, cpzerocut and lmcut (default: true)");
-        options.addOption("selzero", true,
-                "CPZeroCut zeroing mode: base, floor, num (default: base; floor/num require -hybrid true)");
-        options.addOption("selzer", false,
-                "Legacy alias for -selzero floor");
         options.addOption("crd", true,
                 "Causal reasoning decomposition for hmax/hrmax and cpzerocut: none, static, online (default: none)");
         options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
@@ -388,6 +382,18 @@ public class ENHSP {
             if ("--help".equals(arg) || "-help".equals(arg) || "-?".equals(arg)) {
                 printHelp(options);
                 throw new PlannerExitException(0, "Help requested.");
+            }
+            if ("-selzero".equals(arg) || "-selzer".equals(arg)) {
+                throw new PlannerExitException(
+                        -1,
+                        "Selective CPZeroCut zeroing modes are not exposed."
+                );
+            }
+            if ("-hybrid".equals(arg)) {
+                throw new PlannerExitException(
+                        -1,
+                        "Option -hybrid has been renamed to -floor."
+                );
             }
         }
 
@@ -446,39 +452,14 @@ public class ENHSP {
                 }
             }
 
-            String hybridValue = cmd.getOptionValue("hybrid", "true");
-            if (!"true".equalsIgnoreCase(hybridValue)
-                    && !"false".equalsIgnoreCase(hybridValue)) {
+            String floorValue = cmd.getOptionValue("floor", "true");
+            if (!"true".equalsIgnoreCase(floorValue)
+                    && !"false".equalsIgnoreCase(floorValue)) {
                 throw new ParseException(
-                        "Option -hybrid accepts only true or false, got: " + hybridValue
+                        "Option -floor accepts only true or false, got: " + floorValue
                 );
             }
-            hybrid = Boolean.parseBoolean(hybridValue);
-            final String zeroingValue;
-            if (cmd.hasOption("selzer") && cmd.hasOption("selzero")) {
-                throw new ParseException("Use either -selzer or -selzero, not both");
-            } else if (cmd.hasOption("selzer")) {
-                zeroingValue = "floor";
-            } else {
-                zeroingValue = cmd.getOptionValue("selzero", "base");
-            }
-            if ("base".equalsIgnoreCase(zeroingValue)) {
-                zeroingMode = CPZeroCut.ZeroingMode.BASE;
-            } else if ("floor".equalsIgnoreCase(zeroingValue)) {
-                zeroingMode = CPZeroCut.ZeroingMode.FLOOR;
-            } else if ("num".equalsIgnoreCase(zeroingValue)) {
-                zeroingMode = CPZeroCut.ZeroingMode.NUM;
-            } else {
-                throw new ParseException(
-                        "Option -selzero accepts only base, floor or num, got: "
-                                + zeroingValue
-                );
-            }
-            if (zeroingMode != CPZeroCut.ZeroingMode.BASE && !hybrid) {
-                throw new ParseException(
-                        "Option -selzero " + zeroingValue + " requires -hybrid true"
-                );
-            }
+            floor = Boolean.parseBoolean(floorValue);
 
             String crdValue = cmd.getOptionValue("crd", "none");
             if ("none".equalsIgnoreCase(crdValue)) {
@@ -648,12 +629,12 @@ public class ENHSP {
         if(novelty!=null){
             SearchHeuristic h_temp;
             h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction, false, hybrid, crdMode, zeroingMode);
+                    unitCostHeuristic, linearEffectsAbstraction, false, floor, crdMode);
             h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
         }
         else {
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, hybrid, crdMode, zeroingMode);
+                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, floor, crdMode);
         }
     }
 
@@ -669,9 +650,8 @@ public class ENHSP {
                         unitCostHeuristic,
                         linearEffectsAbstraction,
                         false,
-                        hybrid,
-                        crdMode,
-                        zeroingMode
+                        floor,
+                        crdMode
                 );
                 return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblemForIteration, k_nov, base);
             }
@@ -684,9 +664,8 @@ public class ENHSP {
                     unitCostHeuristic || ignoreMetric,
                     linearEffectsAbstraction,
                     aibrDebug,
-                    hybrid,
-                    crdMode,
-                    zeroingMode
+                    floor,
+                    crdMode
             );
         };
     }
