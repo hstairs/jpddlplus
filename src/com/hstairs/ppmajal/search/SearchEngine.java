@@ -43,7 +43,7 @@ public abstract class SearchEngine {
 
     public void initHandle(SearchNode init){
             searchSpaceHandle = init;//this needs to have an handle on the initial state for saving it into a json file
-
+            
     }
 
     public abstract SimpleSearchNode search(SearchProblem p, SearchHeuristic h, PrintStream out);

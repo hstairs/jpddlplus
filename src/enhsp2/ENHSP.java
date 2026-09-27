@@ -14,9 +14,9 @@ import com.hstairs.ppmajal.search.SearchHeuristic;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Sdac;
 import com.hstairs.ppmajal.transition.TransitionGround;
-import com.hstairs.enhsp2.SimpleExternalLogger;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 import com.hstairs.ppmajal.transition.TransitionSchema;
+import com.hstairs.ppmajal.pddl.heuristics.biobjective.IdealPointHeuristic;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -280,7 +280,7 @@ public class ENHSP {
                     problem.validate(sp,new BigDecimal(this.deltaExecution), new BigDecimal(deltaExecution), fileName);
                     System.out.println("Numeric Plan Trace saved to " + fileName);
                 }
-                if (sp == null) {
+                if (sp == null && (lastSol.paretoPlans() == null || lastSol.paretoPlans().isEmpty())) { // se sp è nullo e non c'è nessuna frontiera di Pareto, allora fallisce.
                     return bestSolution;
                 }else {
                     bestSolution = lastSol;
@@ -584,16 +584,32 @@ public class ENHSP {
         aibrPreprocessing = cfg.aibrPreprocessing;
     }
 
-    private void setHeuristic() {
+
+
+    private SearchHeuristic createHeuristic() {
         if(novelty!=null){
-            SearchHeuristic h_temp;
-            h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction, false);
-            h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
+            SearchHeuristic h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions, unitCostHeuristic, linearEffectsAbstraction, false);
+            return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
+        } else {
+            return PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions, unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug);
         }
-        else {
-            h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug);
+    }
+
+    private void setHeuristic() {
+         if ("boa".equals(searchEngineString) || "boastar".equals(searchEngineString)) {
+                if (heuristicProblem.multiMetrics != null && heuristicProblem.multiMetrics.length >= 2) {
+                Metric originalMetric = heuristicProblem.getMetric();
+                heuristicProblem.setMetric(heuristicProblem.multiMetrics[0]);
+                SearchHeuristic h1 = createHeuristic();
+                heuristicProblem.setMetric(heuristicProblem.multiMetrics[1]);
+                SearchHeuristic h2 = createHeuristic();
+                heuristicProblem.setMetric(originalMetric);
+                this.h = new IdealPointHeuristic(h1, h2); 
+            } else {
+                throw new RuntimeException("boastar requires 2 metrics defined in the PDDL problem with the syntax: (:metric minimize (metric1) (metric2)).");
+            }
+        } else {
+             this.h = createHeuristic();
         }
     }
 
@@ -659,7 +675,27 @@ public class ENHSP {
     }
 
     private void printInfo(PDDLSolution plan, boolean pddlPlus, String savePlan, PDDLState lastState) {
-        if (plan.rawPlan() != null) {
+        boolean isBiObjective = plan.paretoPlans() != null && !plan.paretoPlans().isEmpty() 
+                             && plan.paretoCosts() != null && !plan.paretoCosts().isEmpty();
+
+        if (isBiObjective) {
+            System.out.println("\nPareto frontier found: " + plan.paretoPlans().size() + " plans\n");
+            for (int i = 0; i < plan.paretoPlans().size(); i++) {
+                StringBuilder costStr = new StringBuilder();
+                if (i < plan.paretoCosts().size()) {
+                    Pair<Float, Float> cost = plan.paretoCosts().get(i);
+                    costStr.append(" (g1=").append(String.format("%.2f", cost.getLeft()))
+                            .append(", g2=").append(String.format("%.2f", cost.getRight())).append(")");
+                }
+                System.out.println("Frontier plan " + (i + 1) + costStr);
+                if (plan.paretoTimes() != null && i < plan.paretoTimes().size()) {
+                    System.out.println("Time (msec): " + plan.paretoTimes().get(i));
+                }
+                PDDLState frontierLastState = i < plan.paretoLastStates().size() ? plan.paretoLastStates().get(i) : lastState;
+                printPlan(plan.paretoPlans().get(i), pddlPlus, frontierLastState, savePlan);
+                System.out.println();
+            }
+        } else if (plan.rawPlan() != null) {
             System.out.println("Problem Solved\n");
             System.out.println("Found Plan:");
             printPlan(plan.rawPlan(), pddlPlus, lastState, savePlan);
@@ -671,7 +707,16 @@ public class ENHSP {
         if (pddlPlus && plan.rawPlan() != null) {
             System.out.println("Elapsed Time: " + lastState.time);
         }
-        System.out.println("Metric (Search):" + plan.gValueAtTheEnd());
+        if (isBiObjective) {
+            String g1 = "g1", g2 = "g2";          
+            if (problem != null && problem.multiMetrics != null && problem.multiMetrics.length >= 2) {
+                g1 = problem.multiMetrics[0].getMetExpr().getInvolvedNumericFluents().toString().replaceAll("[\\[\\]\\(\\)]", "");
+                g2 = problem.multiMetrics[1].getMetExpr().getInvolvedNumericFluents().toString().replaceAll("[\\[\\]\\(\\)]", "");
+            }   
+            System.out.println("Metric (Search): Bi-Objective (g1=" + g1 + ", g2=" + g2 + ")");
+        } else {
+            System.out.println("Metric (Search):" + plan.gValueAtTheEnd());
+        }
         System.out.println("Planning Time (msec): " + overallPlanningTime);
         System.out.println("Heuristic Time (msec): " + plan.stats().heuristicTime());
         System.out.println("Search Time (msec): " + plan.stats().searchTime());

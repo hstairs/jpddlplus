@@ -1,4 +1,4 @@
-package com.hstairs.enhsp2;
+package enhsp2;
 
 import com.hstairs.ppmajal.search.searchnodes.IdaStarSearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;

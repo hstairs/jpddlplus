@@ -2,11 +2,13 @@ package com.hstairs.ppmajal.PDDLProblem;
 
 import com.hstairs.ppmajal.problem.State;
 import com.hstairs.ppmajal.search.*;
+import com.hstairs.ppmajal.search.searchnodes.BoaStarSearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SearchNode;
 import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Transition;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
 import java.io.PrintStream;
@@ -50,7 +52,8 @@ public class PDDLPlanner {
         {"ehs", "EHS", "Enhanced Heuristic Search"},
         {"ida", "IDA", "Iterative Deepening A*"},
         {"lazygbfs", "LazyGBFS", "Lazy Greedy Best-First Search"},
-        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"}
+        {"lazywastar", "LazyWAStar", "Lazy Weighted A* Search"},
+        {"boa", "BOAStar", "Bi-Objective A* Search"}
     };
 
     private static final Map<String, BiFunction<PDDLPlanner, TieBreaker, SearchEngine>> SEARCH_ENGINES = Map.ofEntries(
@@ -59,7 +62,8 @@ public class PDDLPlanner {
         Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
         Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
-        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
+        Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG)),
+        Map.entry(SE_INFOS[6][0], (planner, tb) -> new BOAStar(planner.helpfulActions))
     );
 
     final private boolean bucketBasedQueueSearch;
@@ -155,17 +159,72 @@ public class PDDLPlanner {
         searchEngine.setTimeoutInMs(timeoutInMs);
 
         searchEngine.beforeExecution();
-        final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);
+        final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out); // chiamta  all'algoritmo
         searchEngine.afterExecution();
-        if (solutionHandle == null)
-            return new PDDLSolution(null, null, searchEngine.getStats(), -1);
-        float objectiveValue = solutionHandle.gValue;
+        if (solutionHandle == null){
+            return new PDDLSolution(null, null, searchEngine.getStats(), -1); // nessuna soluzione
+        }
+        
         SearchEngine.SearchStats stats = searchEngine.getStats();
+        
+        if (solutionHandle instanceof BoaStarSearchNode boaStarNode) {
+            List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> paretoPlans = this.extractParetoPlans(boaStarNode, p);
+            List<PDDLState> paretoLastStates = this.extractParetoLastStates(boaStarNode);
+            List<Pair<Float, Float>> paretoCosts = this.extractParetoCosts(boaStarNode);
+            List<Long> paretoTimes = this.extractParetoTimes(boaStarNode);
+            LinkedList<ImmutablePair<BigDecimal, TransitionGround>> representativePlan = paretoPlans.isEmpty() ? null : paretoPlans.get(0);
+            
+            float objectiveValue = boaStarNode.gValue;
+            if (stats.iterativeMetricSummary() != null) {
+                objectiveValue = stats.iterativeMetricSummary().bestObjectiveValue();
+            }
+            return new PDDLSolution(representativePlan, paretoPlans, paretoLastStates, paretoCosts, paretoTimes, boaStarNode, stats, objectiveValue);
+        }
+        
+        float objectiveValue = solutionHandle.gValue;
         if (stats.iterativeMetricSummary() != null) {
             objectiveValue = stats.iterativeMetricSummary().bestObjectiveValue();
         }
-        return new PDDLSolution(this.extractPlan(solutionHandle, p),
-                solutionHandle, stats, objectiveValue);
+        return new PDDLSolution(this.extractPlan(solutionHandle, p), solutionHandle, stats, objectiveValue); // caso algoritmi standard
+    }
+
+    // dal BoaStarSearchNode di BOAStar estrae tutte le soluzioni non dominate dalla frontiera.
+    private List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> extractParetoPlans(BoaStarSearchNode frontierNode, PDDLProblem p) {
+        List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> plans = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            LinkedList<ImmutablePair<BigDecimal, TransitionGround>> plan = this.extractPlan(node, p);
+            if (plan != null) {
+                plans.add(plan);
+            }
+        }
+        return plans;
+    }
+    // restituisce una lista di stati (PDDLState), uno per ogni piano della frontiera.
+    private List<PDDLState> extractParetoLastStates(BoaStarSearchNode frontierNode) {
+        List<PDDLState> states = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            if (node.s instanceof PDDLState state) {
+                states.add(state);
+            }
+        }
+        return states;
+    }
+    // estrae il vettore <g1,g2> per ogni piano nella frontiera.
+    private List<Pair<Float, Float>> extractParetoCosts(BoaStarSearchNode frontierNode) {
+        List<Pair<Float, Float>> costs = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            costs.add(new ImmutablePair<>(node.gValue, node.g2));
+        }
+        return costs;
+    }
+
+    // estrae il tempo in cui è stata trovata la soluzione per ogni piano.
+    private List<Long> extractParetoTimes(BoaStarSearchNode frontierNode) {
+        List<Long> times = new ArrayList<>();
+        for (BoaStarSearchNode node : frontierNode.getSolution()) {
+            times.add(node.timeFound);
+        }
+        return times;
     }
 
     public LinkedList<ImmutablePair<BigDecimal, TransitionGround>> extractPlan(SimpleSearchNode input, PDDLProblem p) {

@@ -38,6 +38,9 @@ public interface SearchProblem {
 
     public  Float gValue(State s, Object act, State temp, float gValue);
 
+    // overloading per gestire metriche multi-obiettivo.
+    public  Float gValue(State s, Object act, State temp, float gValue, int metricIndex);
+
     public  boolean milestoneReached(Float d, Float current_value, State temp);
     
 }

@@ -63,4 +63,10 @@ public interface SearchHeuristic {
     default void setComputeHelpfulActionsMap(){
 
     }
+
+    default List<float[]> computeBiObjectiveEstimate(State s) {
+        List<float[]> res = new ArrayList<>();
+        res.add(new float[]{ computeEstimate(s) });
+        return res;
+    }
 }
