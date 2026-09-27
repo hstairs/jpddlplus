@@ -11,11 +11,15 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
 
+import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class PDDLPlanner {
+    private static final int DEFAULT_ITERATIVE_OPTIMIZATION_MAX_ITERATIONS = 100;
     final String search;
     final String redundantConstraints;
     final boolean helpfulTransitions;
@@ -31,6 +35,9 @@ public class PDDLPlanner {
     private SearchEngine searchEngine;
     private IExternalLogger extenalLogger;
     private final long timeoutInMs;
+    private final boolean iterativeOptimization;
+    private final Function<PDDLProblem, SearchHeuristic> heuristicBuilder;
+    private Consumer<SimpleSearchNode> iterativeSolutionListener;
 
     // ---------------- Static Maps ---------------- //
     private static final Map<String, SearchEngine.TieBreaking> TIE_BREAKERS = Map.of(
@@ -66,7 +73,7 @@ public class PDDLPlanner {
                 false, 1,
                 new BigDecimal(1.0), new BigDecimal(1.0),
                 "", false, Float.POSITIVE_INFINITY,false, false,
-                null, Long.MAX_VALUE);
+                null, Long.MAX_VALUE, false, null);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
@@ -74,7 +81,7 @@ public class PDDLPlanner {
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
                        boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling, IExternalLogger extenalLogger) {
         this(search, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t,
-                saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling, extenalLogger, Long.MAX_VALUE);
+                saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling, extenalLogger, Long.MAX_VALUE, false, null);
     }
 
     public PDDLPlanner(String search, String redundantConstraints,
@@ -82,6 +89,25 @@ public class PDDLPlanner {
                        float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
                        boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling,
                        IExternalLogger extenalLogger, long timeoutInMs) {
+        this(search, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t,
+                saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling, extenalLogger, timeoutInMs, false, null);
+    }
+
+    public PDDLPlanner(String search, String redundantConstraints,
+                       boolean helpfulActionPruning, boolean helpfulTransitions,
+                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling,
+                       IExternalLogger extenalLogger, long timeoutInMs, boolean iterativeOptimization) {
+        this(search, redundantConstraints, helpfulActionPruning, helpfulTransitions, hWeigth, planningDelta, executionDelta, t,
+                saveSearchSpace, depthLimit, bucketBasedQueueSearch, tunnelling, extenalLogger, timeoutInMs, iterativeOptimization, null);
+    }
+
+    public PDDLPlanner(String search, String redundantConstraints,
+                       boolean helpfulActionPruning, boolean helpfulTransitions,
+                       float hWeigth, BigDecimal planningDelta, BigDecimal executionDelta, String t,
+                       boolean saveSearchSpace, float depthLimit, boolean bucketBasedQueueSearch, boolean tunnelling,
+                       IExternalLogger extenalLogger, long timeoutInMs, boolean iterativeOptimization,
+                       Function<PDDLProblem, SearchHeuristic> heuristicBuilder) {
         this.search = search;
         this.redundantConstraints = redundantConstraints;
         this.helpfulTransitions = helpfulTransitions;
@@ -96,10 +122,21 @@ public class PDDLPlanner {
         this.extenalLogger = extenalLogger;
         this.tunnelling = tunnelling;
         this.timeoutInMs = timeoutInMs <= 0 ? Long.MAX_VALUE : timeoutInMs;
+        this.iterativeOptimization = iterativeOptimization;
+        this.heuristicBuilder = heuristicBuilder;
     }
 
     public SearchNode searchSpaceHandle;
-    public PDDLSolution plan(PDDLProblem p, SearchHeuristic h){
+
+    public SearchEngine getSearchEngine() {
+        return searchEngine;
+    }
+
+    public void setIterativeSolutionListener(Consumer<SimpleSearchNode> iterativeSolutionListener) {
+        this.iterativeSolutionListener = iterativeSolutionListener;
+    }
+
+    public PDDLSolution plan(PDDLProblem p, SearchHeuristic h, PrintStream out){
         TieBreaker tb = new TieBreaker(
                 TIE_BREAKERS.getOrDefault(t, SearchEngine.TieBreaking.ARBITRARY)
         );
@@ -108,6 +145,15 @@ public class PDDLPlanner {
         searchEngine = SEARCH_ENGINES
                 .getOrDefault(search.toLowerCase(), (pl, tie) -> new WAStar(pl.hWeigth, false, pl.helpfulActions, tie, pl.saveSearchSpace, pl.boundG, pl.bucketBasedQueueSearch))
                 .apply(this, tb);
+
+        if (iterativeOptimization) {
+            searchEngine = new IterativeMetricSearch(
+                    searchEngine,
+                    new PDDLIterativeOptimizationSupport(p, heuristicBuilder),
+                    DEFAULT_ITERATIVE_OPTIMIZATION_MAX_ITERATIONS
+            );
+            ((IterativeMetricSearch) searchEngine).setIncumbentListener(iterativeSolutionListener);
+        }
 
         searchEngine.setExtenalLogger(this.extenalLogger);
         searchEngine.setTimeoutInMs(timeoutInMs);
@@ -118,15 +164,28 @@ public class PDDLPlanner {
         if (solutionHandle == null){
             return new PDDLSolution(null, null, searchEngine.getStats(), -1); // nessuna soluzione
         }
+        
+        SearchEngine.SearchStats stats = searchEngine.getStats();
+        
         if (solutionHandle instanceof BoaStarSearchNode boaStarNode) {
             List<LinkedList<ImmutablePair<BigDecimal, TransitionGround>>> paretoPlans = this.extractParetoPlans(boaStarNode, p);
             List<PDDLState> paretoLastStates = this.extractParetoLastStates(boaStarNode);
             List<Pair<Float, Float>> paretoCosts = this.extractParetoCosts(boaStarNode);
             List<Long> paretoTimes = this.extractParetoTimes(boaStarNode);
             LinkedList<ImmutablePair<BigDecimal, TransitionGround>> representativePlan = paretoPlans.isEmpty() ? null : paretoPlans.get(0);
-            return new PDDLSolution(representativePlan, paretoPlans, paretoLastStates, paretoCosts, paretoTimes, boaStarNode, searchEngine.getStats(), boaStarNode.gValue);
+            
+            float objectiveValue = boaStarNode.gValue;
+            if (stats.iterativeMetricSummary() != null) {
+                objectiveValue = stats.iterativeMetricSummary().bestObjectiveValue();
+            }
+            return new PDDLSolution(representativePlan, paretoPlans, paretoLastStates, paretoCosts, paretoTimes, boaStarNode, stats, objectiveValue);
         }
-        return new PDDLSolution(this.extractPlan(solutionHandle, p), solutionHandle, searchEngine.getStats(), solutionHandle.gValue); // caso algoritmi standard
+        
+        float objectiveValue = solutionHandle.gValue;
+        if (stats.iterativeMetricSummary() != null) {
+            objectiveValue = stats.iterativeMetricSummary().bestObjectiveValue();
+        }
+        return new PDDLSolution(this.extractPlan(solutionHandle, p), solutionHandle, stats, objectiveValue); // caso algoritmi standard
     }
 
     // dal BoaStarSearchNode di BOAStar estrae tutte le soluzioni non dominate dalla frontiera.
@@ -290,4 +349,5 @@ public class PDDLPlanner {
         }
         return sb.toString();
     }
+
 }

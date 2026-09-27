@@ -89,7 +89,7 @@ public class programmaticMain {
         System.out.println("Total Number of Transitions:"+TransitionGround.totNumberOfTransitions);
         decActionRepresentation.prettyPrint();
         PDDLPlanner planner = new PDDLPlanner();
-        PDDLSolution plan = planner.plan(problem, new H1(problem));
+        PDDLSolution plan = planner.plan(problem, new H1(problem), System.out);
         System.out.println(plan.rawPlan());
         System.out.println(plan.lastState());
     }

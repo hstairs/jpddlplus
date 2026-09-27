@@ -466,7 +466,7 @@ public class PDDLProblem implements SearchProblem {
 
     protected boolean easyCleanUp(boolean aibrPreprocessing) {
         //out.println("prova");
-//        this.saveInitInit();
+        this.saveInitInit();
         if (!sweepStructuresForUnreachableStatements())
             return false;
 
@@ -516,7 +516,7 @@ public class PDDLProblem implements SearchProblem {
 
         }
         return true;
-//        this.makePddlState(); //remake init so as to account for only reachable actions
+        //this.makePddlState(); //remake init so as to account for only reachable actions
     }
 
     protected boolean sweepStructuresForUnreachableStatements() {
@@ -762,7 +762,6 @@ public class PDDLProblem implements SearchProblem {
         if (NumFluent.numFluentsBank != null) {
             for (NumFluent nf : NumFluent.numFluentsBank.values()) {
                 if ((this.getActualFluents().contains(nf) && this.isSubgoalsRelevant(nf)) || !invAnalysis) {
-
                     if (nf.isGrounded()) {
                         PDDLNumber number = this.getInitNumFluentsValues().get(nf);
                         if (number == null) {
@@ -1574,6 +1573,13 @@ public class PDDLProblem implements SearchProblem {
 
     public void setGoals(Condition con) {
         liftedGoals = con;
+    }
+
+    public void setGroundGoalsForSearch(Condition con) {
+        groundGoals = con;
+        if (readyForSearch) {
+            makeInit();
+        }
     }
 
 

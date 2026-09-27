@@ -8,7 +8,10 @@ import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
+import com.hstairs.ppmajal.search.IterativeMetricSearch;
+import com.hstairs.ppmajal.search.SearchEngine;
 import com.hstairs.ppmajal.search.SearchHeuristic;
+import com.hstairs.ppmajal.search.searchnodes.SimpleSearchNode;
 import com.hstairs.ppmajal.transition.Sdac;
 import com.hstairs.ppmajal.transition.TransitionGround;
 import com.hstairs.ppmajal.extraUtils.IExternalLogger;
@@ -25,8 +28,10 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -133,6 +138,7 @@ public class ENHSP {
     boolean pls;
     boolean bucketBasedQueueSearch;
     boolean tunnelling;
+    boolean iterativeOptimization;
 
     public ENHSP(boolean copyProblem) {
         copyOfTheProblem = copyProblem;
@@ -358,6 +364,7 @@ public class ENHSP {
         options.addOption("pls", false, "Print the very last state");
         options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
+        options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
 
         return options;
     }
@@ -416,6 +423,7 @@ public class ENHSP {
             }
 
             pls = cmd.hasOption("pls");
+            iterativeOptimization = cmd.hasOption("iopt");
             String ea = cmd.getOptionValue("ea");
             if (ea != null) {
                 if (ea.equals("all")){
@@ -605,6 +613,34 @@ public class ENHSP {
         }
     }
 
+    private Function<PDDLProblem, SearchHeuristic> iterativeHeuristicFactory() {
+        return heuristicProblemForIteration -> {
+            if (novelty != null) {
+                SearchHeuristic base = PDDLHeuristic.getHeuristic(
+                        heuristic,
+                        heuristicProblemForIteration,
+                        redundantConstraints,
+                        helpfulActions,
+                        helpfulTransitions,
+                        unitCostHeuristic,
+                        linearEffectsAbstraction,
+                        false
+                );
+                return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblemForIteration, k_nov, base);
+            }
+            return PDDLHeuristic.getHeuristic(
+                    heuristic,
+                    heuristicProblemForIteration,
+                    redundantConstraints,
+                    helpfulActions,
+                    helpfulTransitions,
+                    unitCostHeuristic || ignoreMetric,
+                    linearEffectsAbstraction,
+                    aibrDebug
+            );
+        };
+    }
+
     private PDDLSolution search(long timeoutMs) throws Exception {
         PDDLPlanner planner = new PDDLPlanner(searchEngineString,
                 redundantConstraints,
@@ -614,7 +650,9 @@ public class ENHSP {
                 deltaPlanning != null ? new BigDecimal(deltaPlanning) : new BigDecimal(1.0),
                 deltaExecution != null ? new BigDecimal(deltaExecution) : new BigDecimal(1.0),
                 tieBreaking == null ? "arbitrary": tieBreaking, savingSearchSpaceJson, depthLimit == -1 ? Float.POSITIVE_INFINITY : depthLimit,
-                bucketBasedQueueSearch, tunnelling, this.externalLogger, timeoutMs);
+                bucketBasedQueueSearch, tunnelling, this.externalLogger, timeoutMs, iterativeOptimization,
+                iterativeOptimization ? iterativeHeuristicFactory() : null);
+        configureIterativePlanSaving(planner);
 
         if (savingSearchSpaceJson) {
             Runtime.getRuntime().addShutdownHook(new Thread() {//this is to save json also when the planner is interrupted
@@ -626,10 +664,10 @@ public class ENHSP {
             });
         }
         overallStart = System.currentTimeMillis();
-        PDDLSolution plan = planner.plan(problem, h);
+        PDDLSolution plan = planner.plan(problem, h, out);
         overallPlanningTime = (System.currentTimeMillis() - overallStart);
         endGValue = plan.gValueAtTheEnd();
-        printInfo(plan,pddlPlus,savePlan,plan.rawPlan() == null ? null : plan.lastState());
+        printInfo(plan,pddlPlus,finalPlanFileName(),plan.rawPlan() == null ? null : plan.lastState());
         if (savingSearchSpaceJson) {
             planner.getSearchSpaceHandle().printJson(getProblem().getPddlFileReference() + ".sp_log");
         }
@@ -686,10 +724,49 @@ public class ENHSP {
         System.out.println("States Evaluated:" + plan.stats().nodesEvaluated());
         System.out.println("Number of Dead-Ends detected:" + plan.stats().deadEnds());
         System.out.println("Number of Duplicates detected:" + plan.stats().duplicates());
+        printIterativeMetricStats(plan.stats());
         if (pls){
             System.out.println(lastState);
         }
 
+    }
+
+    private void configureIterativePlanSaving(PDDLPlanner planner) {
+        if (!iterativeOptimization || savePlan == null || savePlan.isBlank()) {
+            return;
+        }
+        AtomicInteger incumbentIndex = new AtomicInteger(0);
+        planner.setIterativeSolutionListener(incumbent -> {
+            LinkedList<ImmutablePair<BigDecimal, TransitionGround>> incumbentPlan = planner.extractPlan(incumbent, problem);
+            PDDLState incumbentLastState = incumbent.s == null ? null : (PDDLState) incumbent.s;
+            printPlan(incumbentPlan, pddlPlus, incumbentLastState, indexedPlanFileName(savePlan, incumbentIndex.getAndIncrement()));
+        });
+    }
+
+    private String indexedPlanFileName(String fileName, int index) {
+        return fileName + "_" + index;
+    }
+
+    private String finalPlanFileName() {
+        if (iterativeOptimization) {
+            return null;
+        }
+        return savePlan;
+    }
+
+    private void printIterativeMetricStats(SearchEngine.SearchStats stats) {
+        SearchEngine.IterativeMetricSummary summary = stats.iterativeMetricSummary();
+        if (summary == null) {
+            return;
+        }
+        System.out.println("Iterative metric search summary:");
+        System.out.println("  max iterations: " + summary.maxIterations());
+        System.out.println("  iterations attempted: " + summary.iterationsAttempted());
+        System.out.println("  successful improvements: " + summary.successfulImprovements());
+        System.out.println("  best objective value: " + summary.bestObjectiveValue());
+        System.out.println("  min observed objective: " + summary.minObservedObjective());
+        System.out.println("  max observed objective: " + summary.maxObservedObjective());
+        System.out.println("  stop reason: " + summary.stopReason());
     }
 
 

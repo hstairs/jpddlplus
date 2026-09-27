@@ -88,7 +88,29 @@ public abstract class SearchEngine {
         ARBITRARY
     }
 
-    public record SearchStats(int nodesExpanded, int nodesEvaluated, int deadEnds, int duplicates, long searchTime, long heuristicTime) {
+    public record IterativeMetricSummary(
+            int maxIterations,
+            int iterationsAttempted,
+            int successfulImprovements,
+            float bestObjectiveValue,
+            float minObservedObjective,
+            float maxObservedObjective,
+            String stopReason
+    ) {
+    }
+
+    public record SearchStats(
+            int nodesExpanded,
+            int nodesEvaluated,
+            int deadEnds,
+            int duplicates,
+            long searchTime,
+            long heuristicTime,
+            IterativeMetricSummary iterativeMetricSummary
+    ) {
+        public SearchStats(int nodesExpanded, int nodesEvaluated, int deadEnds, int duplicates, long searchTime, long heuristicTime) {
+            this(nodesExpanded, nodesEvaluated, deadEnds, duplicates, searchTime, heuristicTime, null);
+        }
     }
 
     public void beforeExecution() {
@@ -107,6 +129,9 @@ public abstract class SearchEngine {
 
     public void setTimeoutInMs(long timeoutInMs) {
         this.timeoutInMs = timeoutInMs <= 0 ? Long.MAX_VALUE : timeoutInMs;
+    }
+
+    public void setGBound(float gBound) {
     }
 
     protected boolean shouldStop(long startTimeMs) {
