@@ -203,7 +203,7 @@ public class PDDLHeuristic {
                         toOneTransformation, linearEffectsAbstraction, hybrid);
             case "h1dec":
             case "cpzerocut":
-                return CPZeroCut.create(
+                return new CPZeroCut(
                         heuristicProblem,
                         redundantConstraints,
                         toOneTransformation,

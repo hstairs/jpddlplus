@@ -778,7 +778,7 @@ public class H1 implements SearchHeuristic {
         }
     }
 
-    protected final BitSet activeCausalAncestors(int actionId, State state) {
+    protected final BitSet  activeCausalAncestors(int actionId, State state) {
         BitSet ancestors = activeCausalAncestorsByAction[actionId];
         if (ancestors != null) {
             return ancestors;
