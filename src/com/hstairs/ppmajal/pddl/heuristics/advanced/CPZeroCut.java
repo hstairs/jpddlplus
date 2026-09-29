@@ -124,6 +124,87 @@ public class CPZeroCut extends H1 {
             }
         }
     }
+
+    private record ConditionDistance(int conditionId, float distance) {}
+
+    private void setToZeroSelectively(
+            float threshold,
+            int[] goalConditions,
+            BitSet changedActions,
+            BitSet visitedConditions,
+            State state
+    ) {
+        final float[] iterationCosts = Arrays.copyOf(reducedCosts, reducedCosts.length);
+        final float[] bestDistance = new float[totNumberOfTerms];
+        Arrays.fill(bestDistance, Float.POSITIVE_INFINITY);
+        final PriorityQueue<ConditionDistance> queue = new PriorityQueue<>(
+                Comparator.comparingDouble(ConditionDistance::distance)
+        );
+        visitedConditions.clear();
+        for (final int conditionId : goalConditions) {
+            bestDistance[conditionId] = 0f;
+            queue.add(new ConditionDistance(conditionId, 0f));
+        }
+
+        while (!queue.isEmpty()) {
+            final ConditionDistance current = queue.poll();
+            final int conditionId = current.conditionId();
+            final float distance = current.distance();
+            if (visitedConditions.get(conditionId)
+                    || distance > bestDistance[conditionId] + NUMERIC_PRECISION) {
+                continue;
+            }
+            visitedConditions.set(conditionId);
+
+            final ArrayList<Edge> conditionEdges = incomingEdges[conditionId];
+            if (conditionEdges == null) {
+                continue;
+            }
+            if (distance + NUMERIC_PRECISION >= threshold) {
+                continue;
+            }
+            for (final Edge edge : conditionEdges) {
+                final int actionId = edge.actionId();
+
+                if (reducedCosts[actionId] != 0f) {
+                    reducedCosts[actionId] = 0f;
+                    changedActions.set(actionId);
+                }
+
+                final float nextDistance = distance
+                        + zeroingMultiplier(actionId, conditionId, state)
+                        * iterationCosts[actionId];
+                for (final int supporter : edge.supporters()) {
+                    final int[] sourcePcf = pcf[supporter];
+                    if (sourcePcf == null) {
+                        continue;
+                    }
+                    for (final int sourceCondition : sourcePcf) {
+                        if (nextDistance + NUMERIC_PRECISION
+                                < bestDistance[sourceCondition]) {
+                            bestDistance[sourceCondition] = nextDistance;
+                            queue.add(new ConditionDistance(sourceCondition, nextDistance));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private float zeroingMultiplier(int actionId, int conditionId, State state) {
+        if (zeroingMode != ZeroingMode.NUM) {
+            return 1f;
+        }
+        final Terminal terminal = Terminal.getTerminal(conditionId);
+        if (!(terminal instanceof Comparison comparison)) {
+            return 1f;
+        }
+        final float contribution = numericContribution(actionId, comparison);
+        if (contribution <= 0f || !isKnownInterferenceFree(actionId, conditionId, state)) {
+            return 1f;
+        }
+        return Math.max(1f, computeRepetitions(actionId, comparison, contribution, state));
+    }
 //
 //    private void setToZeroSelectively(
 //            float threshold,
@@ -582,12 +663,22 @@ public class CPZeroCut extends H1 {
                 closed.clear();
                 changedActions.clear();
 
-                setToZero(
-                        pcf[cp.goal()],
-                        changedActions,
-                        supportStack,
-                        visitedConditions
-                );
+                if (zeroingMode == ZeroingMode.BASE) {
+                    setToZero(
+                            pcf[cp.goal()],
+                            changedActions,
+                            supportStack,
+                            visitedConditions
+                    );
+                } else {
+                    setToZeroSelectively(
+                            value,
+                            pcf[cp.goal()],
+                            changedActions,
+                            visitedConditions,
+                            state
+                    );
+                }
 
 
                 if (changedActions.isEmpty()) {

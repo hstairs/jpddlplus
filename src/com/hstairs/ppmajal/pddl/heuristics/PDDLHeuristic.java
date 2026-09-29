@@ -162,6 +162,13 @@ public class PDDLHeuristic {
             H1.CrdMode crdMode,
             CPZeroCut.ZeroingMode zeroingMode
     ) {
+        // Keep the enum-based API consistent with the legacy boolean overload:
+        // hybrid selects the activation-floor variant unless a mode is explicit.
+        if (zeroingMode == null) {
+            zeroingMode = hybrid
+                    ? CPZeroCut.ZeroingMode.FLOOR
+                    : CPZeroCut.ZeroingMode.BASE;
+        }
         if (redundantConstraints == null) {
             redundantConstraints = "";
         }
@@ -267,7 +274,7 @@ public class PDDLHeuristic {
                 new HeuristicInfo("hradd", "HRAdd", "Additive version of subgoaling heuristic plus redundant constraints."),
                 new HeuristicInfo("hrmax", "HRMax", "Hmax for Numeric Planning with redundant constraints."),
                 new HeuristicInfo("h1dec", "CPZeroCut", "Legacy alias for the basic CPZeroCut heuristic."),
-                new HeuristicInfo("cpzerocut", "CPZeroCut", "Critical-path heuristic that zeroes the complete support closure."),
+                new HeuristicInfo("cpzerocut", "CPZeroCut", "Metric-aware critical-path heuristic with BASE, FLOOR and NUM support zeroing modes."),
                 new HeuristicInfo("hrmaxb", "HRMax-Bucket", "Hmax with bucket expansion and redundant constraints."),
                 new HeuristicInfo("lmcut", "LMCut", "LM-Cut variant implemented as an H1 extension."),
                 new HeuristicInfo("h1res", "H1Res", "Resolution-based heuristic without optimizations."),

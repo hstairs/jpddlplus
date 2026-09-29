@@ -8,6 +8,7 @@ import com.hstairs.ppmajal.extraUtils.PlannerExitException;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.PDDLNovelyHeuristic;
 import com.hstairs.ppmajal.pddl.heuristics.advanced.H1;
+import com.hstairs.ppmajal.pddl.heuristics.advanced.CPZeroCut;
 import com.hstairs.ppmajal.pddl.heuristics.novelty.IntervalQuantifiedBothHeuristic;
 import com.hstairs.ppmajal.search.IterativeMetricSearch;
 import com.hstairs.ppmajal.search.SearchEngine;
@@ -141,6 +142,7 @@ public class ENHSP {
     boolean tunnelling;
     boolean iterativeOptimization;
     boolean floor = true;
+    CPZeroCut.ZeroingMode zeroingMode;
     H1.CrdMode crdMode = H1.CrdMode.NONE;
 
     public ENHSP(boolean copyProblem) {
@@ -369,6 +371,10 @@ public class ENHSP {
         options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
         options.addOption("floor", true,
                 "Use the witness-local numeric activation floor for hmax/hrmax, cpzerocut and lmcut (default: true)");
+        options.addOption("selzero", true,
+                "CPZeroCut zeroing mode: base, floor, num (default: follows -floor)");
+        options.addOption("selzer", false,
+                "Legacy alias for -selzero floor");
         options.addOption("crd", true,
                 "Causal reasoning decomposition for hmax/hrmax and cpzerocut: none, static, online (default: none)");
         options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
@@ -382,12 +388,6 @@ public class ENHSP {
             if ("--help".equals(arg) || "-help".equals(arg) || "-?".equals(arg)) {
                 printHelp(options);
                 throw new PlannerExitException(0, "Help requested.");
-            }
-            if ("-selzero".equals(arg) || "-selzer".equals(arg)) {
-                throw new PlannerExitException(
-                        -1,
-                        "Selective CPZeroCut zeroing modes are not exposed."
-                );
             }
             if ("-hybrid".equals(arg)) {
                 throw new PlannerExitException(
@@ -460,6 +460,34 @@ public class ENHSP {
                 );
             }
             floor = Boolean.parseBoolean(floorValue);
+
+            if (cmd.hasOption("selzero") && cmd.hasOption("selzer")) {
+                throw new ParseException("Use either -selzero or -selzer, not both");
+            }
+            if (cmd.hasOption("selzero") || cmd.hasOption("selzer")) {
+                final String zeroingValue = cmd.hasOption("selzer")
+                        ? "floor"
+                        : cmd.getOptionValue("selzero");
+                if ("base".equalsIgnoreCase(zeroingValue)) {
+                    zeroingMode = CPZeroCut.ZeroingMode.BASE;
+                } else if ("floor".equalsIgnoreCase(zeroingValue)) {
+                    zeroingMode = CPZeroCut.ZeroingMode.FLOOR;
+                } else if ("num".equalsIgnoreCase(zeroingValue)) {
+                    zeroingMode = CPZeroCut.ZeroingMode.NUM;
+                } else {
+                    throw new ParseException(
+                            "Option -selzero accepts only base, floor or num, got: "
+                                    + zeroingValue
+                    );
+                }
+                if (zeroingMode != CPZeroCut.ZeroingMode.BASE && !floor) {
+                    throw new ParseException(
+                            "Option -selzero " + zeroingValue + " requires -floor true"
+                    );
+                }
+            } else {
+                zeroingMode = null;
+            }
 
             String crdValue = cmd.getOptionValue("crd", "none");
             if ("none".equalsIgnoreCase(crdValue)) {
@@ -626,19 +654,29 @@ public class ENHSP {
     }
 
     private void setHeuristic() {
+        final CPZeroCut.ZeroingMode selectedZeroingMode = selectedZeroingMode();
         if(novelty!=null){
             SearchHeuristic h_temp;
             h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic, linearEffectsAbstraction, false, floor, crdMode);
+                    unitCostHeuristic, linearEffectsAbstraction, false, floor, crdMode,
+                    selectedZeroingMode);
             h = PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
         }
         else {
             h = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions,
-                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, floor, crdMode);
+                    unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug, floor, crdMode,
+                    selectedZeroingMode);
         }
     }
 
+    private CPZeroCut.ZeroingMode selectedZeroingMode() {
+        return zeroingMode != null
+                ? zeroingMode
+                : (floor ? CPZeroCut.ZeroingMode.FLOOR : CPZeroCut.ZeroingMode.BASE);
+    }
+
     private Function<PDDLProblem, SearchHeuristic> iterativeHeuristicFactory() {
+        final CPZeroCut.ZeroingMode selectedZeroingMode = selectedZeroingMode();
         return heuristicProblemForIteration -> {
             if (novelty != null) {
                 SearchHeuristic base = PDDLHeuristic.getHeuristic(
@@ -651,7 +689,8 @@ public class ENHSP {
                         linearEffectsAbstraction,
                         false,
                         floor,
-                        crdMode
+                        crdMode,
+                        selectedZeroingMode
                 );
                 return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblemForIteration, k_nov, base);
             }
@@ -665,7 +704,8 @@ public class ENHSP {
                     linearEffectsAbstraction,
                     aibrDebug,
                     floor,
-                    crdMode
+                    crdMode,
+                    selectedZeroingMode
             );
         };
     }
