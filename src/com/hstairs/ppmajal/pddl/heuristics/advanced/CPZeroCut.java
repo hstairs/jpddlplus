@@ -178,8 +178,108 @@ public class CPZeroCut extends H1 {
         }
     }
 
+    /**
+     * Selectively consumes only the portion of an action cost that fits below
+     * the current threshold. The regular selective method above is left
+     * untouched so that the two policies can be compared independently.
+     */
+    private void zeroSupportClosureUpToThresholdFractional(
+            float threshold,
+            int[] goalConditions,
+            BitSet changedActions,
+            BitSet visitedConditions,
+            State state
+    ) {
+        final float[] iterationCosts = Arrays.copyOf(
+                residualActionCosts,
+                residualActionCosts.length
+        );
+        final float[] bestDistance = new float[totNumberOfTerms];
+        Arrays.fill(bestDistance, Float.POSITIVE_INFINITY);
+        final PriorityQueue<QueuedCondition> queue = new PriorityQueue<>(
+                Comparator.comparingDouble(QueuedCondition::distance)
+        );
+        visitedConditions.clear();
+        for (final int conditionId : goalConditions) {
+            bestDistance[conditionId] = 0f;
+            queue.add(new QueuedCondition(conditionId, 0f));
+        }
+
+        while (!queue.isEmpty()) {
+            final QueuedCondition current = queue.poll();
+            final int conditionId = current.conditionId();
+            final float distance = current.distance();
+            if (visitedConditions.get(conditionId)
+                    || distance > bestDistance[conditionId] + NUMERIC_PRECISION) {
+                continue;
+            }
+            visitedConditions.set(conditionId);
+
+            final ArrayList<SupportEdge> conditionEdges =
+                    supportEdgesByCondition[conditionId];
+            if (conditionEdges == null) {
+                continue;
+            }
+            final float availableDistance = threshold - distance;
+            if (availableDistance <= NUMERIC_PRECISION) {
+                continue;
+            }
+
+            for (final SupportEdge edge : conditionEdges) {
+                final int actionId = edge.actionId();
+                final float actionCost = iterationCosts[actionId];
+                final float multiplier = numericDistanceMultiplier(
+                        actionId,
+                        conditionId,
+                        state
+                );
+                final float edgeDistance = multiplier * actionCost;
+                final float retainedCost;
+                if (edgeDistance <= availableDistance + NUMERIC_PRECISION) {
+                    retainedCost = 0f;
+                } else {
+                    retainedCost = Math.max(
+                            0f,
+                            actionCost - availableDistance / multiplier
+                    );
+                }
+
+                if (retainedCost + NUMERIC_PRECISION
+                        < residualActionCosts[actionId]) {
+                    residualActionCosts[actionId] = retainedCost;
+                    changedActions.set(actionId);
+                }
+
+                // The threshold is reached inside this action. Its source
+                // conditions must remain available for a later iteration.
+                if (edgeDistance > availableDistance + NUMERIC_PRECISION) {
+                    continue;
+                }
+
+                final float nextDistance = distance + edgeDistance;
+                for (final int supporter : edge.supporterActions()) {
+                    final int[] sourcePcf = preferredConditionsByAction[supporter];
+                    if (sourcePcf == null) {
+                        continue;
+                    }
+                    for (final int sourceCondition : sourcePcf) {
+                        if (nextDistance + NUMERIC_PRECISION
+                                < bestDistance[sourceCondition]) {
+                            bestDistance[sourceCondition] = nextDistance;
+                            queue.add(new QueuedCondition(
+                                    sourceCondition,
+                                    nextDistance
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private float numericDistanceMultiplier(int actionId, int conditionId, State state) {
-        if (zeroingMode != ZeroingMode.NUM) {
+        if (zeroingMode != ZeroingMode.NUM
+                && zeroingMode != ZeroingMode.NUM_FRACTIONAL) {
             return 1f;
         }
         final Terminal terminal = Terminal.getTerminal(conditionId);
@@ -195,7 +295,8 @@ public class CPZeroCut extends H1 {
     public enum ZeroingMode {
         BASE,
         FLOOR,
-        NUM
+        NUM,
+        NUM_FRACTIONAL
     }
 
     private static final int[] EMPTY_INT_ARRAY = new int[0];
@@ -482,6 +583,14 @@ public class CPZeroCut extends H1 {
                         changedActions,
                         supportStack,
                         visitedConditions
+                );
+            } else if (zeroingMode == ZeroingMode.NUM_FRACTIONAL) {
+                zeroSupportClosureUpToThresholdFractional(
+                        value,
+                        preferredConditionsByAction[cp.goal()],
+                        changedActions,
+                        visitedConditions,
+                        state
                 );
             } else {
                 zeroSupportClosureUpToThreshold(

@@ -372,9 +372,13 @@ public class ENHSP {
         options.addOption("floor", true,
                 "Use the witness-local numeric activation floor for hmax/hrmax, cpzerocut and lmcut (default: true)");
         options.addOption("selzero", true,
-                "CPZeroCut zeroing mode: base, floor, num (default: follows -floor)");
-        options.addOption("selzer", false,
-                "Legacy alias for -selzero floor");
+                "CPZeroCut zeroing mode: base, floor, num, numfract (default: follows -floor)");
+        options.addOption(Option.builder("selzer")
+                .hasArg()
+                .optionalArg(true)
+                .argName("mode")
+                .desc("Legacy alias for -selzero floor; accepts an optional mode")
+                .build());
         options.addOption("crd", true,
                 "Causal reasoning decomposition for hmax/hrmax and cpzerocut: none, static, online (default: none)");
         options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
@@ -466,7 +470,7 @@ public class ENHSP {
             }
             if (cmd.hasOption("selzero") || cmd.hasOption("selzer")) {
                 final String zeroingValue = cmd.hasOption("selzer")
-                        ? "floor"
+                        ? cmd.getOptionValue("selzer", "floor")
                         : cmd.getOptionValue("selzero");
                 if ("base".equalsIgnoreCase(zeroingValue)) {
                     zeroingMode = CPZeroCut.ZeroingMode.BASE;
@@ -474,9 +478,11 @@ public class ENHSP {
                     zeroingMode = CPZeroCut.ZeroingMode.FLOOR;
                 } else if ("num".equalsIgnoreCase(zeroingValue)) {
                     zeroingMode = CPZeroCut.ZeroingMode.NUM;
+                } else if ("numfract".equalsIgnoreCase(zeroingValue)) {
+                    zeroingMode = CPZeroCut.ZeroingMode.NUM_FRACTIONAL;
                 } else {
                     throw new ParseException(
-                            "Option -selzero accepts only base, floor or num, got: "
+                            "Options -selzero/-selzer accept only base, floor, num or numfract, got: "
                                     + zeroingValue
                     );
                 }
