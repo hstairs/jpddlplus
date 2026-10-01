@@ -318,70 +318,76 @@ public class ENHSP {
         options.addRequiredOption("o", "domain", true, "PDDL domain file (operators, predicates/functions, transition model)");
         options.addRequiredOption("f", "problem", true, "PDDL problem file (objects, initial state, goals, optional metric)");
         options.addOption("help", false, "Show help and modeling instructions");
-        options.addOption("planner", true, "Fast Preconfgured Planner. This overrides all other parameters but domain and problem specs.\n" + Planner.getHelp() + "\n");
-        options.addOption("h", true, "allows to select heuristic (default is hadd). " + PDDLHeuristic.getHelpString() + "\n");
-        options.addOption("s", true, "allows to select search strategy (default is WAStar):\n" + PDDLPlanner.getHelpString() + "\n");
-        options.addOption("nov", true, "heuristic novelty: options:\n"
+        options.addOption("planner", true, "Preconfigured planner. Overrides all options except domain and problem.\n" + Planner.getHelp() + "\n");
+        options.addOption("h", true, "Heuristic (default: hadd). " + PDDLHeuristic.getHelpString() + "\n");
+        options.addOption("s", true, "Search strategy (default: gbfs):\n" + PDDLPlanner.getHelpString() + "\n");
+        options.addOption("nov", true, "Novelty heuristic. Options:\n"
                 + "aqb, Atom Quantified Both novelty heuristic\n"
                 + "aw, Atom Width novelty heuristic\n"
                 + "iqb, Interval Quantified Both novelty heuristic\n"
                 + "iw, Interval Width novelty heuristic" );
-        options.addOption("knov", true, "novelty k parameter, 1 or 2");
-        options.addOption("ties", true, "tie-breaking (default is arbitrary): larger_g, smaller_g, arbitrary");
-        options.addOption("dp", "delta_planning", true, "planning decision executionDelta: float");
-        options.addOption("de", "delta_execution", true, "planning execution executionDelta: float");
-        options.addOption("dh", "delta_heuristic", true, "planning heuristic executionDelta: float");
-        options.addOption("dv", "delta_validation", true, "validation executionDelta: float");
-        options.addOption("d", "delta", true, "Override other delta_<planning,execuction,validation,heuristic> configurations: float");
-        options.addOption("epsilon", true, "epsilon separation: float");
-        options.addOption("wh", true, "h-values weight: float");
-        options.addOption("sjr", false, "save state space explored in json file");
-        options.addOption("ha", "helpful-actions", true, "activate helpful actions in the search");
-        options.addOption("pe", "print-events-plan", false, "activate printing of events");
-        options.addOption("ht", "helpful-transitions", true, "activate up-to-macro actions");
-        options.addOption("sp", true, "Save plan. Argument is filename");
-        options.addOption("pt", false, "print state trajectory (Experimental)");
-        options.addOption("im", false, "Ignore Metric in the heuristic");
-        options.addOption("dap", false, "Disable Aibr Preprocessing");
-        options.addOption("red", "redundant_constraints", true, "Choose mechanism for redundant constraints generation among, "
-                + "no, brute and smart. No redundant constraints generation is the default");
-        options.addOption("gro", "grounding", true, "Activate grounding via internal mechanism, fd or metricff or internal or naive (default is internal)");
-        options.addOption("dl", true, "bound on plan-cost: float (Experimental)");
-        options.addOption("k", true, "maximal number of subdomains. This works in combination with haddabs: integer");
-        options.addOption("anytime", false, "Run in anytime modality. Incrementally tries to find a lower bound. Does not stop until the user decides so");
-        options.addOption("timeout", true, "Overall planning timeout (seconds).");
-        options.addOption("stopgro", false, "Stop After Grounding");
-        options.addOption("ival", false, "Internal Validation");
-        options.addOption("sdac", true, "Activate State Dependent Action Cost (Very Experimental!). Options are: disabled, rhs, condition");
-        options.addOption("onlyplan",false,"Print only the plan without waiting");
+        options.addOption("knov", true, "Novelty width k (1 or 2; default: 2)");
+        options.addOption("ties", true, "Tie-breaking (default: arbitrary): larger_g, smaller_g, arbitrary");
+        options.addOption("dp", "delta_planning", true, "Planning discretisation delta (default: 1.0)");
+        options.addOption("de", "delta_execution", true, "Execution discretisation delta (default: 1.0)");
+        options.addOption("dh", "delta_heuristic", true, "Heuristic discretisation delta (default: 1.0)");
+        options.addOption("dv", "delta_validation", true, "Validation discretisation delta (default: 1.0)");
+        options.addOption("d", "delta", true, "Override all discretisation deltas");
+        options.addOption("epsilon", true, "Numeric separation epsilon");
+        options.addOption("wh", true, "Heuristic-value weight");
+        options.addOption("sjr", false, "Save the explored state space as JSON");
+        options.addOption("ha", "helpful-actions", true, "Enable helpful-action pruning (true|false)");
+        options.addOption("pe", "print-events-plan", false, "Print events in the plan");
+        options.addOption("ht", "helpful-transitions", true, "Enable helpful transitions (true|false)");
+        options.addOption("sp", true, "Save the plan to this file");
+        options.addOption("pt", false, "Print the state trajectory (experimental)");
+        options.addOption("im", false, "Ignore the metric in the heuristic");
+        options.addOption("dap", false, "Disable AIBR preprocessing");
+        options.addOption("red", "redundant_constraints", true, "Redundant-constraint generation: no, brute, smart (default: no)");
+        options.addOption("gro", "grounding", true, "Grounding engine (default: internal): internal, fd, metricff, naive");
+        options.addOption("dl", true, "Plan-cost bound (experimental)");
+        options.addOption("k", true, "Maximum number of subdomains for haddabs (default: 2)");
+        options.addOption("anytime", false, "Continue searching for improving plans");
+        options.addOption("timeout", true, "Overall planning timeout in seconds");
+        options.addOption("stopgro", false, "Stop after grounding");
+        options.addOption("ival", false, "Validate a supplied plan internally");
+        options.addOption("sdac", true, "State-dependent action cost: disabled, rhs, condition (experimental)");
+        options.addOption("onlyplan",false,"Print only the plan");
         options.addOption("print_actions",false,"Print all actions after grounding");
-        options.addOption("tolerance",true,"Numeric tolerance in evaluating numeric conditions. Default is 0.00001");
-        options.addOption("inputplan",true,"Insert the name of the file containing the plan to validate. This is to be used with ival activated");
-        options.addOption("silent",false,"Activate silent modality");
-        options.addOption("autoanytime",false,"Activate auto anytime modality. ");
-        options.addOption("uch",false,"Pretend all actions cost one in the heuristic");
-        options.addOption("with_posthoc_logger", true, "Activate the posthoc file logger. A filename must be provided as argument");
-        options.addOption("npm",false,"PDDL+ feature: Do not print makespan in the plan");
-        options.addOption("pai",false,"Print all info before search");
-        options.addOption("ea",true,"Effect abstraction mode for non-constants effects. " +
-                "Takes integer as an argument, denoting the number of intervals to consider");
-        options.addOption("aibr_debug", false, "Enable AIBR debug logging");
-        options.addOption("pls", false, "Print the very last state");
-        options.addOption("bbqs", false, "Use Bucket Based Priority Queue in the search if applicable");
-        options.addOption("tun", false, "(Experimental) Use tunnelling  during search");
+        options.addOption("tolerance",true,"Numeric-condition tolerance (default: 0.00001)");
+        options.addOption("inputplan",true,"Plan file to validate (use with -ival)");
+        options.addOption("silent",false,"Suppress planner output");
+        options.addOption("autoanytime",false,"Enable automatic anytime mode");
+        options.addOption("uch",false,"Treat all actions as unit cost in the heuristic");
+        options.addOption("with_posthoc_logger", true, "Write posthoc logs to this file");
+        options.addOption("npm",false,"Do not print makespan in PDDL+ plans");
+        options.addOption("pai",false,"Print all information before search");
+        options.addOption("ea", true, "Non-constant effect abstraction: number of intervals or all");
+        options.addOption(Option.builder("aibr_debug")
+                .longOpt("aibr-debug")
+                .desc("Enable AIBR debug logging")
+                .build());
+        options.addOption("pls", false, "Print the final state");
+        options.addOption("bbqs", false, "Use a bucket-based priority queue where applicable");
+        options.addOption("tun", false, "Use tunnelling during search (experimental)");
         options.addOption("floor", true,
                 "Use the witness-local numeric activation floor for hmax/hrmax, cpzerocut and lmcut (default: true)");
-        options.addOption("selzero", true,
-                "CPZeroCut zeroing mode: base, floor, num, numfract (default: follows -floor)");
+        options.addOption(Option.builder("selzero")
+                .hasArg()
+                .optionalArg(true)
+                .argName("mode")
+                .desc("CPZeroCut zeroing mode: base, floor, num, numfract (default: floor)")
+                .build());
         options.addOption(Option.builder("selzer")
                 .hasArg()
                 .optionalArg(true)
                 .argName("mode")
-                .desc("Legacy alias for -selzero floor; accepts an optional mode")
+                .desc("Legacy alias for -selzero; accepts an optional mode")
                 .build());
         options.addOption("crd", true,
                 "Causal reasoning decomposition for hmax/hrmax and cpzerocut: none, static, online (default: none)");
-        options.addOption("iopt", "iterative_optimistaion", false, "Wrap the selected search with iterative metric optimization");
+        options.addOption("iopt", "iterative_optimization", false, "Wrap the selected search with iterative metric optimization");
+        options.addOption("iterative_optimistaion", false, "Legacy alias for -iopt");
 
         return options;
     }
@@ -416,7 +422,6 @@ public class ENHSP {
             else k_nov = 2;
             optionValue = cmd.getOptionValue("tolerance");
             if (optionValue != null){
-                System.out.println(optionValue);
                 Utils.tolerance = Double.parseDouble(optionValue);
             }
             
@@ -446,7 +451,7 @@ public class ENHSP {
             }
 
             pls = cmd.hasOption("pls");
-            iterativeOptimization = cmd.hasOption("iopt");
+            iterativeOptimization = cmd.hasOption("iopt") || cmd.hasOption("iterative_optimistaion");
             String ea = cmd.getOptionValue("ea");
             if (ea != null) {
                 if (ea.equals("all")){
@@ -471,7 +476,7 @@ public class ENHSP {
             if (cmd.hasOption("selzero") || cmd.hasOption("selzer")) {
                 final String zeroingValue = cmd.hasOption("selzer")
                         ? cmd.getOptionValue("selzer", "floor")
-                        : cmd.getOptionValue("selzero");
+                        : cmd.getOptionValue("selzero", "floor");
                 if ("base".equalsIgnoreCase(zeroingValue)) {
                     zeroingMode = CPZeroCut.ZeroingMode.BASE;
                 } else if ("floor".equalsIgnoreCase(zeroingValue)) {
@@ -575,8 +580,7 @@ public class ENHSP {
             }else if (sdacValue.equals("condition")){
                 sdac = Sdac.byCondition;
             }else{
-                new UnsupportedOperationException("Sdac value can be one of the followings:" +
-                        "disables, rhs, condition");
+                throw new ParseException("Option -sdac accepts only disabled, rhs or condition, got: " + sdacValue);
             }
             printMakespan = !cmd.hasOption("npm");
             helpfulActions = cmd.getOptionValue("ha") != null && "true".equals(cmd.getOptionValue("ha"));
@@ -599,7 +603,7 @@ public class ENHSP {
                 externalLogger = new PosthocFileLogger(filePath);
             }
             printAllInfo = cmd.hasOption("pai");
-            aibrDebug = cmd.hasOption("aibr-debug");
+            aibrDebug = cmd.hasOption("aibr-debug") || cmd.hasOption("aibr_debug");
             bucketBasedQueueSearch = cmd.hasOption("bbqs");
             tunnelling = cmd.hasOption("tun");
 

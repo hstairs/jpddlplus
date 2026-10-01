@@ -39,6 +39,8 @@ import com.hstairs.ppmajal.transition.TransitionGround;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import static java.lang.Math.ceil;
 import java.util.*;
 import org.jgrapht.alg.util.Pair;
@@ -87,7 +89,7 @@ public class H1 implements SearchHeuristic {
     private final float[][] numericContributionRaw;
     private final Map<Pair<Integer, Integer>, Float> numericContribution;
     private final double[] numericComparisonEvaluation;
-    private final Map<Long, Float> numericRepetitionCache;
+    private final Long2FloatOpenHashMap numericRepetitionCache;
     private final double[] strictComparisonEpsilon;
     protected final ArrayShifter termsArrayShifter;
     protected final ArrayShifter actionsArrayShifter;
@@ -130,7 +132,7 @@ public class H1 implements SearchHeuristic {
     private final boolean useNumericActivationFloor;
     private CausalAchievers causalAchievers;
     private BitSet[] activeCausalAncestorsByAction;
-    private final Map<Long, BitSet> interferingAchieversCache;
+    private final Long2ObjectOpenHashMap<BitSet> interferingAchieversCache;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
@@ -230,8 +232,9 @@ public class H1 implements SearchHeuristic {
         conditionCost = new float[totNumberOfTerms];
         closed = new boolean[cp.numActions()];
         numericComparisonEvaluation = new double[totNumberOfTerms];
-        numericRepetitionCache = new HashMap<>();
-        interferingAchieversCache = new HashMap<>();
+        numericRepetitionCache = new Long2FloatOpenHashMap();
+        numericRepetitionCache.defaultReturnValue(Float.NaN);
+        interferingAchieversCache = new Long2ObjectOpenHashMap<>();
         strictComparisonEpsilon = new double[totNumberOfTerms];
         Arrays.fill(strictComparisonEpsilon, Double.NaN);
         resetNumericRepetitionCache();
@@ -1206,8 +1209,8 @@ public class H1 implements SearchHeuristic {
     ) {
         final long key = ((long) actionId << 32)
                 | (comparison.getId() & 0xffffffffL);
-        final Float cached = numericRepetitionCache.get(key);
-        if (cached != null) {
+        final float cached = numericRepetitionCache.get(key);
+        if (!Float.isNaN(cached)) {
             return cached;
         }
 

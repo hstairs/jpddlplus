@@ -6,7 +6,6 @@ import com.hstairs.ppmajal.problem.State;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import org.jgrapht.util.FibonacciHeap;
-import org.jgrapht.util.FibonacciHeapNode;
 
 import java.util.*;
 
@@ -121,12 +120,10 @@ public class CPZeroCut extends H1 {
             BitSet visitedConditions,
             State state
     ) {
-        final float[] iterationCosts = Arrays.copyOf(residualActionCosts, residualActionCosts.length);
-        final float[] bestDistance = new float[totNumberOfTerms];
-        Arrays.fill(bestDistance, Float.POSITIVE_INFINITY);
-        final PriorityQueue<QueuedCondition> queue = new PriorityQueue<>(
-                Comparator.comparingDouble(QueuedCondition::distance)
-        );
+        resetThresholdTraversal();
+        final float[] iterationCosts = iterationActionCosts;
+        final float[] bestDistance = thresholdBestDistance;
+        final PriorityQueue<QueuedCondition> queue = thresholdQueue;
         visitedConditions.clear();
         for (final int conditionId : goalConditions) {
             bestDistance[conditionId] = 0f;
@@ -163,14 +160,18 @@ public class CPZeroCut extends H1 {
                         * iterationCosts[actionId];
                 for (final int supporter : edge.supporterActions()) {
                     final int[] sourcePcf = preferredConditionsByAction[supporter];
+
                     if (sourcePcf == null) {
                         continue;
                     }
+                    final float toPush = supporter == actionId
+                            ? distance + iterationCosts[actionId]
+                            : nextDistance;
                     for (final int sourceCondition : sourcePcf) {
-                        if (nextDistance + NUMERIC_PRECISION
+                        if (toPush + NUMERIC_PRECISION
                                 < bestDistance[sourceCondition]) {
-                            bestDistance[sourceCondition] = nextDistance;
-                            queue.add(new QueuedCondition(sourceCondition, nextDistance));
+                            bestDistance[sourceCondition] = toPush;
+                            queue.add(new QueuedCondition(sourceCondition, toPush));
                         }
                     }
                 }
@@ -190,15 +191,10 @@ public class CPZeroCut extends H1 {
             BitSet visitedConditions,
             State state
     ) {
-        final float[] iterationCosts = Arrays.copyOf(
-                residualActionCosts,
-                residualActionCosts.length
-        );
-        final float[] bestDistance = new float[totNumberOfTerms];
-        Arrays.fill(bestDistance, Float.POSITIVE_INFINITY);
-        final PriorityQueue<QueuedCondition> queue = new PriorityQueue<>(
-                Comparator.comparingDouble(QueuedCondition::distance)
-        );
+        resetThresholdTraversal();
+        final float[] iterationCosts = iterationActionCosts;
+        final float[] bestDistance = thresholdBestDistance;
+        final PriorityQueue<QueuedCondition> queue = thresholdQueue;
         visitedConditions.clear();
         for (final int conditionId : goalConditions) {
             bestDistance[conditionId] = 0f;
@@ -234,41 +230,38 @@ public class CPZeroCut extends H1 {
                         state
                 );
                 final float edgeDistance = multiplier * actionCost;
-                final float retainedCost;
-                if (edgeDistance <= availableDistance + NUMERIC_PRECISION) {
-                    retainedCost = 0f;
-                } else {
-                    retainedCost = Math.max(
-                            0f,
-                            actionCost - availableDistance / multiplier
-                    );
-                }
+                // The action is its own activation-floor witness.  Its
+                // largest admissible consumption is therefore one action
+                // cost, capped by the distance still available.
+                final float retainedCost = Math.max(
+                        0f,
+                        actionCost - availableDistance
+                );
 
-                if (retainedCost + NUMERIC_PRECISION
-                        < residualActionCosts[actionId]) {
-                    residualActionCosts[actionId] = retainedCost;
+                final float normalizedRetainedCost = retainedCost
+                        <= NUMERIC_PRECISION ? 0f : retainedCost;
+                if (normalizedRetainedCost < residualActionCosts[actionId]) {
+                    residualActionCosts[actionId] = normalizedRetainedCost;
                     changedActions.set(actionId);
                 }
 
-                // The threshold is reached inside this action. Its source
-                // conditions must remain available for a later iteration.
-                if (edgeDistance > availableDistance + NUMERIC_PRECISION) {
-                    continue;
-                }
-
-                final float nextDistance = distance + edgeDistance;
                 for (final int supporter : edge.supporterActions()) {
                     final int[] sourcePcf = preferredConditionsByAction[supporter];
                     if (sourcePcf == null) {
                         continue;
                     }
+                    final float supporterDistance = distance
+                            + (supporter == actionId ? actionCost : edgeDistance);
+                    if (supporterDistance + NUMERIC_PRECISION > threshold) {
+                        continue;
+                    }
                     for (final int sourceCondition : sourcePcf) {
-                        if (nextDistance + NUMERIC_PRECISION
+                        if (supporterDistance + NUMERIC_PRECISION
                                 < bestDistance[sourceCondition]) {
-                            bestDistance[sourceCondition] = nextDistance;
+                            bestDistance[sourceCondition] = supporterDistance;
                             queue.add(new QueuedCondition(
                                     sourceCondition,
-                                    nextDistance
+                                    supporterDistance
                             ));
                         }
                     }
@@ -277,7 +270,11 @@ public class CPZeroCut extends H1 {
         }
     }
 
-    private float numericDistanceMultiplier(int actionId, int conditionId, State state) {
+    private float numericDistanceMultiplier(
+            int actionId,
+            int conditionId,
+            State state
+    ) {
         if (zeroingMode != ZeroingMode.NUM
                 && zeroingMode != ZeroingMode.NUM_FRACTIONAL) {
             return 1f;
@@ -287,11 +284,25 @@ public class CPZeroCut extends H1 {
             return 1f;
         }
         final float contribution = numericContribution(actionId, comparison);
-        if (contribution <= 0f || !isKnownInterferenceFree(actionId, conditionId, state)) {
+        if (contribution <= 0f) {
             return 1f;
         }
-        return Math.max(1f, computeNumericRepetitions(actionId, comparison, contribution, state));
+        return Math.max(1f, computeNumericRepetitions(
+                actionId, comparison, contribution, state));
     }
+
+    private void resetThresholdTraversal() {
+        System.arraycopy(
+                residualActionCosts,
+                0,
+                iterationActionCosts,
+                0,
+                residualActionCosts.length
+        );
+        Arrays.fill(thresholdBestDistance, Float.POSITIVE_INFINITY);
+        thresholdQueue.clear();
+    }
+
     public enum ZeroingMode {
         BASE,
         FLOOR,
@@ -304,7 +315,13 @@ public class CPZeroCut extends H1 {
     private final ZeroingMode zeroingMode;
     private final CrdMode causalReasoningMode;
     private final int[][] singletonConditionSets;
-    private float[] residualActionCosts;
+    private final float[] residualActionCosts;
+    private final float[] iterationActionCosts;
+    private final float[] thresholdBestDistance;
+    private final PriorityQueue<QueuedCondition> thresholdQueue;
+    private final BitSet changedActions;
+    private final IntArrayList supportStack;
+    private final BitSet visitedConditions;
 
     private record SupportEdge(int actionId, int[] supporterActions) {}
 
@@ -327,6 +344,15 @@ public class CPZeroCut extends H1 {
         this.causalReasoningMode = crdMode;
         this.preferredConditionsByAction = new int[cp.numActions()][];
         this.singletonConditionSets = new int[getTotNumberOfTerms()][];
+        this.residualActionCosts = new float[cp.actionCost().length];
+        this.iterationActionCosts = new float[cp.actionCost().length];
+        this.thresholdBestDistance = new float[getTotNumberOfTerms()];
+        this.thresholdQueue = new PriorityQueue<>(
+                Comparator.comparingDouble(QueuedCondition::distance)
+        );
+        this.changedActions = new BitSet(cp.numActions());
+        this.supportStack = new IntArrayList();
+        this.visitedConditions = new BitSet(getTotNumberOfTerms());
         for (int i = 0; i < getTotNumberOfTerms(); i++) {
             this.singletonConditionSets[i] = new int[] { i };
         }
@@ -345,7 +371,7 @@ public class CPZeroCut extends H1 {
         Arrays.fill(getConditionCost(), Float.MAX_VALUE);
         Arrays.fill(getClosed(), false);
         Arrays.fill(getConditionInit(), false);
-        nodeOf = new FibonacciHeapNode[cp.numActions()];
+        Arrays.fill(nodeOf, null);
 
         final FibonacciHeap heap = new FibonacciHeap();
         for (final int conditionId : allConditions) {
@@ -397,7 +423,7 @@ public class CPZeroCut extends H1 {
     private void propagateCostChanges(State state, BitSet changedActions) {
         final FibonacciHeap heap = new FibonacciHeap();
         Arrays.fill(getClosed(), false);
-        nodeOf = new FibonacciHeapNode[cp.numActions()];
+        Arrays.fill(nodeOf, null);
         for (int actionId = changedActions.nextSetBit(0); actionId >= 0;
              actionId = changedActions.nextSetBit(actionId + 1)) {
             for (final int conditionId : getConditionsAchievableById(actionId)) {
@@ -552,7 +578,7 @@ public class CPZeroCut extends H1 {
     @Override
     public float computeEstimate(State state) {
         float estimate = 0f;
-        residualActionCosts = Arrays.copyOf(cp.actionCost(), cp.actionCost().length);
+        System.arraycopy(cp.actionCost(), 0, residualActionCosts, 0, residualActionCosts.length);
         ensureCrdCausalAchievers(state);
         resetNumericAchieverCostCache();
         resetNumericRepetitionCache();
@@ -562,9 +588,9 @@ public class CPZeroCut extends H1 {
             return initialValue;
         }
 
-        final BitSet changedActions = new BitSet(cp.numActions());
-        final IntArrayList supportStack = new IntArrayList();
-        final BitSet visitedConditions = new BitSet(getTotNumberOfTerms());
+        changedActions.clear();
+        supportStack.clear();
+        visitedConditions.clear();
         while (true) {
             final float value = getActionHCost()[cp.goal()];
             if (value == 0f) {
