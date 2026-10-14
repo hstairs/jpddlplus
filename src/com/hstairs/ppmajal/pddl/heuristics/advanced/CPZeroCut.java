@@ -5,6 +5,9 @@ import com.hstairs.ppmajal.conditions.*;
 import com.hstairs.ppmajal.problem.State;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
+import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import org.jgrapht.util.FibonacciHeap;
 
 import java.util.*;
@@ -20,50 +23,42 @@ public class CPZeroCut extends H1 {
             State state
     ) {
         final Terminal terminal = Terminal.getTerminal(conditionId);
+        final float preconditionCost = getActionHCost()[actionId];
         if (!(terminal instanceof Comparison comparison)) {
-            return computeBaseSupporterCost(conditionId, actionId, state, true);
+            return preconditionCost + getActionCost()[actionId];
         }
 
         final float contribution = numericContribution(actionId, comparison);
-        if (contribution <= 0f) {
-            return computeBaseSupporterCost(conditionId, actionId, state, true);
+        if (contribution > 0f) {
+            return computeNumericAchieverCost(
+                    conditionId,
+                    actionId,
+                    numericEffectCost(actionId, comparison, contribution, state),
+                    state
+            );
         }
-
-        final float repetitions = computeNumericRepetitions(
-                actionId,
-                comparison,
-                contribution,
-                state
-        );
-        return computeNumericAchieverCost(
-                conditionId,
-                actionId,
-                repetitions * getActionCost()[actionId],
-                state
+        if (contribution == UNKNOWNEFFECT) {
+            return preconditionCost;
+        }
+        if (contribution == 0f) {
+            return -1f;
+        }
+        return preconditionCost + numericEffectCost(
+                actionId, comparison, contribution, state
         );
     }
 
-    private float computeBaseSupporterCost(
-            int conditionId,
-            int actionId,
-            State state,
-            boolean includeHeuristicCost
+    private float numericEffectCost(
+            int actionId, Comparison comparison, float contribution, State state
     ) {
-        final Terminal terminal = Terminal.getTerminal(conditionId);
-        float actionCost = getActionCost()[actionId];
-        final float heuristicCost = includeHeuristicCost ? getActionHCost()[actionId] : 0f;
-        if (!(terminal instanceof Comparison comparison)) {
-            return heuristicCost + actionCost;
-        }
+        return numericRepetitions(actionId, comparison, contribution, state)
+                * getActionCost()[actionId];
+    }
 
-        final float contribution = numericContribution(actionId, comparison);
-        if (contribution == UNKNOWNEFFECT) {
-            actionCost = 0f;
-        } else if (contribution == 0f) {
-            return -1f;
-        }
-        return heuristicCost + computeNumericRepetitions(
-                actionId, comparison, contribution, state) * actionCost;
+    private float numericRepetitions(
+            int actionId, Comparison comparison, float contribution, State state
+    ) {
+        return computeNumericRepetitions(actionId, comparison, contribution, state);
     }
 
     private void zeroCompleteSupportClosure(
@@ -113,12 +108,18 @@ public class CPZeroCut extends H1 {
 
     private record QueuedCondition(int conditionId, float distance) {}
 
+    private enum ThresholdReduction {
+        FULL,
+        FRACTIONAL
+    }
+
     private void zeroSupportClosureUpToThreshold(
             float threshold,
             int[] goalConditions,
             BitSet changedActions,
             BitSet visitedConditions,
-            State state
+            State state,
+            ThresholdReduction reduction
     ) {
         resetThresholdTraversal();
         final float[] iterationCosts = iterationActionCosts;
@@ -144,20 +145,30 @@ public class CPZeroCut extends H1 {
             if (conditionEdges == null) {
                 continue;
             }
-            if (distance + NUMERIC_PRECISION >= threshold) {
+            final float availableDistance = threshold - distance;
+            if (availableDistance <= NUMERIC_PRECISION) {
                 continue;
             }
             for (final SupportEdge edge : conditionEdges) {
                 final int actionId = edge.actionId();
 
-                if (residualActionCosts[actionId] != 0f) {
-                    residualActionCosts[actionId] = 0f;
+                final float actionCost = iterationCosts[actionId];
+                final float repetitions = zeroingRepetitions(
+                        actionId,
+                        conditionId,
+                        state
+                );
+                final float edgeDistance = repetitions * actionCost;
+                final float retainedCost = reduction == ThresholdReduction.FULL
+                        ? 0f
+                        : Math.max(0f, actionCost - availableDistance);
+                final float normalizedRetainedCost = retainedCost
+                        <= NUMERIC_PRECISION ? 0f : retainedCost;
+                if (normalizedRetainedCost < residualActionCosts[actionId]) {
+                    residualActionCosts[actionId] = normalizedRetainedCost;
                     changedActions.set(actionId);
                 }
 
-                final float nextDistance = distance
-                        + numericDistanceMultiplier(actionId, conditionId, state)
-                        * iterationCosts[actionId];
                 for (final int supporter : edge.supporterActions()) {
                     final int[] sourcePcf = preferredConditionsByAction[supporter];
 
@@ -165,8 +176,12 @@ public class CPZeroCut extends H1 {
                         continue;
                     }
                     final float toPush = supporter == actionId
-                            ? distance + iterationCosts[actionId]
-                            : nextDistance;
+                            ? distance + actionCost
+                            : distance + edgeDistance;
+                    if (reduction == ThresholdReduction.FRACTIONAL
+                            && toPush + NUMERIC_PRECISION > threshold) {
+                        continue;
+                    }
                     for (final int sourceCondition : sourcePcf) {
                         if (toPush + NUMERIC_PRECISION
                                 < bestDistance[sourceCondition]) {
@@ -179,98 +194,7 @@ public class CPZeroCut extends H1 {
         }
     }
 
-    /**
-     * Selectively consumes only the portion of an action cost that fits below
-     * the current threshold. The regular selective method above is left
-     * untouched so that the two policies can be compared independently.
-     */
-    private void zeroSupportClosureUpToThresholdFractional(
-            float threshold,
-            int[] goalConditions,
-            BitSet changedActions,
-            BitSet visitedConditions,
-            State state
-    ) {
-        resetThresholdTraversal();
-        final float[] iterationCosts = iterationActionCosts;
-        final float[] bestDistance = thresholdBestDistance;
-        final PriorityQueue<QueuedCondition> queue = thresholdQueue;
-        visitedConditions.clear();
-        for (final int conditionId : goalConditions) {
-            bestDistance[conditionId] = 0f;
-            queue.add(new QueuedCondition(conditionId, 0f));
-        }
-
-        while (!queue.isEmpty()) {
-            final QueuedCondition current = queue.poll();
-            final int conditionId = current.conditionId();
-            final float distance = current.distance();
-            if (visitedConditions.get(conditionId)
-                    || distance > bestDistance[conditionId] + NUMERIC_PRECISION) {
-                continue;
-            }
-            visitedConditions.set(conditionId);
-
-            final ArrayList<SupportEdge> conditionEdges =
-                    supportEdgesByCondition[conditionId];
-            if (conditionEdges == null) {
-                continue;
-            }
-            final float availableDistance = threshold - distance;
-            if (availableDistance <= NUMERIC_PRECISION) {
-                continue;
-            }
-
-            for (final SupportEdge edge : conditionEdges) {
-                final int actionId = edge.actionId();
-                final float actionCost = iterationCosts[actionId];
-                final float multiplier = numericDistanceMultiplier(
-                        actionId,
-                        conditionId,
-                        state
-                );
-                final float edgeDistance = multiplier * actionCost;
-                // The action is its own activation-floor witness.  Its
-                // largest admissible consumption is therefore one action
-                // cost, capped by the distance still available.
-                final float retainedCost = Math.max(
-                        0f,
-                        actionCost - availableDistance
-                );
-
-                final float normalizedRetainedCost = retainedCost
-                        <= NUMERIC_PRECISION ? 0f : retainedCost;
-                if (normalizedRetainedCost < residualActionCosts[actionId]) {
-                    residualActionCosts[actionId] = normalizedRetainedCost;
-                    changedActions.set(actionId);
-                }
-
-                for (final int supporter : edge.supporterActions()) {
-                    final int[] sourcePcf = preferredConditionsByAction[supporter];
-                    if (sourcePcf == null) {
-                        continue;
-                    }
-                    final float supporterDistance = distance
-                            + (supporter == actionId ? actionCost : edgeDistance);
-                    if (supporterDistance + NUMERIC_PRECISION > threshold) {
-                        continue;
-                    }
-                    for (final int sourceCondition : sourcePcf) {
-                        if (supporterDistance + NUMERIC_PRECISION
-                                < bestDistance[sourceCondition]) {
-                            bestDistance[sourceCondition] = supporterDistance;
-                            queue.add(new QueuedCondition(
-                                    sourceCondition,
-                                    supporterDistance
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private float numericDistanceMultiplier(
+    private float zeroingRepetitions(
             int actionId,
             int conditionId,
             State state
@@ -287,8 +211,7 @@ public class CPZeroCut extends H1 {
         if (contribution <= 0f) {
             return 1f;
         }
-        return Math.max(1f, computeNumericRepetitions(
-                actionId, comparison, contribution, state));
+        return Math.max(1f, numericRepetitions(actionId, comparison, contribution, state));
     }
 
     private void resetThresholdTraversal() {
@@ -327,6 +250,77 @@ public class CPZeroCut extends H1 {
 
     private ArrayList<SupportEdge>[] supportEdgesByCondition;
     private final int[][] preferredConditionsByAction;
+
+    private final Long2FloatOpenHashMap crdMinima = new Long2FloatOpenHashMap();
+    private final LongOpenHashSet crdUpdatedThisRound = new LongOpenHashSet();
+    private LongArrayList[] crdPotentialPairsBySupporter;
+    private LongArrayList[] crdActivePairsBySupporter;
+
+    private static long supportKey(int actionId, int conditionId) {
+        return ((long) actionId << 32) | (conditionId & 0xffffffffL);
+    }
+
+    private void updateCrdMinimaOnExpansion(int supporter, State state) {
+        if (causalReasoningMode == CrdMode.NONE) {
+            return;
+        }
+        final float value = getActionHCost()[supporter];
+        LongArrayList potential = crdPotentialPairsBySupporter[supporter];
+        if (potential == null) {
+            potential = new LongArrayList();
+            crdPotentialPairsBySupporter[supporter] = potential;
+            cacheCrdPotentialPairs(supporter, potential);
+        }
+        LongArrayList pairs = crdActivePairsBySupporter[supporter];
+        if (pairs == null) {
+            pairs = new LongArrayList();
+            crdActivePairsBySupporter[supporter] = pairs;
+            cacheCrdActivePairs(supporter, state, potential, pairs);
+        }
+        for (final long pair : pairs) {
+            final int actionId = (int) (pair >> 32);
+            if (!getClosed()[actionId] && crdUpdatedThisRound.add(pair)) {
+                crdMinima.put(pair, Math.min(crdMinima.getOrDefault(pair, Float.MAX_VALUE), value));
+            }
+        }
+    }
+
+    private void cacheCrdPotentialPairs(int supporter, LongArrayList pairs) {
+        for (final int actionId : reachableTransitions) {
+            for (final int conditionId : getConditionsAchievableById(actionId)) {
+                if (!(Terminal.getTerminal(conditionId) instanceof Comparison)) {
+                    continue;
+                }
+                if (potentialInterferingAchievers(actionId, conditionId).get(supporter)) {
+                    pairs.add(supportKey(actionId, conditionId));
+                }
+            }
+        }
+    }
+
+    private void cacheCrdActivePairs(
+            int supporter, State state, LongArrayList potential, LongArrayList active
+    ) {
+        if (causalReasoningMode == CrdMode.STATIC) {
+            active.addAll(potential);
+            return;
+        }
+        for (final long pair : potential) {
+            final int actionId = (int) (pair >> 32);
+            final int conditionId = (int) pair;
+            if (interferingAchievers(actionId, conditionId, state).get(supporter)) {
+                active.add(pair);
+            }
+        }
+    }
+
+    @Override
+    protected float computeCausalPreconditionCost(
+            int conditionId, int actionId, float numericEffectCost, State state
+    ) {
+        return Math.min(getActionHCost()[actionId],
+                crdMinima.getOrDefault(supportKey(actionId, conditionId), Float.MAX_VALUE));
+    }
 
     public CPZeroCut(
             PDDLProblem problem,
@@ -372,6 +366,12 @@ public class CPZeroCut extends H1 {
         Arrays.fill(getClosed(), false);
         Arrays.fill(getConditionInit(), false);
         Arrays.fill(nodeOf, null);
+        crdMinima.clear();
+        crdUpdatedThisRound.clear();
+        if (crdPotentialPairsBySupporter == null) {
+            crdPotentialPairsBySupporter = new LongArrayList[cp.numActions()];
+        }
+        crdActivePairsBySupporter = new LongArrayList[cp.numActions()];
 
         final FibonacciHeap heap = new FibonacciHeap();
         for (final int conditionId : allConditions) {
@@ -409,6 +409,7 @@ public class CPZeroCut extends H1 {
                 }
                 continue;
             }
+            updateCrdMinimaOnExpansion(actionId, state);
             for (final int conditionId : getConditionsAchievableById(actionId)) {
                 if (!getConditionInit()[conditionId]) {
                     if (!updating) {
@@ -422,6 +423,7 @@ public class CPZeroCut extends H1 {
 
     private void propagateCostChanges(State state, BitSet changedActions) {
         final FibonacciHeap heap = new FibonacciHeap();
+        crdUpdatedThisRound.clear();
         Arrays.fill(getClosed(), false);
         Arrays.fill(nodeOf, null);
         for (int actionId = changedActions.nextSetBit(0); actionId >= 0;
@@ -481,24 +483,7 @@ public class CPZeroCut extends H1 {
             return getOrCreateAchievers(conditionId).toIntArray();
         }
 
-        final BitSet filtered = interferingAchievers(
-                actionId,
-                conditionId,
-                state
-        );
-        final boolean containsAction = filtered.get(actionId);
-        final int[] supporters = new int[
-                filtered.cardinality() + (containsAction ? 0 : 1)
-        ];
-        int index = 0;
-        if (!containsAction) {
-            supporters[index++] = actionId;
-        }
-        for (int supporter = filtered.nextSetBit(0); supporter >= 0;
-             supporter = filtered.nextSetBit(supporter + 1)) {
-            supporters[index++] = supporter;
-        }
-        return supporters;
+        return interferingSupporterActions(actionId, conditionId, state);
     }
 
     protected void updateActions(final int conditionId, final FibonacciHeap heap) {
@@ -507,11 +492,10 @@ public class CPZeroCut extends H1 {
             return;
         }
         for (final int actionId : actions) {
-            final PcfChoice preferred = computePcfChoice(
-                    cp.preconditionFunction()[actionId]
-            );
-            final float value = preferred.cost();
             if (!closed[actionId] && !getActionInit()[actionId]) {
+                final float value = computePcfCost(
+                        cp.preconditionFunction()[actionId]
+                );
                 if (value <= getActionHCost()[actionId]) {
                     getActionHCost()[actionId] = value;
                     if (getNodeOf()[actionId] == null) {
@@ -525,6 +509,42 @@ public class CPZeroCut extends H1 {
     }
 
     private record PcfChoice(float cost, int[] conditions) {}
+
+    private float computePcfCost(final Condition condition) {
+        if (condition instanceof AndCond and) {
+            if (and.sons == null || and.sons.length == 0) {
+                return 0f;
+            }
+            float best = computePcfCost((Condition) and.sons[0]);
+            if (best == Float.MAX_VALUE) {
+                return best;
+            }
+            for (int i = 1; i < and.sons.length; i++) {
+                final float child = computePcfCost((Condition) and.sons[i]);
+                if (child == Float.MAX_VALUE) {
+                    return child;
+                }
+                if (child > best) {
+                    best = child;
+                }
+            }
+            return best;
+        }
+        if (condition instanceof OrCond or) {
+            if (or.sons == null || or.sons.length == 0) {
+                return 0f;
+            }
+            float best = Float.POSITIVE_INFINITY;
+            for (final var childCondition : or.sons) {
+                best = Math.min(best, computePcfCost((Condition) childCondition));
+            }
+            return best;
+        }
+        if (condition instanceof Terminal terminal) {
+            return getConditionCost()[terminal.getId()];
+        }
+        throw new RuntimeException("This is not supported:" + condition);
+    }
 
     private PcfChoice computePcfChoice(final Condition condition) {
         if (condition instanceof AndCond and) {
@@ -611,12 +631,13 @@ public class CPZeroCut extends H1 {
                         visitedConditions
                 );
             } else if (zeroingMode == ZeroingMode.NUM_FRACTIONAL) {
-                zeroSupportClosureUpToThresholdFractional(
+                zeroSupportClosureUpToThreshold(
                         value,
                         preferredConditionsByAction[cp.goal()],
                         changedActions,
                         visitedConditions,
-                        state
+                        state,
+                        ThresholdReduction.FRACTIONAL
                 );
             } else {
                 zeroSupportClosureUpToThreshold(
@@ -624,7 +645,8 @@ public class CPZeroCut extends H1 {
                         preferredConditionsByAction[cp.goal()],
                         changedActions,
                         visitedConditions,
-                        state
+                        state,
+                        ThresholdReduction.FULL
                 );
             }
 

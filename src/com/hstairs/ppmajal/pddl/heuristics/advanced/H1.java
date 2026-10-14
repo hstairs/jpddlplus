@@ -133,6 +133,7 @@ public class H1 implements SearchHeuristic {
     private CausalAchievers causalAchievers;
     private BitSet[] activeCausalAncestorsByAction;
     private final Long2ObjectOpenHashMap<BitSet> interferingAchieversCache;
+    private final Long2ObjectOpenHashMap<BitSet> potentialInterferingAchieversCache;
 
     public H1(PDDLProblem problem) {
         this(problem, true, false, false, "no", false, false, false, false, null, false, -1,false);
@@ -235,6 +236,7 @@ public class H1 implements SearchHeuristic {
         numericRepetitionCache = new Long2FloatOpenHashMap();
         numericRepetitionCache.defaultReturnValue(Float.NaN);
         interferingAchieversCache = new Long2ObjectOpenHashMap<>();
+        potentialInterferingAchieversCache = new Long2ObjectOpenHashMap<>();
         strictComparisonEpsilon = new double[totNumberOfTerms];
         Arrays.fill(strictComparisonEpsilon, Double.NaN);
         resetNumericRepetitionCache();
@@ -730,20 +732,15 @@ public class H1 implements SearchHeuristic {
             legacyEstimate = preconditionCost + numericEffectCost;
         } else if (crdMode != CrdMode.NONE && causalAchievers != null) {
             float causalPreconditionCost = actionHCost[actionId];
-            final BitSet interferingAchievers = cachedInterferingAchievers(
-                    actionId,
-                    conditionId,
-                    state
-            );
-            if (!interferingAchievers.isEmpty()) {
-                for (int interferingActionId = interferingAchievers.nextSetBit(0);
-                     interferingActionId >= 0;
-                     interferingActionId = interferingAchievers.nextSetBit(interferingActionId + 1)) {
-                    if (getActionHCost()[interferingActionId] < causalPreconditionCost) {
-                        causalPreconditionCost = getActionHCost()[interferingActionId];
-                    }
-                }
+            final float activationCost = preconditionCost + getActionCost()[actionId];
+            // Q starts at H(a) and can only decrease. Once the floor dominates,
+            // scanning more interfering achievers cannot change the result.
+            if (useNumericActivationFloor
+                    && causalPreconditionCost + numericEffectCost <= activationCost) {
+                return activationCost;
             }
+            causalPreconditionCost = computeCausalPreconditionCost(
+                    conditionId, actionId, numericEffectCost, state);
             legacyEstimate = causalPreconditionCost + numericEffectCost;
         } else {
             minAchieverPreconditionCost[conditionId] = Math.min(
@@ -755,6 +752,25 @@ public class H1 implements SearchHeuristic {
         return useNumericActivationFloor
                 ? Math.max(preconditionCost + getActionCost()[actionId], legacyEstimate)
                 : legacyEstimate;
+    }
+
+    /** Subclasses maintaining Q incrementally can replace the interference scan. */
+    protected float computeCausalPreconditionCost(
+            int conditionId, int actionId, float numericEffectCost, State state
+    ) {
+        float minimum = getActionHCost()[actionId];
+        final float activationCost = minimum + getActionCost()[actionId];
+        final BitSet interfering = cachedInterferingAchievers(actionId, conditionId, state);
+        for (int supporter = interfering.nextSetBit(0); supporter >= 0;
+             supporter = interfering.nextSetBit(supporter + 1)) {
+            if (getActionHCost()[supporter] < minimum) {
+                minimum = getActionHCost()[supporter];
+                if (useNumericActivationFloor && minimum + numericEffectCost <= activationCost) {
+                    break;
+                }
+            }
+        }
+        return minimum;
     }
 
     /**
@@ -773,10 +789,14 @@ public class H1 implements SearchHeuristic {
         if (crdMode == CrdMode.NONE) {
             return;
         }
-        interferingAchieversCache.clear();
+        // STATIC membership depends only on the already-built causal relation,
+        // not on the state or the residual costs used by cost partitioning.
+        if (crdMode == CrdMode.ONLINE) {
+            interferingAchieversCache.clear();
+        }
         if (activeCausalAncestorsByAction == null) {
             activeCausalAncestorsByAction = new BitSet[cp.numActions()];
-        } else {
+        } else if (crdMode == CrdMode.ONLINE) {
             Arrays.fill(activeCausalAncestorsByAction, null);
         }
     }
@@ -816,6 +836,53 @@ public class H1 implements SearchHeuristic {
                 conditionId,
                 state
         ).clone();
+    }
+
+    /** Returns a fresh supporter array without exposing or cloning the cached bit set. */
+    protected final int[] interferingSupporterActions(int actionId, int conditionId, State state) {
+        final BitSet filtered = cachedInterferingAchievers(actionId, conditionId, state);
+        final boolean containsAction = filtered.get(actionId);
+        final int[] supporters = new int[filtered.cardinality() + (containsAction ? 0 : 1)];
+        int index = 0;
+        if (!containsAction) {
+            supporters[index++] = actionId;
+        }
+        for (int supporter = filtered.nextSetBit(0); supporter >= 0;
+             supporter = filtered.nextSetBit(supporter + 1)) {
+            supporters[index++] = supporter;
+        }
+        return supporters;
+    }
+
+    /**
+     * State-independent CRD candidates. ONLINE later removes candidates whose
+     * causal preconditions are already true in the evaluated state.
+     */
+    protected final BitSet potentialInterferingAchievers(int actionId, int conditionId) {
+        final long key = ((long) actionId << 32) | (conditionId & 0xffffffffL);
+        final BitSet cached = potentialInterferingAchieversCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        final BitSet ancestors = new BitSet(cp.numActions());
+        for (final Condition precondition :
+                cp.preconditionFunction()[actionId].getTerminalConditionsInArray()) {
+            if (precondition instanceof Terminal terminal) {
+                final BitSet closure = causalAchievers.causalAchieversByCondition[terminal.getId()];
+                if (closure != null) {
+                    ancestors.or(closure);
+                }
+            }
+        }
+        final BitSet achievers = causalAchievers.directAchieversByCondition[conditionId];
+        if (achievers == null) {
+            ancestors.clear();
+        } else {
+            ancestors.and(achievers);
+        }
+        potentialInterferingAchieversCache.put(key, ancestors);
+        return ancestors;
     }
 
     private BitSet cachedInterferingAchievers(
