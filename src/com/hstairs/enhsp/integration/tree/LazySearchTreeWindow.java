@@ -362,7 +362,7 @@ public final class LazySearchTreeWindow {
             } catch (ClassNotFoundException ex) {
                 JOptionPane.showMessageDialog(frame,
                         "Batik libraries not found in classpath.\n"
-                                + "Add Batik jars under jar_dependencies (e.g. batik-svggen + batik-dom + dependencies) "
+                                + "Add Batik jars under lib/runtime (e.g. batik-svggen + batik-dom + dependencies) "
                                 + "and restart.\n\nDetails: " + ex.getMessage(),
                         "Save SVG (Batik)",
                         JOptionPane.ERROR_MESSAGE);

@@ -49,7 +49,7 @@ public class IDAStar extends SearchEngine {
             out.println("Initial State is not valid");
             return null;
         }
-        System.out.println(hWeigth);
+        out.println(hWeigth);
         deadEndsDetected = 0;
         long start = System.currentTimeMillis();
         Float hAtInit = h.computeEstimate(initState);

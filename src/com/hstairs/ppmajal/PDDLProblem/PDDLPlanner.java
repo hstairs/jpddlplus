@@ -31,6 +31,7 @@ public class PDDLPlanner {
     private final float boundG;
     private final boolean tunnelling;
     private SearchEngine searchEngine;
+    private PrintStream searchOutput = System.out;
     private IExternalLogger extenalLogger;
     private final long timeoutInMs;
     private final boolean iterativeOptimization;
@@ -57,7 +58,7 @@ public class PDDLPlanner {
         Map.entry(SE_INFOS[0][0], (planner, tb) -> new WAStar(planner.hWeigth, true, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[1][0], (planner, tb) -> new WAStar(planner.hWeigth, false, planner.helpfulActions, tb, planner.saveSearchSpace, planner.boundG, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[2][0], (planner, __) -> new EHS(planner.helpfulActions)),
-        Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, System.out)),
+        Map.entry(SE_INFOS[3][0], (planner, __) -> new IDAStar(planner.helpfulActions, planner.hWeigth, false, false, false, planner.searchOutput)),
         Map.entry(SE_INFOS[4][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, false, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG, false, planner.bucketBasedQueueSearch)),
         Map.entry(SE_INFOS[5][0], (planner, tb) -> new LazyWAStar(planner.hWeigth, true, planner.helpfulActions, planner.saveSearchSpace, tb, planner.boundG))
     );
@@ -133,6 +134,7 @@ public class PDDLPlanner {
     }
 
     public PDDLSolution plan(PDDLProblem p, SearchHeuristic h, PrintStream out){
+        searchOutput = out == null ? System.out : out;
         TieBreaker tb = new TieBreaker(
                 TIE_BREAKERS.getOrDefault(t, SearchEngine.TieBreaking.ARBITRARY)
         );
@@ -155,7 +157,7 @@ public class PDDLPlanner {
         searchEngine.setTimeoutInMs(timeoutInMs);
 
         searchEngine.beforeExecution();
-        final SimpleSearchNode solutionHandle = searchEngine.search(p, h, System.out);
+        final SimpleSearchNode solutionHandle = searchEngine.search(p, h, searchOutput);
         searchEngine.afterExecution();
         if (solutionHandle == null)
             return new PDDLSolution(null, null, searchEngine.getStats(), -1);

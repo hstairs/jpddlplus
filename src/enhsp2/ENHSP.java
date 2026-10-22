@@ -356,7 +356,7 @@ public class ENHSP {
         options.addOption("print_actions",false,"Print all actions after grounding");
         options.addOption("tolerance",true,"Numeric-condition tolerance (default: 0.00001)");
         options.addOption("inputplan",true,"Plan file to validate (use with -ival)");
-        options.addOption("silent",false,"Suppress planner output");
+        options.addOption("silent",false,"Suppress search output, including initial heuristic and f(n) progress lines");
         options.addOption("autoanytime",false,"Enable automatic anytime mode");
         options.addOption("uch",false,"Treat all actions as unit cost in the heuristic");
         options.addOption("with_posthoc_logger", true, "Write posthoc logs to this file");

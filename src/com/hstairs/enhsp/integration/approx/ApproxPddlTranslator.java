@@ -265,6 +265,15 @@ public final class ApproxPddlTranslator {
             }
             return "(decrease " + ensureFunctionLike(lhs) + " " + rhs + ")";
         }
+        if ("*=".equals(cmp.op) || "/=".equals(cmp.op)) {
+            String lhs = toPddlExpression(cmp.left);
+            String rhs = toPddlExpression(cmp.right);
+            if (lhs == null || rhs == null) {
+                return null;
+            }
+            String effect = "*=".equals(cmp.op) ? "scale-up" : "scale-down";
+            return "(" + effect + " " + ensureFunctionLike(lhs) + " " + rhs + ")";
+        }
         String lhs = toPddlExpression(cmp.left);
         String rhs = toPddlExpression(cmp.right);
         if (lhs == null || rhs == null) {
@@ -296,7 +305,26 @@ public final class ApproxPddlTranslator {
         if (increase != null) return "(increase " + lhs + " " + increase + ")";
         String decrease = detectDecrease(lhs, rhs);
         if (decrease != null) return "(decrease " + lhs + " " + decrease + ")";
+        String scaleUp = detectScaleUp(lhs, rhs);
+        if (scaleUp != null) return "(scale-up " + lhs + " " + scaleUp + ")";
+        String scaleDown = detectScaleDown(lhs, rhs);
+        if (scaleDown != null) return "(scale-down " + lhs + " " + scaleDown + ")";
         return "(assign " + lhs + " " + rhs + ")";
+    }
+
+    private static String detectScaleUp(String lhs, String rhs) {
+        String[] parts = splitBinaryPrefix(rhs, "*");
+        if (parts == null) return null;
+        if (sameExpr(parts[0], lhs) && !containsExpr(parts[1], lhs)) return parts[1];
+        if (sameExpr(parts[1], lhs) && !containsExpr(parts[0], lhs)) return parts[0];
+        return null;
+    }
+
+    private static String detectScaleDown(String lhs, String rhs) {
+        String[] parts = splitBinaryPrefix(rhs, "/");
+        if (parts == null) return null;
+        if (sameExpr(parts[0], lhs) && !containsExpr(parts[1], lhs)) return parts[1];
+        return null;
     }
 
     private static String detectIncrease(String lhs, String rhs) {
@@ -387,7 +415,8 @@ public final class ApproxPddlTranslator {
             if (depth != 0) continue;
             if (i + 1 < s.length()) {
                 String two = s.substring(i, i + 2);
-                if ("<=".equals(two) || ">=".equals(two) || "+=".equals(two) || "-=".equals(two)) {
+                if ("<=".equals(two) || ">=".equals(two) || "+=".equals(two)
+                        || "-=".equals(two) || "*=".equals(two) || "/=".equals(two)) {
                     return new ComparisonSplit(s.substring(0, i), two, s.substring(i + 2));
                 }
             }

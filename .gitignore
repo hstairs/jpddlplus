@@ -7,3 +7,60 @@
 *.log
 *.tmp
 .DS_Store
+
+# Local workspace organization and independent repositories.
+/archive/
+/README_LOCAL.md
+/rust-port/
+/slurm_experiments/
+/subgoaling_revisit_paper/
+
+# Generated distributions and temporary build/test products.
+/enhsp25.jar
+/enhsp25-gui.jar
+/*.iml
+__pycache__/
+*.py[cod]
+
+# Local agent/plugin tooling and post-IPC research data.
+/codex-plugins/
+/post-ipc26-domains/
+
+# Detailed research campaigns and generated evidence stay in the workspace.
+/tests/benchmarks/*
+/tests/research/
+/tests/tools/
+
+# Keep only PDDL fixtures referenced by the committed Java regression suite.
+/tests/fixtures/pddl/*
+!/tests/fixtures/pddl/counterexamplehmax/
+!/tests/fixtures/pddl/cpzero_and_pcf/
+!/tests/fixtures/pddl/cpzero_hypergraph_interference/
+!/tests/fixtures/pddl/cpzero_numfrac_repetition_counterexample/
+!/tests/fixtures/pddl/cpzero_selective/
+!/tests/fixtures/pddl/cpzero_selective_numeric/
+!/tests/fixtures/pddl/cpzero_selective_numeric_interference/
+!/tests/fixtures/pddl/disjunctive_pcf_inadmissibility/
+!/tests/fixtures/pddl/h1dec_ssnp_state_reset/
+!/tests/fixtures/pddl/iterative_optimization/
+!/tests/fixtures/pddl/lmcut_dominance_counterexample/
+!/tests/fixtures/pddl/lmcut_duplicate_action/
+!/tests/fixtures/pddl/ssnp_aware_twist/
+!/tests/fixtures/pddl/ssnp_local_interference/
+!/tests/fixtures/pddl/ssnp_state_interference/
+
+# Draft examples and generated planner output retained locally.
+/examples/iterative_minimization/
+/examples/iterative_optimization/
+/examples/iterative_pddlplus/
+/examples/pddl+/muise_domain/
+/examples/pddl+/car_non_linear/instances/*_search_*.npt
+# Preserve the previously tracked sailing counterexample at its new location.
+!/tests/benchmarks/sailing-numfract-counterexample/
+!/tests/benchmarks/sailing-numfract-counterexample/**
+
+# Local design note and generated parser copies; canonical parser sources live in src/.
+/docs/web-ui-refactor-plan.md
+/grammar/Pddl.tokens
+/grammar/PddlLexer.java
+/grammar/PddlParser.java

@@ -1,0 +1,9 @@
+services:
+  enhsp:
+    image: enhsp25:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /work
+    volumes:
+      - ./:/work

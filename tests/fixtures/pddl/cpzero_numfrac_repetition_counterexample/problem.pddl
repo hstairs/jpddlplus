@@ -1,0 +1,5 @@
+(define (problem p)
+  (:domain cpzero-numfrac-repetition-counterexample)
+  (:init (= (x) 0))
+  (:goal (>= (x) 2))
+  (:metric minimize (cost)))
