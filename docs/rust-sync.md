@@ -33,6 +33,7 @@ coverage, not a claim that all implementations have identical behavior.
 | RUST-002 | Complete H1 parity: numeric HAdd/HMax/HMRP, switches, extraction and applicable Java preprocessing | Differential initial/intermediate estimates and matching plan behavior on representative domains |
 | RUST-003 | Expand search/CLI coverage and document tie behavior | Differential traces and explicit supported-option registry |
 | RUST-004 | Expand regression/performance coverage beyond blind counters | Multiple numeric, propositional and PDDL+ cases with reproducible time, memory and correctness measurements |
+| RUST-005 | Port two-objective metric parsing and BOA* Pareto search from `grammar/Pddl.g`, `src/com/hstairs/ppmajal/PDDLProblem/`, `src/com/hstairs/ppmajal/search/BOAStar.java`, and `src/enhsp2/ENHSP.java` to `src/parser.rs`, `src/model.rs`, `src/search.rs`, and `src/main.rs`. The transitional Rust checkout has no BOA* implementation. | On `tests/fixtures/pddl/boastar/{domain,problem}.pddl`, `java -jar enhsp25.jar -o tests/fixtures/pddl/boastar/domain.pddl -f tests/fixtures/pddl/boastar/problem.pddl -s boa -h blind` returns exactly the non-dominated cost pairs (1,5) and (5,1), excluding (6,6); verify matching Rust plans and costs before closing. |
 | JAVA-001 | Wire supplied-plan validation into the Java CLI or revise its advertised `-ival`/`-inputplan` interface | A regression must check the supplied file, reject an invalid plan and avoid silently performing a new search; assess the Rust counterpart when implemented |
 
 Baseline noted on 2026-10-22: Java HEAD

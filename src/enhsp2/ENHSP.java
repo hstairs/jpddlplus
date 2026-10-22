@@ -664,12 +664,7 @@ public class ENHSP {
     }
 
     private SearchHeuristic createHeuristic() {
-        if(novelty!=null){
-            SearchHeuristic h_temp = PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions, unitCostHeuristic, linearEffectsAbstraction, false);
-            return PDDLNovelyHeuristic.getNoveltyHeuristic(novelty, heuristicProblem, k_nov, h_temp);
-        } else {
-            return PDDLHeuristic.getHeuristic(heuristic, heuristicProblem, redundantConstraints, helpfulActions, helpfulTransitions, unitCostHeuristic || ignoreMetric, linearEffectsAbstraction, aibrDebug);
-        }
+        return iterativeHeuristicFactory().apply(heuristicProblem);
     }
 
     private void setHeuristic() {

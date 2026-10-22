@@ -1,0 +1,6 @@
+(define (problem boa-tradeoff-instance)
+  (:domain boa-tradeoff)
+  (:init (= (cost1) 0) (= (cost2) 0))
+  (:goal (done))
+  (:metric minimize (cost1) (cost2))
+)

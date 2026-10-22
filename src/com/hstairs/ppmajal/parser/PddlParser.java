@@ -10500,8 +10500,10 @@ public class PddlParser extends Parser {
 				{
 				Object root_1 = (Object)adaptor.nil();
 				root_1 = (Object)adaptor.becomeRoot((Object)adaptor.create(OBJECTS, "OBJECTS"), root_1);
-				adaptor.addChild(root_1, stream_typedNameList.nextTree());
-				adaptor.addChild(root_0, root_1);
+				if (stream_typedNameList.hasNext()) {
+					adaptor.addChild(root_1, stream_typedNameList.nextTree());
+					adaptor.addChild(root_0, root_1);
+				}
 				}
 
 			}
